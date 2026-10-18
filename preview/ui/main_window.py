@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import (
     QAction, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
-    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent
+    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap
 )
 from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
