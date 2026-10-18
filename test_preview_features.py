@@ -11,7 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PIL import Image
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QLabel
 from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtCore import QPointF, QRectF
 
@@ -386,5 +386,47 @@ class TestPreviewParity(unittest.TestCase):
         self.assertFalse(win.slideshow_hud.isVisible())
         win.close()
 
+    def test_22_updater_version_parsing(self):
+        from preview.core.updater import parse_version
+        self.assertEqual(parse_version("1.1.1"), (1, 1, 1))
+        self.assertEqual(parse_version("v1.2.0"), (1, 2, 0))
+        self.assertGreater(parse_version("v1.2.0"), parse_version("v1.1.1"))
+        self.assertGreater(parse_version("2.0.0"), parse_version("1.9.9"))
+        self.assertEqual(parse_version("invalid"), (0,))
+
+    def test_23_update_dialog_and_banner_ui(self):
+        from preview.core.updater import UpdateInfo
+        from preview.ui.update_dialog import UpdateDialog, UpdateBanner
+        info = UpdateInfo(
+            version="1.2.0",
+            tag_name="v1.2.0",
+            title="Preview 1.2.0",
+            body="### What's New\n- Awesome new feature\n- Bug fixes",
+            html_url="https://github.com/shivamprasad1001/previewmacos/releases/tag/v1.2.0",
+            deb_url="https://example.com/preview.deb",
+            exe_url="https://example.com/preview.exe"
+        )
+        self.assertEqual(info.version, "1.2.0")
+        
+        # Test Dialog instantiation
+        dlg = UpdateDialog(info, current_version="1.1.1")
+        self.assertIsNotNone(dlg.notes_browser)
+        self.assertTrue(dlg.auto_check_cb.isChecked())
+        dlg.close()
+
+        # Test Banner instantiation
+        banner = UpdateBanner(info)
+        labels_text = " ".join(lbl.text() for lbl in banner.findChildren(QLabel))
+        self.assertIn("1.2.0", labels_text)
+        banner.close()
+
+    def test_24_main_window_update_integration(self):
+        win = MacMainWindow(initial_file=self.test_img_path)
+        self.assertTrue(hasattr(win, "_check_for_updates_manual"))
+        self.assertTrue(hasattr(win, "_check_for_updates_startup"))
+        self.assertTrue(hasattr(win, "_start_update_check"))
+        win.close()
+
 if __name__ == "__main__":
     unittest.main()
+

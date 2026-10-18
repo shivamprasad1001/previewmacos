@@ -33,6 +33,8 @@ from preview.ui.signature_dialog import SignatureDialog
 from preview.ui.inspector_dialog import InspectorDialog
 from preview.ui.about_dialog import AboutDialog
 from preview.ui.export_dialog import MacExportDialog
+from preview.core.updater import UpdateCheckWorker, UpdateInfo
+from preview.ui.update_dialog import UpdateDialog, UpdateBanner
 
 class FloatingStatusPill(QWidget):
     """Small floating pill displaying page and zoom info at bottom center of canvas, fading after 2s."""
@@ -397,6 +399,8 @@ class MacMainWindow(QMainWindow):
         self.is_frameless: bool = True
         self._last_sidebar_width: int = 190
         self._sidebar_anim: Optional[QVariantAnimation] = None
+        self._update_worker: Optional[UpdateCheckWorker] = None
+        self.update_banner: Optional[UpdateBanner] = None
 
         # Listen for system theme changes
         app = QApplication.instance()
@@ -412,6 +416,9 @@ class MacMainWindow(QMainWindow):
         self._setup_ui()
         self._setup_menus()
         self._apply_theme(self.current_theme, animate=False)
+
+        # Background update check on startup (delayed 2.5s)
+        QTimer.singleShot(2500, self._check_for_updates_startup)
 
         target = initial_target or initial_file
         if target:
@@ -737,6 +744,10 @@ class MacMainWindow(QMainWindow):
         about_act.triggered.connect(self._show_about)
         self.logo_menu.addAction(about_act)
 
+        check_updates_act = QAction("Check for Updates...", self)
+        check_updates_act.triggered.connect(self._check_for_updates_manual)
+        self.logo_menu.addAction(check_updates_act)
+
         self.logo_menu.addSeparator()
 
         theme_act = QAction("Toggle Dark/Light Mode", self)
@@ -973,6 +984,12 @@ class MacMainWindow(QMainWindow):
 
         # 8. Help Menu
         self.help_menu = self.top_menubar.addMenu("Help")
+        check_up_h_act = QAction("Check for Updates...", self)
+        check_up_h_act.triggered.connect(self._check_for_updates_manual)
+        self.help_menu.addAction(check_up_h_act)
+
+        self.help_menu.addSeparator()
+
         about_h_act = QAction("About Document Viewer", self)
         about_h_act.triggered.connect(self._show_about)
         self.help_menu.addAction(about_h_act)
@@ -984,7 +1001,7 @@ class MacMainWindow(QMainWindow):
                   frameless_act, actual_size, zoom_to_fit, zoom_in_act, zoom_out_act, next_act,
                   prev_act, first_act, last_act, markup_act, loupe_act, crop_act, rot_l_act,
                   rot_r_act, color_act, size_act, insp_act, min_act, zoom_win_act, theme_act,
-                  quit_act, pref_act, hide_act]:
+                  quit_act, pref_act, hide_act, check_updates_act, check_up_h_act]:
             self.addAction(a)
 
     def _toggle_menu_bar(self, checked: bool):
@@ -1772,3 +1789,99 @@ class MacMainWindow(QMainWindow):
             self.open_file(paths[0])
         else:
             self.open_files(paths)
+
+    # --- Software Update Checks ---
+    def _check_for_updates_startup(self):
+        """Non-blocking background check for new versions on launch."""
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        auto_check = settings.value("check_updates_on_startup", True, type=bool)
+        if not auto_check:
+            return
+
+        import time
+        last_check = settings.value("last_update_check_time", 0.0, type=float)
+        now = time.time()
+        # Check at most once every 24 hours automatically
+        if now - last_check < 86400:
+            return
+
+        self._start_update_check(is_manual=False)
+
+    def _check_for_updates_manual(self):
+        """User-initiated manual update check with visual progress feedback."""
+        self._show_status("Checking for updates...", 3000)
+        self._start_update_check(is_manual=True)
+
+    def _start_update_check(self, is_manual: bool = False):
+        if self._update_worker and self._update_worker.isRunning():
+            return
+
+        from preview import __version__
+        self._update_worker = UpdateCheckWorker(current_version=__version__, is_manual=is_manual, parent=self)
+        if is_manual:
+            self._update_worker.update_available.connect(self._show_update_dialog)
+            self._update_worker.no_update_available.connect(self._on_no_update_manual)
+            self._update_worker.check_failed.connect(self._on_update_check_failed_manual)
+        else:
+            self._update_worker.update_available.connect(self._on_update_available_startup)
+
+        self._update_worker.start()
+
+    def _on_update_available_startup(self, update_info: UpdateInfo):
+        """Displays non-intrusive in-app banner when background check finds an update."""
+        import time
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        settings.setValue("last_update_check_time", time.time())
+
+        # If user marked this specific version as skipped, honor their preference
+        skipped = settings.value("skipped_version", "", type=str)
+        if skipped == update_info.version:
+            return
+
+        if not self.update_banner:
+            self.update_banner = UpdateBanner(update_info, self)
+            self.update_banner.view_requested.connect(lambda: self._show_update_dialog(update_info))
+            # Insert above the splitter
+            idx = self.main_layout.indexOf(self.splitter)
+            if idx >= 0:
+                self.main_layout.insertWidget(idx, self.update_banner)
+            else:
+                self.main_layout.addWidget(self.update_banner)
+        else:
+            self.update_banner.setVisible(True)
+
+    def _show_update_dialog(self, update_info: UpdateInfo):
+        """Opens macOS Sparkle style software update sheet."""
+        if self.update_banner:
+            self.update_banner.setVisible(False)
+        from preview import __version__
+        dlg = UpdateDialog(update_info, current_version=__version__, parent=self)
+        dlg.exec()
+
+    def _on_no_update_manual(self, current_ver: str):
+        """Shows informative dialog confirming the user has the newest version."""
+        import time
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        settings.setValue("last_update_check_time", time.time())
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Software Update")
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "icon.png")
+        if os.path.exists(icon_path):
+            msg.setIconPixmap(QPixmap(icon_path).scaled(54, 54, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        else:
+            msg.setIcon(QMessageBox.Icon.Information)
+        msg.setText("<h3>You're up to date!</h3>")
+        msg.setInformativeText(f"Preview {current_ver} is currently the newest version available.")
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()
+
+    def _on_update_check_failed_manual(self, err: str):
+        """Shows warning dialog when manual update check fails."""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Software Update")
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setText("<h3>Unable to Check for Updates</h3>")
+        msg.setInformativeText(f"Could not connect to the update server:\n{err}\n\nPlease check your internet connection and try again.")
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()

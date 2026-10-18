@@ -49,6 +49,24 @@ class AboutDialog(QDialog):
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version_label)
 
+        check_updates_btn = QPushButton("Check for Updates...")
+        check_updates_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        check_updates_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(128, 128, 128, 0.12);
+                border: 1px solid rgba(128, 128, 128, 0.25);
+                border-radius: 5px;
+                padding: 3px 12px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background: rgba(128, 128, 128, 0.22);
+            }
+        """)
+        check_updates_btn.clicked.connect(self._on_check_updates_clicked)
+        layout.addWidget(check_updates_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
         layout.addSpacing(6)
 
         # 3. Developer & Attribution Card
@@ -83,3 +101,9 @@ class AboutDialog(QDialog):
         close_btn.setStyleSheet("background-color: #0a84ff; color: white; padding: 5px 16px; border-radius: 6px; font-weight: 600;")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def _on_check_updates_clicked(self):
+        parent = self.parent()
+        self.accept()
+        if parent and hasattr(parent, "_check_for_updates_manual"):
+            parent._check_for_updates_manual()
