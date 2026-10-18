@@ -1734,8 +1734,8 @@ class MacMainWindow(QMainWindow):
             self.page_badge.setVisible(False)
             self.toolbar_widget.update_title_geometry()
 
-    def _show_status(self, msg: str):
-        self.status_bar.showMessage(msg, 4000)
+    def _show_status(self, msg: str, timeout: int = 4000):
+        self.status_bar.showMessage(msg, timeout)
         if hasattr(self, "floating_pill") and self.floating_pill:
             self.floating_pill.show_status(msg)
 
