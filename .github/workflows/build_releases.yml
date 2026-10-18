@@ -26,7 +26,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev libgl1-mesa-glx
+          sudo apt-get install -y dpkg-dev libgl1 libegl1
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pyinstaller
 
