@@ -79,10 +79,10 @@ python3 main.py [optional_path]
 ## 📦 Installable Packages (Linux & Windows)
 
 ### 🐧 Linux Installation (.deb)
-A pre-built Debian package is located in `dist/preview-app_1.1.0_amd64.deb`.
+A pre-built Debian package is located in `dist/preview-app_1.2.1_amd64.deb`.
 To install it on Debian, Ubuntu, Kali, Linux Mint, or Pop!_OS:
 ```bash
-sudo dpkg -i dist/preview-app_1.1.0_amd64.deb
+sudo dpkg -i dist/preview-app_1.2.1_amd64.deb
 ```
 Or rebuild the `.deb` package anytime with a single command:
 ```bash
@@ -94,7 +94,7 @@ Or rebuild the `.deb` package anytime with a single command:
    ```cmd
    windows\build_win.bat
    ```
-2. Compile `windows\setup.iss` with [Inno Setup](https://jrsoftware.org/isdl.php) to generate `dist\Preview-Setup-v1.1.0.exe`.
+2. Compile `windows\setup.iss` with [Inno Setup](https://jrsoftware.org/isdl.php) to generate `dist\Preview-Setup-v1.2.1.exe`.
 3. Automated GitHub Actions will also build both `.deb` and Windows `.exe` installers automatically on push.
 
 ---

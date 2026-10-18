@@ -119,18 +119,23 @@ class TestPreviewParity(unittest.TestCase):
         self.assertEqual(val, [1])
 
     def test_07_about_dialog_attribution(self):
+        from preview import __version__
         about = AboutDialog()
-        # Verify developer and powered by mentions
+        # Verify developer, powered by mentions, and dynamic version
         found_developer = False
         found_trivilabs = False
+        found_version = False
         for child in about.findChildren(object):
             text = getattr(child, "text", lambda: "")()
             if "Shivam Prasad" in text:
                 found_developer = True
             if "TriviLabs.in" in text or "trivilabs.in" in text:
                 found_trivilabs = True
+            if f"Version {__version__}" in text:
+                found_version = True
         self.assertTrue(found_developer, "Developer 'Shivam Prasad' must be present in About dialog")
         self.assertTrue(found_trivilabs, "Powered by 'TriviLabs.in' must be present in About dialog")
+        self.assertTrue(found_version, f"Version {__version__} must be present in About dialog")
 
     def test_08_main_window_layout_and_toolbar_height(self):
         win = MacMainWindow(initial_file=self.test_img_path)

@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 
+from preview import __version__
+
 class AboutDialog(QDialog):
     """Apple macOS styled 'About Preview' dialog."""
 
@@ -44,7 +46,7 @@ class AboutDialog(QDialog):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
-        version_label = QLabel("Version 1.2.0 (Multiplatform Edition)")
+        version_label = QLabel(f"Version {__version__} (Multiplatform Edition)")
         version_label.setStyleSheet("font-size: 12px; color: #8e8e93;")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version_label)
