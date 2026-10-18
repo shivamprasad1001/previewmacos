@@ -274,15 +274,21 @@ class MarkupToolbar(QWidget):
         pix.fill(Qt.GlobalColor.transparent)
         p = QPainter(pix)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        if color.alpha() == 0:
-            # Draw red diagonal slash for transparent
-            p.setPen(QPen(QColor("#ff3b30"), 1.8))
-            p.drawEllipse(1, 1, 16, 16)
-            p.drawLine(3, 15, 15, 3)
+        if not is_fill:
+            # Stroke / Border color button: hollow rounded square with distinct colored border
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(color, 2.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            p.drawRoundedRect(2, 2, 14, 14, 3, 3)
         else:
-            p.setBrush(QBrush(color))
-            p.setPen(QPen(QColor(255, 255, 255, 160), 1))
-            p.drawRoundedRect(1, 1, 16, 16, 4, 4)
+            if color.alpha() == 0:
+                # Draw red diagonal slash for transparent (No Fill)
+                p.setPen(QPen(QColor("#ff3b30"), 1.8))
+                p.drawEllipse(1, 1, 16, 16)
+                p.drawLine(3, 15, 15, 3)
+            else:
+                p.setBrush(QBrush(color))
+                p.setPen(QPen(QColor(255, 255, 255, 160), 1))
+                p.drawRoundedRect(1, 1, 16, 16, 4, 4)
         p.end()
         btn.setIcon(QIcon(pix))
 

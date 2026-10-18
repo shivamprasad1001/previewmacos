@@ -145,99 +145,175 @@ class MacIconFactory:
 
     @staticmethod
     def _draw_markup(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # macOS classic pencil in circle
+        # macOS classic Markup icon: Apple Pencil / Stylus tip inside circle
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        p_circ = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p_circ)
         painter.drawEllipse(r)
-        # Angled pencil
-        p1 = QPointF(r.left() + r.width() * 0.3, r.bottom() - r.height() * 0.3)
-        p2 = QPointF(r.right() - r.width() * 0.3, r.top() + r.height() * 0.3)
-        painter.drawLine(p1, p2)
-        # Tip
-        p_tip = QPointF(r.left() + r.width() * 0.24, r.bottom() - r.height() * 0.24)
-        painter.drawLine(p1, p_tip)
+        
+        # Angled stylus inside circle
+        tip = QPointF(r.left() + r.width() * 0.32, r.bottom() - r.height() * 0.32)
+        top = QPointF(r.right() - r.width() * 0.30, r.top() + r.height() * 0.30)
+        
+        painter.setPen(QPen(color, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(tip, top)
+        painter.setPen(QPen(color, 1.2))
+        painter.drawPoint(QPointF(tip.x() - 1.5, tip.y() + 1.5))
 
     @staticmethod
     def _draw_select(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Dashed marquee box
-        dash_pen = QPen(pen)
-        dash_pen.setStyle(Qt.PenStyle.DashLine)
-        dash_pen.setDashPattern([3, 2])
+        # Marquee selection box with 4 corner anchor handles
+        dash_pen = QPen(color, 1.2, Qt.PenStyle.CustomDashLine, Qt.PenCapStyle.FlatCap)
+        dash_pen.setDashPattern([2.5, 2.0])
         painter.setPen(dash_pen)
-        painter.drawRect(r)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        inner = r.adjusted(1.5, 1.5, -1.5, -1.5)
+        painter.drawRect(inner)
+        
+        # 4 solid corner grab handles
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(color))
+        hs = 2.5
+        for pt in [inner.topLeft(), inner.topRight(), inner.bottomLeft(), inner.bottomRight()]:
+            painter.drawRect(QRectF(pt.x() - hs/2, pt.y() - hs/2, hs, hs))
 
     @staticmethod
     def _draw_pen(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Pen nib angled
+        # Apple Pencil / Stylus angled with drawing stroke
+        p = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        
         path = QPainterPath()
-        top_pt = QPointF(r.right() - 2, r.top() + 2)
-        tip_pt = QPointF(r.left() + 2, r.bottom() - 2)
-        path.moveTo(top_pt)
-        path.lineTo(r.right() - 6, r.top() + 2)
-        path.lineTo(tip_pt)
-        path.lineTo(r.right() - 2, r.top() + 6)
+        tip = QPointF(r.left() + r.width() * 0.25, r.bottom() - r.height() * 0.25)
+        path.moveTo(tip)
+        path.lineTo(r.left() + r.width() * 0.15, r.bottom() - r.height() * 0.40)
+        path.lineTo(r.right() - 4, r.top() + 1)
+        path.lineTo(r.right() - 1, r.top() + 4)
+        path.lineTo(r.left() + r.width() * 0.40, r.bottom() - r.height() * 0.15)
         path.closeSubpath()
         painter.drawPath(path)
-        painter.drawLine(tip_pt, QPointF(r.left() + 7, r.bottom() - 7))
+        
+        # Scribble wave under tip
+        wave = QPainterPath()
+        wave.moveTo(r.left(), r.bottom())
+        wave.quadTo(r.left() + r.width() * 0.2, r.bottom() - 4, r.left() + r.width() * 0.45, r.bottom() - 1)
+        painter.drawPath(wave)
 
     @staticmethod
     def _draw_highlighter(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Marker / Highlighter angled with chisel tip
+        # Chisel-tip marker with broad highlight bar
+        p = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        
+        w, h = r.width(), r.height()
         path = QPainterPath()
-        path.moveTo(r.left() + 3, r.bottom() - 3)
-        path.lineTo(r.left() + 8, r.bottom() - 3)
-        path.lineTo(r.right() - 3, r.top() + 8)
-        path.lineTo(r.right() - 8, r.top() + 3)
+        path.moveTo(r.left() + w * 0.15, r.bottom() - h * 0.35)
+        path.lineTo(r.left() + w * 0.35, r.bottom() - h * 0.15)
+        path.lineTo(r.right() - 1, r.top() + h * 0.35)
+        path.lineTo(r.right() - w * 0.35, r.top() + 1)
         path.closeSubpath()
         painter.drawPath(path)
+        painter.drawLine(QPointF(r.left() + w * 0.25, r.bottom() - h * 0.45), QPointF(r.left() + w * 0.45, r.bottom() - h * 0.25))
+        
+        # Wide highlight stripe at bottom
+        hl_pen = QPen(color, 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(hl_pen)
+        painter.drawLine(QPointF(r.left() + 1, r.bottom() - 1), QPointF(r.right() - 1, r.bottom() - 1))
 
     @staticmethod
     def _draw_shapes(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Overlapping square and circle
-        r_box = QRectF(r.left(), r.top() + r.height()*0.25, r.width()*0.55, r.height()*0.55)
-        painter.drawRoundedRect(r_box, 2, 2)
-        r_circ = QRectF(r.left() + r.width()*0.35, r.top(), r.width()*0.55, r.height()*0.55)
-        painter.drawEllipse(r_circ)
+        # Crisp distinct circle overlapping a sharp square
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        p = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p)
+        # Circle top-left
+        c_sz = r.width() * 0.56
+        painter.drawEllipse(QRectF(r.left(), r.top(), c_sz, c_sz))
+        # Square bottom-right
+        s_sz = r.width() * 0.52
+        painter.drawRect(QRectF(r.right() - s_sz, r.bottom() - s_sz, s_sz, s_sz))
 
     @staticmethod
     def _draw_text(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Capital 'A' or 'T' symbol
-        font = QFont("-apple-system", int(r.height() * 0.9), QFont.Weight.Bold)
+        # Universal 'T' in a subtle dashed text frame
+        p = QPen(color, 1.0, Qt.PenStyle.DashLine)
+        p.setDashPattern([2, 2])
+        painter.setPen(p)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(r, 2, 2)
+        
+        font = QFont("-apple-system", int(r.height() * 0.72), QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(QPen(color))
-        painter.drawText(r, Qt.AlignmentFlag.AlignCenter, "A")
+        painter.drawText(r, Qt.AlignmentFlag.AlignCenter, "T")
 
     @staticmethod
     def _draw_note(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Sticky note with folded corner
+        # Square Post-It Note with curled bottom corner & ruled lines
+        p = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        
+        fold = r.width() * 0.28
         path = QPainterPath()
-        fold = r.width() * 0.3
         path.moveTo(r.left(), r.top())
-        path.lineTo(r.right() - fold, r.top())
-        path.lineTo(r.right(), r.top() + fold)
-        path.lineTo(r.right(), r.bottom())
+        path.lineTo(r.right(), r.top())
+        path.lineTo(r.right(), r.bottom() - fold)
+        path.lineTo(r.right() - fold, r.bottom())
         path.lineTo(r.left(), r.bottom())
         path.closeSubpath()
         painter.drawPath(path)
-        # Fold lines
-        painter.drawLine(QPointF(r.right() - fold, r.top()), QPointF(r.right() - fold, r.top() + fold))
-        painter.drawLine(QPointF(r.right() - fold, r.top() + fold), QPointF(r.right(), r.top() + fold))
+        
+        painter.drawLine(QPointF(r.right() - fold, r.bottom()), QPointF(r.right() - fold, r.bottom() - fold))
+        painter.drawLine(QPointF(r.right() - fold, r.bottom() - fold), QPointF(r.right(), r.bottom() - fold))
+        
+        line_pen = QPen(color, 1.0)
+        painter.setPen(line_pen)
+        y1 = r.top() + r.height() * 0.32
+        y2 = r.top() + r.height() * 0.58
+        painter.drawLine(QPointF(r.left() + 3, y1), QPointF(r.right() - 3, y1))
+        painter.drawLine(QPointF(r.left() + 3, y2), QPointF(r.right() - fold - 1, y2))
 
     @staticmethod
     def _draw_sign(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Cursive signature stroke line
-        path = QPainterPath()
-        path.moveTo(r.left(), r.top() + r.height() * 0.6)
-        path.quadTo(r.left() + r.width()*0.2, r.top(), r.left() + r.width()*0.4, r.top() + r.height()*0.5)
-        path.quadTo(r.left() + r.width()*0.6, r.bottom(), r.left() + r.width()*0.8, r.top() + r.height()*0.4)
-        path.lineTo(r.right(), r.bottom() - 2)
-        painter.drawPath(path)
+        # Fountain pen writing a signature on a baseline
+        w, h = r.width(), r.height()
+        p_base = QPen(color, 1.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p_base)
+        painter.drawLine(QPointF(r.left(), r.bottom() - 1), QPointF(r.right(), r.bottom() - 1))
+        
+        sig = QPainterPath()
+        sig.moveTo(r.left() + 2, r.bottom() - 3)
+        sig.quadTo(r.left() + w * 0.25, r.top() + h * 0.35, r.left() + w * 0.45, r.bottom() - 4)
+        sig.quadTo(r.left() + w * 0.62, r.top() + h * 0.55, r.left() + w * 0.72, r.top() + h * 0.42)
+        p_sig = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(p_sig)
+        painter.drawPath(sig)
+        
+        tip = QPointF(r.left() + w * 0.72, r.top() + h * 0.42)
+        nib = QPainterPath()
+        nib.moveTo(tip)
+        nib.lineTo(tip.x() - 1.5, tip.y() - 4.5)
+        nib.lineTo(tip.x() + 2.5, tip.y() - 8.5)
+        nib.lineTo(tip.x() + 5.5, tip.y() - 5.5)
+        nib.lineTo(tip.x() + 1.5, tip.y() - 1.5)
+        nib.closeSubpath()
+        painter.setBrush(QBrush(color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPath(nib)
 
     @staticmethod
     def _draw_crop(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Intersecting crop angle marks
-        painter.drawLine(QPointF(r.left() + 4, r.top()), QPointF(r.left() + 4, r.bottom() - 4))
-        painter.drawLine(QPointF(r.left(), r.top() + 4), QPointF(r.right() - 4, r.top() + 4))
-        painter.drawLine(QPointF(r.right() - 4, r.top() + 4), QPointF(r.right() - 4, r.bottom()))
-        painter.drawLine(QPointF(r.left() + 4, r.bottom() - 4), QPointF(r.right(), r.bottom() - 4))
+        # Photography framing crop blades
+        m = r.width() * 0.22
+        p = QPen(color, 1.6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap)
+        painter.setPen(p)
+        painter.drawLine(QPointF(r.left() + m, r.top()), QPointF(r.left() + m, r.bottom() - m))
+        painter.drawLine(QPointF(r.left(), r.top() + m), QPointF(r.right() - m, r.top() + m))
+        painter.drawLine(QPointF(r.right() - m, r.top() + m), QPointF(r.right() - m, r.bottom()))
+        painter.drawLine(QPointF(r.left() + m, r.bottom() - m), QPointF(r.right(), r.bottom() - m))
 
     @staticmethod
     def _draw_color_adjust(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
@@ -334,17 +410,21 @@ class MacIconFactory:
 
     @staticmethod
     def _draw_pointer(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # macOS Arrow cursor
+        # Solid classic macOS arrow cursor
         path = QPainterPath()
-        p_top = QPointF(r.left() + 1, r.top() + 1)
-        path.moveTo(p_top)
-        path.lineTo(r.left() + 1, r.bottom() - 3)
-        path.lineTo(r.left() + r.width()*0.4, r.top() + r.height()*0.65)
-        path.lineTo(r.right() - 2, r.bottom() - 1)
-        path.lineTo(r.right() - 1, r.bottom() - 3)
-        path.lineTo(r.left() + r.width()*0.55, r.top() + r.height()*0.5)
-        path.lineTo(r.right() - 2, r.top() + r.height()*0.5)
+        x0, y0 = r.left(), r.top()
+        w, h = r.width(), r.height()
+        path.moveTo(x0, y0)
+        path.lineTo(x0, y0 + h * 0.95)
+        path.lineTo(x0 + w * 0.28, y0 + h * 0.68)
+        path.lineTo(x0 + w * 0.58, y0 + h * 0.98)
+        path.lineTo(x0 + w * 0.74, y0 + h * 0.84)
+        path.lineTo(x0 + w * 0.44, y0 + h * 0.54)
+        path.lineTo(x0 + w * 0.88, y0 + h * 0.54)
         path.closeSubpath()
+        painter.setBrush(QBrush(color))
+        p_pen = QPen(color, 0.8)
+        painter.setPen(p_pen)
         painter.drawPath(path)
 
     @staticmethod
@@ -386,37 +466,32 @@ class MacIconFactory:
 
     @staticmethod
     def _draw_line_style(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # 3 horizontal lines of varying weights (open-source line style icon)
-        y1 = r.top() + r.height() * 0.22
-        y2 = r.top() + r.height() * 0.50
-        y3 = r.top() + r.height() * 0.78
-        
-        p1 = QPen(color)
-        p1.setWidthF(1.2)
-        p1.setCapStyle(Qt.PenCapStyle.RoundCap)
+        # Stepped thickness lines: thin, medium, thick with graduated lengths
+        w, h = r.width(), r.height()
+        p1 = QPen(color, 1.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(p1)
-        painter.drawLine(QPointF(r.left() + 2, y1), QPointF(r.right() - 2, y1))
-
-        p2 = QPen(color)
-        p2.setWidthF(2.2)
-        p2.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.drawLine(QPointF(r.left() + w * 0.25, r.top() + h * 0.2), QPointF(r.right() - w * 0.25, r.top() + h * 0.2))
+        
+        p2 = QPen(color, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(p2)
-        painter.drawLine(QPointF(r.left() + 2, y2), QPointF(r.right() - 2, y2))
-
-        p3 = QPen(color)
-        p3.setWidthF(3.4)
-        p3.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.drawLine(QPointF(r.left() + w * 0.12, r.top() + h * 0.5), QPointF(r.right() - w * 0.12, r.top() + h * 0.5))
+        
+        p3 = QPen(color, 3.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(p3)
-        painter.drawLine(QPointF(r.left() + 2, y3), QPointF(r.right() - 2, y3))
+        painter.drawLine(QPointF(r.left() + 1, r.top() + h * 0.8), QPointF(r.right() - 1, r.top() + h * 0.8))
 
     @staticmethod
     def _draw_redact(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # macOS Redaction blackout icon
-        painter.setPen(pen)
-        painter.drawRoundedRect(r, 2.5, 2.5)
+        # Simulated text lines with solid BLACKOUT CENSOR BAR across middle
+        line_pen = QPen(color, 1.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(line_pen)
+        painter.drawLine(QPointF(r.left() + 1, r.top() + 2), QPointF(r.right() - 1, r.top() + 2))
+        painter.drawLine(QPointF(r.left() + 1, r.bottom() - 2), QPointF(r.right() - 3, r.bottom() - 2))
+        
+        bar = QRectF(r.left(), r.top() + r.height() * 0.30, r.width(), r.height() * 0.40)
         painter.setBrush(QBrush(color))
-        inner = r.adjusted(2.5, 3.5, -2.5, -3.5)
-        painter.drawRoundedRect(inner, 1.5, 1.5)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(bar, 1.5, 1.5)
 
     @staticmethod
     def _draw_loupe(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
