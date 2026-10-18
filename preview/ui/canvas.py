@@ -9,7 +9,7 @@ from PIL import Image
 from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPixmap, QCursor, QMouseEvent, 
-    QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent
+    QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent, QPainterPath
 )
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal, QTimer, QEvent, QVariantAnimation, QEasingCurve
 
@@ -718,9 +718,10 @@ class CanvasView(QWidget):
         painter.restore()
 
         # 5. Draw Loupe / Magnifier Lens if active
-        if self.loupe_enabled and self.document and self.rect().contains(self._loupe_pos.toPoint()):
+        pos_pt = self._loupe_pos.toPoint() if hasattr(self._loupe_pos, "toPoint") else self._loupe_pos
+        if self.loupe_enabled and self.document and self.rect().contains(pos_pt):
             painter.save()
-            cx, cy = self._loupe_pos.x(), self._loupe_pos.y()
+            cx, cy = float(self._loupe_pos.x()), float(self._loupe_pos.y())
             r = self._loupe_radius
             lens_rect = QRectF(cx - r, cy - r, 2 * r, 2 * r)
 
@@ -730,7 +731,7 @@ class CanvasView(QWidget):
             painter.drawEllipse(lens_rect.adjusted(-2, 3, 2, 7))
 
             # Magnified document coordinates
-            doc_center = self.view_to_doc_coords(self._loupe_pos)
+            doc_center = self.view_to_doc_coords(QPointF(cx, cy))
             mag_zoom = max(0.2, self.zoom * self._loupe_zoom)
             
             # Render magnified page

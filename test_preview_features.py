@@ -332,6 +332,15 @@ class TestPreviewParity(unittest.TestCase):
         canvas.toggle_loupe(True)
         self.assertTrue(canvas.loupe_enabled)
         self.assertEqual(canvas.active_tool, AnnotationType.NONE)
+        canvas._loupe_pos = canvas.rect().center()
+
+        # Test paint with loupe active
+        pix = QPixmap(canvas.size())
+        from PyQt6.QtGui import QPainter
+        painter = QPainter(pix)
+        canvas.render(painter)
+        painter.end()
+
         # Disable loupe
         canvas.toggle_loupe(False)
         self.assertFalse(canvas.loupe_enabled)
