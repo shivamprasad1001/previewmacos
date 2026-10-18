@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Preview
+GenericName=macOS Preview
+Comment=macOS Document and Image Viewer for Linux
+Exec="/run/media/zoro0x1/Hard Disk Drive/MyPrograms/REA/preview-macos/run.sh" %F
+Icon=/home/zoro0x1/.local/share/icons/preview-macos.png
+Terminal=false
+Type=Application
+Categories=Graphics;Office;Viewer;
+MimeType=application/pdf;image/png;image/jpeg;image/webp;image/tiff;image/bmp;
+StartupNotify=true
+StartupWMClass=Preview
