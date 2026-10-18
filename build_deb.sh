@@ -11,21 +11,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 APP_NAME="preview-app"
-VERSION="1.2.0"
+VERSION="1.2.1"
 ARCH="amd64"
 PACKAGE_NAME="${APP_NAME}_${VERSION}_${ARCH}"
 BUILD_DIR="$SCRIPT_DIR/build/deb/$PACKAGE_NAME"
 DIST_DIR="$SCRIPT_DIR/dist"
 
 echo "==> [1/5] Building standalone binary with PyInstaller..."
-if [ ! -f "$DIST_DIR/preview-app/preview-app" ]; then
-    pyinstaller --noconfirm --onedir --windowed \
-        --name="preview-app" \
-        --add-data "preview/assets:preview/assets" \
-        --hidden-import fitz \
-        --hidden-import pymupdf \
-        main.py
-fi
+rm -rf "$DIST_DIR/preview-app"
+pyinstaller --noconfirm --onedir --windowed \
+    --name="preview-app" \
+    --add-data "preview/assets:preview/assets" \
+    --hidden-import fitz \
+    --hidden-import pymupdf \
+    main.py
+
 
 echo "==> [2/5] Creating Debian package structure..."
 rm -rf "$BUILD_DIR"
