@@ -126,3 +126,140 @@ class UpdateCheckWorker(QThread):
             self.update_available.emit(update_info)
         else:
             self.no_update_available.emit(self.current_version)
+
+
+class UpdateDownloadWorker(QThread):
+    """
+    Downloads update asset asynchronously in chunks, emitting live progress percentage,
+    download speed, and transferred bytes.
+    """
+    progress = pyqtSignal(int, int, int, float)  # percent, downloaded_bytes, total_bytes, speed_mb_s
+    finished = pyqtSignal(str)                   # target_filepath
+    failed = pyqtSignal(str)                     # error_message
+
+    def __init__(self, download_url: str, target_filepath: str, parent=None):
+        super().__init__(parent)
+        self.download_url = download_url
+        self.target_filepath = target_filepath
+        self._is_cancelled = False
+
+    def cancel(self):
+        self._is_cancelled = True
+
+    def run(self):
+        import time
+        try:
+            os.makedirs(os.path.dirname(self.target_filepath), exist_ok=True)
+            req = urllib.request.Request(
+                self.download_url,
+                headers={"User-Agent": "Preview-App-Downloader"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                total_size = resp.headers.get("Content-Length")
+                total_bytes = int(total_size) if total_size else 0
+
+                downloaded = 0
+                chunk_size = 65536  # 64 KB
+                start_time = time.time()
+                last_emit = 0.0
+
+                with open(self.target_filepath, "wb") as f:
+                    while True:
+                        if self._is_cancelled:
+                            f.close()
+                            if os.path.exists(self.target_filepath):
+                                try:
+                                    os.remove(self.target_filepath)
+                                except Exception:
+                                    pass
+                            self.failed.emit("Download cancelled by user.")
+                            return
+
+                        chunk = resp.read(chunk_size)
+                        if not chunk:
+                            break
+
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        now = time.time()
+
+                        if now - last_emit >= 0.1 or downloaded == total_bytes:
+                            elapsed = max(0.001, now - start_time)
+                            speed_mb_s = (downloaded / (1024 * 1024)) / elapsed
+                            percent = int(downloaded * 100 / total_bytes) if total_bytes > 0 else 0
+                            self.progress.emit(percent, downloaded, total_bytes, speed_mb_s)
+                            last_emit = now
+
+            self.finished.emit(self.target_filepath)
+        except Exception as e:
+            if os.path.exists(self.target_filepath):
+                try:
+                    os.remove(self.target_filepath)
+                except Exception:
+                    pass
+            self.failed.emit(str(e))
+
+
+def install_update(filepath: str) -> Tuple[bool, str]:
+    """
+    Executes the native installer or package manager for the downloaded update.
+    Returns (success, message).
+    """
+    import subprocess
+    import stat
+    system = platform.system().lower()
+
+    if "linux" in system:
+        script_path = "/tmp/preview_auto_update.sh"
+        escaped_deb = os.path.abspath(filepath)
+
+        script_content = f"""#!/usr/bin/env bash
+# macOS Preview Linux Auto-Update Runner
+sleep 1.2
+
+# Try graphical polkit installation with pkexec
+if command -v pkexec >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
+    pkexec dpkg -i "{escaped_deb}"
+    INSTALL_EXIT=$?
+    if [ $INSTALL_EXIT -eq 0 ]; then
+        if command -v preview-app >/dev/null 2>&1; then
+            preview-app &
+        fi
+        exit 0
+    fi
+fi
+
+# Fallback: Open with system Software Store / GDebi
+if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "{escaped_deb}" &
+    exit 0
+fi
+
+exit 1
+"""
+        try:
+            with open(script_path, "w") as f:
+                f.write(script_content)
+            os.chmod(script_path, os.stat(script_path).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+            subprocess.Popen(["/bin/bash", script_path], start_new_session=True, close_fds=True)
+            return True, "Installing update... Please authorize when prompted."
+        except Exception as e:
+            return False, f"Failed to launch installer: {e}"
+
+    elif "windows" in system:
+        try:
+            subprocess.Popen([filepath, "/SILENT", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"], shell=True)
+            return True, "Starting Windows installer..."
+        except Exception as e:
+            return False, f"Failed to start installer: {e}"
+
+    # Generic fallback
+    try:
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        QDesktopServices.openUrl(QUrl.fromLocalFile(filepath))
+        return True, "Opening update package..."
+    except Exception as e:
+        return False, str(e)
+

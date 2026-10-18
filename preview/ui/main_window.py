@@ -1850,6 +1850,9 @@ class MacMainWindow(QMainWindow):
         else:
             self.update_banner.setVisible(True)
 
+        # Show popup notification asking the user to update
+        self._show_update_dialog(update_info)
+
     def _show_update_dialog(self, update_info: UpdateInfo):
         """Opens macOS Sparkle style software update sheet."""
         if self.update_banner:

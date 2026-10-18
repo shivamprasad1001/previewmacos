@@ -427,6 +427,14 @@ class TestPreviewParity(unittest.TestCase):
         self.assertTrue(hasattr(win, "_start_update_check"))
         win.close()
 
+    def test_25_downloader_and_auto_install(self):
+        from preview.core.updater import UpdateDownloadWorker, install_update
+        worker = UpdateDownloadWorker("https://example.com/test.deb", "/tmp/test.deb")
+        self.assertEqual(worker.download_url, "https://example.com/test.deb")
+        self.assertFalse(worker._is_cancelled)
+        worker.cancel()
+        self.assertTrue(worker._is_cancelled)
+
 if __name__ == "__main__":
     unittest.main()
 
