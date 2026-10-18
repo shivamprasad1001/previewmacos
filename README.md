@@ -19,6 +19,7 @@ A pixel-faithful, high-performance reconstruction of Apple's **macOS Preview.app
 
 ### 🖌️ Apple Markup & Annotation Toolbar
 Toggle with `Ctrl + Shift + A` or the pencil icon:
+- **Redaction Tool**: Solid blackout marker for permanently obscuring sensitive data (credit cards, passwords, names).
 - **Sketch / Pen**: Smooth freehand vector drawings with customizable stroke widths and colors.
 - **Highlighter**: Translucent highlighter pen for marking text or image areas.
 - **Shapes**: Rectangle, Rounded Rectangle, Oval/Circle, Line, and Arrow with arrowheads.
@@ -27,13 +28,20 @@ Toggle with `Ctrl + Shift + A` or the pencil icon:
 - **Signatures**: Interactive trackpad/mouse signature drawing pad with save and insert.
 - **Cropping & Marquee Selection**: Drag-to-select marquee box with 8 resize handles and instant crop execution.
 
+### 🔍 Advanced Tools & Productivity
+- **Interactive Magnifier / Loupe Tool (`~`)**: Real-time circular magnifying glass with authentic glass rim, reticle, and drop shadow.
+- **Fullscreen Slideshow Mode (`F11`)**: Borderless presentation mode with floating glass HUD and auto-advance timer.
+- **Native Print & Print Preview (`Ctrl + P` / `Ctrl + Shift + P`)**: High-resolution printing for all documents and photo galleries.
+- **Export as PDF... & Advanced Export Sheet (`Ctrl + Shift + E` / `Ctrl + E`)**: One-click convert to PDF, or export to PNG, JPEG, WebP, TIFF with DPI and compression control.
+- **Live Text Extraction (`Ctrl + Shift + C`)**: Extract and copy selectable page text or entire document text to clipboard.
+- **Sidebar Page Management**: Right-click any thumbnail to Delete, Duplicate, Insert Blank Page, or Rotate.
+- **Open Recent Menu**: Automatically tracks and remembers the last 10 opened documents and folders.
+- **PDF Text Search**: Live search bar highlighting matching query occurrences across pages.
+- **Inspector Window (`Ctrl + I`)**: Detailed file stats, dimensions, DPI, color space, author, creator, and PDF metadata.
+
 ### 🎨 Apple Adjust Color & Size
 - **Adjust Color Panel (`Ctrl + Alt + C`)**: Real-time multi-channel RGB histogram, Exposure, Contrast, Highlights, Shadows, Saturation, Temperature, Tint, Sharpness, Sepia, and instant **Auto Levels**.
 - **Adjust Size Panel (`Ctrl + Alt + S`)**: Preset dimensions (Full HD, 4K, 1024×768), proportional aspect ratio locking, pixels/percent unit conversion, and real-time output size estimation.
-
-### 🔍 Search & Inspector
-- **PDF Text Search**: Live search bar highlighting matching query occurrences across pages.
-- **Inspector Window (`Ctrl + I`)**: Detailed file stats, dimensions, DPI, color space, author, creator, and PDF metadata.
 
 ### 🌗 macOS Sequoia Aesthetics
 - Unified macOS toolbar with traffic light controls.
@@ -96,8 +104,16 @@ Or rebuild the `.deb` package anytime with a single command:
 | Shortcut | Action |
 | :--- | :--- |
 | `Ctrl + O` | Open File... |
+| `Ctrl + Shift + O` | Open Folder of Images... |
 | `Ctrl + S` | Save |
 | `Ctrl + Shift + S` | Save As... |
+| `Ctrl + Shift + E` | Export as PDF... |
+| `Ctrl + E` | Export... (Format, Quality, DPI Sheet) |
+| `Ctrl + P` | Print Document... |
+| `Ctrl + Shift + P` | Print Preview... |
+| `Ctrl + Shift + C` | Copy Current Page Text |
+| `F11` / `Ctrl + Shift + F` | Toggle Fullscreen Slideshow |
+| `~` / `` ` `` | Toggle Magnifier / Loupe Tool |
 | `Ctrl + B` | Toggle Sidebar |
 | `Ctrl + +` / `Ctrl + =` | Zoom In |
 | `Ctrl + -` | Zoom Out |
@@ -111,7 +127,7 @@ Or rebuild the `.deb` package anytime with a single command:
 | `Ctrl + Alt + S` | Adjust Size... |
 | `Ctrl + I` | Show Inspector |
 | `Space + Drag` | Pan / Hand Tool |
-| `Delete` / `Backspace` | Delete Selected Annotation |
+| `Delete` / `Backspace` | Delete Selected Annotation / Page |
 | `Ctrl + Z` | Undo |
 | `Ctrl + Shift + Z` | Redo |
 | `Ctrl + Q` | Quit |

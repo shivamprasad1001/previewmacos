@@ -86,6 +86,10 @@ class MarkupToolbar(QWidget):
         self.note_btn = self._create_tool_button("note", "Sticky Note", AnnotationType.NOTE)
         layout.addWidget(self.note_btn)
 
+        # 6.5 Redaction Tool
+        self.redact_btn = self._create_tool_button("redact", "Redact / Blackout Info", AnnotationType.REDACT)
+        layout.addWidget(self.redact_btn)
+
         # 7. Signature Tool
         self.sign_btn = QToolButton()
         self.sign_btn.setFixedSize(28, 28)
@@ -190,6 +194,7 @@ class MarkupToolbar(QWidget):
         self.highlighter_btn.setIcon(MacIconFactory.create_icon("highlighter", "#ffffff" if self.highlighter_btn.isChecked() else col, 16))
         self.text_btn.setIcon(MacIconFactory.create_icon("text", "#ffffff" if self.text_btn.isChecked() else col, 16))
         self.note_btn.setIcon(MacIconFactory.create_icon("note", "#ffffff" if self.note_btn.isChecked() else col, 16))
+        self.redact_btn.setIcon(MacIconFactory.create_icon("redact", "#ffffff" if self.redact_btn.isChecked() else col, 16))
         self.sign_btn.setIcon(MacIconFactory.create_icon("sign", col, 16))
         self.width_btn.setIcon(MacIconFactory.create_icon("line_style", col, 16))
         self.crop_btn.setIcon(MacIconFactory.create_icon("crop", col, 16))

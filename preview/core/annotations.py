@@ -23,6 +23,7 @@ class AnnotationType(Enum):
     NOTE = auto()
     SIGNATURE = auto()
     CROP_BOX = auto()
+    REDACT = auto()
 
 class AnnotationItem:
     """A single markup or annotation element."""
@@ -160,6 +161,17 @@ class AnnotationItem:
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             painter.drawPixmap(scaled_rect.toRect(), self.signature_pixmap)
 
+        elif self.item_type == AnnotationType.REDACT:
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+                                 self.rect.width() * zoom, self.rect.height() * zoom)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor("#000000")))
+            painter.drawRect(scaled_rect)
+            # Subtle inner edge
+            painter.setPen(QPen(QColor(255, 255, 255, 30), 1.0))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(scaled_rect)
+
         elif self.item_type == AnnotationType.CROP_BOX:
             scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
                                  self.rect.width() * zoom, self.rect.height() * zoom)
@@ -206,7 +218,7 @@ class AnnotationItem:
         if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
                               AnnotationType.ELLIPSE, AnnotationType.TEXT, 
                               AnnotationType.NOTE, AnnotationType.SIGNATURE, 
-                              AnnotationType.CROP_BOX):
+                              AnnotationType.CROP_BOX, AnnotationType.REDACT):
             return self.rect.normalized()
         elif self.points:
             min_x = min(p.x() for p in self.points)

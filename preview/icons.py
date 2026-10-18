@@ -410,5 +410,62 @@ class MacIconFactory:
         painter.drawLine(QPointF(r.left() + 2, y3), QPointF(r.right() - 2, y3))
 
     @staticmethod
+    def _draw_redact(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # macOS Redaction blackout icon
+        painter.setPen(pen)
+        painter.drawRoundedRect(r, 2.5, 2.5)
+        painter.setBrush(QBrush(color))
+        inner = r.adjusted(2.5, 3.5, -2.5, -3.5)
+        painter.drawRoundedRect(inner, 1.5, 1.5)
+
+    @staticmethod
+    def _draw_loupe(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Loupe / Magnifier circular lens
+        cx = r.center().x()
+        cy = r.center().y()
+        rad = min(r.width(), r.height()) * 0.44
+        painter.setPen(pen)
+        painter.drawEllipse(QPointF(cx, cy), rad, rad)
+        # Inner lens ring
+        p_inner = QPen(color)
+        p_inner.setWidthF(1.0)
+        painter.setPen(p_inner)
+        painter.drawEllipse(QPointF(cx, cy), rad * 0.65, rad * 0.65)
+        # Reticle crosshair
+        ch = rad * 0.3
+        painter.drawLine(QPointF(cx - ch, cy), QPointF(cx + ch, cy))
+        painter.drawLine(QPointF(cx, cy - ch), QPointF(cx, cy + ch))
+
+    @staticmethod
+    def _draw_print(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Printer body and paper
+        painter.setPen(pen)
+        # Body
+        body = QRectF(r.left(), r.top() + r.height() * 0.35, r.width(), r.height() * 0.45)
+        painter.drawRoundedRect(body, 2, 2)
+        # Top sheet
+        top_sheet = QRectF(r.left() + r.width() * 0.2, r.top(), r.width() * 0.6, r.height() * 0.38)
+        painter.drawRect(top_sheet)
+        # Bottom paper tray
+        bot_sheet = QRectF(r.left() + r.width() * 0.22, r.top() + r.height() * 0.65, r.width() * 0.56, r.height() * 0.35)
+        painter.drawRect(bot_sheet)
+
+    @staticmethod
+    def _draw_slideshow(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Presentation screen with play button
+        painter.setPen(pen)
+        painter.drawRoundedRect(r, 3, 3)
+        # Play triangle
+        play_path = QPainterPath()
+        cx, cy = r.center().x(), r.center().y()
+        sz = r.width() * 0.2
+        play_path.moveTo(cx - sz * 0.7, cy - sz)
+        play_path.lineTo(cx + sz * 1.0, cy)
+        play_path.lineTo(cx - sz * 0.7, cy + sz)
+        play_path.closeSubpath()
+        painter.setBrush(QBrush(color))
+        painter.drawPath(play_path)
+
+    @staticmethod
     def _draw_default(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
         painter.drawRect(r)

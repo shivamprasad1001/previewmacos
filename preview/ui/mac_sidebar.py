@@ -7,10 +7,10 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, 
     QTreeWidget, QTreeWidgetItem, QLabel, QStackedWidget, QToolButton,
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu
+    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu, QMessageBox
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QAction
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QRectF, QModelIndex
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QRectF, QModelIndex, QEvent
 
 from preview.core.document import Document
 from preview.icons import MacIconFactory
@@ -188,6 +188,9 @@ class MacSidebar(QWidget):
         self.thumb_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.thumb_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.thumb_list.currentRowChanged.connect(self._on_row_changed)
+        self.thumb_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.thumb_list.customContextMenuRequested.connect(self._show_thumb_context_menu)
+        self.thumb_list.installEventFilter(self)
         self.stack.addWidget(self.thumb_list)
 
         # 2. Outline / Table of contents tree
@@ -287,3 +290,78 @@ class MacSidebar(QWidget):
             self.set_view_mode("Table of Contents")
         else:
             self.set_view_mode("Thumbnails")
+
+    def _show_thumb_context_menu(self, pos):
+        if not self.document:
+            return
+        item = self.thumb_list.itemAt(pos)
+        if not item:
+            return
+        idx = self.thumb_list.row(item)
+
+        menu = QMenu(self)
+        menu.setObjectName("thumbContextMenu")
+
+        act_rot_cw = QAction("Rotate 90° Clockwise", self)
+        act_rot_cw.triggered.connect(lambda: self.document.rotate_page(idx, 90))
+        menu.addAction(act_rot_cw)
+
+        act_rot_ccw = QAction("Rotate 90° Counter-Clockwise", self)
+        act_rot_ccw.triggered.connect(lambda: self.document.rotate_page(idx, -90))
+        menu.addAction(act_rot_ccw)
+
+        menu.addSeparator()
+
+        act_dup = QAction("Duplicate Page", self)
+        act_dup.triggered.connect(lambda: self._duplicate_page(idx))
+        menu.addAction(act_dup)
+
+        act_insert = QAction("Insert Blank Page After", self)
+        act_insert.triggered.connect(lambda: self._insert_blank_page(idx))
+        menu.addAction(act_insert)
+
+        menu.addSeparator()
+
+        act_del = QAction("Delete Page", self)
+        act_del.setShortcut("Delete")
+        act_del.setEnabled(self.document.page_count > 1)
+        act_del.triggered.connect(lambda: self._confirm_and_delete_page(idx))
+        menu.addAction(act_del)
+
+        menu.exec(self.thumb_list.mapToGlobal(pos))
+
+    def _duplicate_page(self, idx: int):
+        if self.document and self.document.duplicate_page(idx):
+            self.reload_thumbnails()
+            self.page_selected.emit(idx + 1)
+
+    def _insert_blank_page(self, idx: int):
+        if self.document and self.document.insert_blank_page(idx):
+            self.reload_thumbnails()
+            self.page_selected.emit(idx + 1)
+
+    def _confirm_and_delete_page(self, idx: int):
+        if not self.document:
+            return
+        if self.document.page_count <= 1:
+            QMessageBox.information(self, "Delete Page", "Cannot delete the only page in the document.")
+            return
+
+        reply = QMessageBox.question(
+            self, "Delete Page", 
+            f"Are you sure you want to delete page {idx + 1}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.document.delete_page(idx)
+            self.reload_thumbnails()
+
+    def eventFilter(self, source, event):
+        if source == self.thumb_list and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+                row = self.thumb_list.currentRow()
+                if row >= 0:
+                    self._confirm_and_delete_page(row)
+                    return True
+        return super().eventFilter(source, event)

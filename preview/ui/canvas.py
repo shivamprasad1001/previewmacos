@@ -77,6 +77,12 @@ class CanvasView(QWidget):
         self._spring_timer.timeout.connect(self._spring_to_bounds)
         self.floating_pill = None
 
+        # Loupe / Magnifier
+        self.loupe_enabled: bool = False
+        self._loupe_pos: QPointF = QPointF(-1000, -1000)
+        self._loupe_radius: float = 80.0
+        self._loupe_zoom: float = 2.5
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._auto_fit and self.document:
@@ -231,8 +237,29 @@ class CanvasView(QWidget):
             )
             self.update()
 
+    def toggle_loupe(self, enable: Optional[bool] = None):
+        """Toggles macOS Loupe / Magnifier lens inspection tool."""
+        if enable is None:
+            self.loupe_enabled = not self.loupe_enabled
+        else:
+            self.loupe_enabled = enable
+
+        if self.loupe_enabled:
+            self.set_active_tool(AnnotationType.NONE)
+            center = QPointF(self.width() / 2.0, self.height() / 2.0)
+            self._loupe_pos = center
+            self.status_message.emit("Magnifier active — Move cursor to inspect, Esc to close")
+        else:
+            self._loupe_pos = QPointF(-1000, -1000)
+            self.status_message.emit("Magnifier closed")
+        
+        self._update_cursor()
+        self.update()
+
     def set_active_tool(self, tool: AnnotationType):
         self.active_tool = tool
+        if tool != AnnotationType.NONE and self.loupe_enabled:
+            self.loupe_enabled = False
         if tool != AnnotationType.CROP_BOX and self.crop_box:
             self.crop_box = None
             self.crop_available.emit(False)
@@ -242,11 +269,14 @@ class CanvasView(QWidget):
     def _update_cursor(self):
         if self._space_held or self._is_panning:
             self.setCursor(Qt.CursorShape.OpenHandCursor if not self._is_panning else Qt.CursorShape.ClosedHandCursor)
+        elif self.loupe_enabled:
+            self.setCursor(Qt.CursorShape.CrossCursor)
         elif self.active_tool in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
             self.setCursor(Qt.CursorShape.CrossCursor)
         elif self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
                                   AnnotationType.ELLIPSE, AnnotationType.LINE, 
-                                  AnnotationType.ARROW, AnnotationType.CROP_BOX):
+                                  AnnotationType.ARROW, AnnotationType.CROP_BOX,
+                                  AnnotationType.REDACT):
             self.setCursor(Qt.CursorShape.CrossCursor)
         elif self.active_tool == AnnotationType.TEXT:
             self.setCursor(Qt.CursorShape.IBeamCursor)
@@ -277,6 +307,10 @@ class CanvasView(QWidget):
         if self._spring_anim and self._spring_anim.state() == QVariantAnimation.State.Running:
             self._spring_anim.stop()
 
+        if event.button() == Qt.MouseButton.RightButton:
+            self._show_canvas_context_menu(event.position())
+            return
+
         if event.button() == Qt.MouseButton.MiddleButton or (event.button() == Qt.MouseButton.LeftButton and self._space_held):
             self._is_panning = True
             self._pan_start = event.position()
@@ -305,9 +339,10 @@ class CanvasView(QWidget):
                 self.update()
                 return
 
-            # 3. Handle Shapes
+            # 3. Handle Shapes & Redaction
             if self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
-                                    AnnotationType.ELLIPSE, AnnotationType.LINE, AnnotationType.ARROW):
+                                    AnnotationType.ELLIPSE, AnnotationType.LINE, 
+                                    AnnotationType.ARROW, AnnotationType.REDACT):
                 item = AnnotationItem(self.active_tool)
                 item.stroke_color = QColor(self.stroke_color)
                 item.stroke_width = self.stroke_width
@@ -404,6 +439,10 @@ class CanvasView(QWidget):
             self._pan_start = event.position()
             return
 
+        if self.loupe_enabled:
+            self._loupe_pos = event.position()
+            self.update()
+
         doc_pt = self.view_to_doc_coords(event.position())
 
         # Update Crop Box
@@ -419,7 +458,8 @@ class CanvasView(QWidget):
                 self._active_annotation.points.append(doc_pt)
             elif self._active_annotation.item_type in (AnnotationType.RECTANGLE, 
                                                         AnnotationType.ROUNDED_RECT, 
-                                                        AnnotationType.ELLIPSE):
+                                                        AnnotationType.ELLIPSE,
+                                                        AnnotationType.REDACT):
                 p1 = self._active_annotation.rect.topLeft()
                 self._active_annotation.rect = QRectF(p1, doc_pt).normalized()
             elif self._active_annotation.item_type in (AnnotationType.LINE, AnnotationType.ARROW):
@@ -676,3 +716,112 @@ class CanvasView(QWidget):
         if self.crop_box:
             self.crop_box.draw(painter, zoom=self.zoom)
         painter.restore()
+
+        # 5. Draw Loupe / Magnifier Lens if active
+        if self.loupe_enabled and self.document and self.rect().contains(self._loupe_pos.toPoint()):
+            painter.save()
+            cx, cy = self._loupe_pos.x(), self._loupe_pos.y()
+            r = self._loupe_radius
+            lens_rect = QRectF(cx - r, cy - r, 2 * r, 2 * r)
+
+            # Drop shadow under lens
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(0, 0, 0, 60)))
+            painter.drawEllipse(lens_rect.adjusted(-2, 3, 2, 7))
+
+            # Magnified document coordinates
+            doc_center = self.view_to_doc_coords(self._loupe_pos)
+            mag_zoom = max(0.2, self.zoom * self._loupe_zoom)
+            
+            # Render magnified page
+            mag_pix = self.document.render_page(self.current_page, zoom=mag_zoom)
+            mag_page_x = cx - doc_center.x() * mag_zoom
+            mag_page_y = cy - doc_center.y() * mag_zoom
+
+            # Circular clipping path for lens
+            clip = QPainterPath()
+            clip.addEllipse(lens_rect)
+            painter.setClipPath(clip)
+
+            # White page backing
+            painter.setBrush(QBrush(QColor("#ffffff")))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRect(lens_rect)
+
+            # Draw magnified document
+            painter.drawPixmap(int(mag_page_x), int(mag_page_y), mag_pix)
+
+            # Draw magnified annotations inside loupe
+            painter.save()
+            painter.translate(mag_page_x, mag_page_y)
+            for item in self._get_current_annotations():
+                item.draw(painter, zoom=mag_zoom)
+            painter.restore()
+
+            # Glass reticle & bezel
+            painter.setClipping(False)
+            pen_cross = QPen(QColor(10, 132, 255, 120), 1.0)
+            painter.setPen(pen_cross)
+            painter.drawLine(QPointF(cx - 8, cy), QPointF(cx + 8, cy))
+            painter.drawLine(QPointF(cx, cy - 8), QPointF(cx, cy + 8))
+
+            # macOS silver-titanium bezel
+            rim_outer = QPen(QColor(50, 50, 55, 230), 3.5)
+            painter.setPen(rim_outer)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(lens_rect)
+
+            rim_inner = QPen(QColor(255, 255, 255, 160), 1.0)
+            painter.setPen(rim_inner)
+            painter.drawEllipse(lens_rect.adjusted(1.5, 1.5, -1.5, -1.5))
+
+            painter.restore()
+
+    def _show_canvas_context_menu(self, pos: QPointF):
+        if not self.document:
+            return
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QAction
+        menu = QMenu(self)
+        menu.setObjectName("canvasContextMenu")
+        
+        # Copy page text
+        if self.document.is_pdf:
+            act_copy = QAction("Copy Page Text", self)
+            act_copy.triggered.connect(self._copy_page_text)
+            menu.addAction(act_copy)
+            menu.addSeparator()
+
+        # Loupe
+        act_loupe = QAction("Hide Magnifier" if self.loupe_enabled else "Show Magnifier", self)
+        act_loupe.setShortcut("~")
+        act_loupe.triggered.connect(lambda: self.toggle_loupe())
+        menu.addAction(act_loupe)
+        menu.addSeparator()
+
+        # Zoom
+        act_fit = QAction("Zoom to Fit", self)
+        act_fit.triggered.connect(self.zoom_to_fit)
+        menu.addAction(act_fit)
+
+        act_actual = QAction("Actual Size", self)
+        act_actual.triggered.connect(self.zoom_actual_size)
+        menu.addAction(act_actual)
+        menu.addSeparator()
+
+        # Rotate
+        act_rot = QAction("Rotate 90° Clockwise", self)
+        act_rot.triggered.connect(lambda: self.document.rotate_page(self.current_page, 90))
+        menu.addAction(act_rot)
+
+        menu.exec(self.mapToGlobal(pos.toPoint()))
+
+    def _copy_page_text(self):
+        if self.document and self.document.is_pdf:
+            txt = self.document.extract_text(self.current_page)
+            if txt:
+                from PyQt6.QtWidgets import QApplication
+                QApplication.clipboard().setText(txt)
+                self.status_message.emit(f"Copied {len(txt)} characters to clipboard")
+            else:
+                self.status_message.emit("No selectable text on this page")

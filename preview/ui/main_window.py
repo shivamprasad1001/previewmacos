@@ -11,13 +11,13 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
     QToolButton, QLineEdit, QLabel, QFileDialog, QMessageBox, 
     QApplication, QMenu, QMenuBar, QStatusBar, QSizePolicy, QGraphicsDropShadowEffect,
-    QGraphicsOpacityEffect, QFrame
+    QGraphicsOpacityEffect, QFrame, QDialog
 )
 from PyQt6.QtGui import (
     QAction, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
-    QMouseEvent, QPainter, QBrush, QPen, QFont
+    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent
 )
-from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
 from preview.theme import MacTheme
 from preview.icons import MacIconFactory
@@ -32,6 +32,7 @@ from preview.ui.adjust_size_dialog import AdjustSizeDialog
 from preview.ui.signature_dialog import SignatureDialog
 from preview.ui.inspector_dialog import InspectorDialog
 from preview.ui.about_dialog import AboutDialog
+from preview.ui.export_dialog import MacExportDialog
 
 class FloatingStatusPill(QWidget):
     """Small floating pill displaying page and zoom info at bottom center of canvas, fading after 2s."""
@@ -98,6 +99,93 @@ class FloatingStatusPill(QWidget):
             return
         x = (p.width() - self.width()) // 2
         y = p.height() - self.height() - 20
+        self.move(max(0, x), max(0, y))
+
+class FloatingSlideshowHUD(QWidget):
+    """Floating translucent control bar for Fullscreen Slideshow mode."""
+
+    def __init__(self, main_win: 'MacMainWindow', parent: QWidget):
+        super().__init__(parent)
+        self.main_win = main_win
+        self.setObjectName("floatingSlideshowHUD")
+        self.setStyleSheet("""
+            #floatingSlideshowHUD {
+                background-color: rgba(24, 24, 26, 220);
+                border: 1px solid rgba(255, 255, 255, 38);
+                border-radius: 18px;
+            }
+            #floatingSlideshowHUD QToolButton {
+                background: transparent;
+                border: none;
+                border-radius: 12px;
+                color: #ffffff;
+                font-size: 13px;
+                padding: 4px 8px;
+            }
+            #floatingSlideshowHUD QToolButton:hover {
+                background-color: rgba(255, 255, 255, 35);
+            }
+            #floatingSlideshowHUD QLabel {
+                color: #e5e5ea;
+                font-size: 12px;
+                font-weight: 500;
+                padding: 0 10px;
+            }
+        """)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(6)
+
+        # Prev
+        self.prev_btn = QToolButton()
+        self.prev_btn.setText("◀")
+        self.prev_btn.setToolTip("Previous Page (Left Arrow)")
+        self.prev_btn.clicked.connect(self.main_win.prev_page)
+        layout.addWidget(self.prev_btn)
+
+        # Play / Pause
+        self.play_btn = QToolButton()
+        self.play_btn.setText("⏸")
+        self.play_btn.setToolTip("Pause / Resume Auto-advance (Space)")
+        self.play_btn.clicked.connect(self.main_win._toggle_slideshow_timer)
+        layout.addWidget(self.play_btn)
+
+        # Next
+        self.next_btn = QToolButton()
+        self.next_btn.setText("▶")
+        self.next_btn.setToolTip("Next Page (Right Arrow)")
+        self.next_btn.clicked.connect(self.main_win.next_page)
+        layout.addWidget(self.next_btn)
+
+        # Counter
+        self.counter_label = QLabel("1 / 1")
+        layout.addWidget(self.counter_label)
+
+        # Exit
+        self.exit_btn = QToolButton()
+        self.exit_btn.setText("✕")
+        self.exit_btn.setToolTip("Exit Slideshow (Esc)")
+        self.exit_btn.clicked.connect(self.main_win._toggle_slideshow)
+        layout.addWidget(self.exit_btn)
+
+        self.adjustSize()
+        self.hide()
+
+    def update_page_info(self, current: int, total: int):
+        self.counter_label.setText(f"{current} / {total}")
+        self.adjustSize()
+        self._reposition()
+
+    def set_playing(self, is_playing: bool):
+        self.play_btn.setText("⏸" if is_playing else "▶")
+
+    def _reposition(self):
+        p = self.parentWidget()
+        if not p:
+            return
+        x = (p.width() - self.width()) // 2
+        y = p.height() - self.height() - 28
         self.move(max(0, x), max(0, y))
 
 class TrafficLightButton(QToolButton):
@@ -409,6 +497,9 @@ class MacMainWindow(QMainWindow):
         self.floating_pill = FloatingStatusPill(self.canvas)
         self.canvas.floating_pill = self.floating_pill
 
+        # 7. Floating Slideshow HUD
+        self.slideshow_hud = FloatingSlideshowHUD(self, self.canvas)
+
     def _setup_toolbar(self):
         self.toolbar_widget = DraggableToolbar(self)
         self.toolbar_widget.setObjectName("macToolbar")
@@ -682,6 +773,9 @@ class MacMainWindow(QMainWindow):
         open_folder_act.triggered.connect(self._open_folder_dialog)
         self.file_menu.addAction(open_folder_act)
 
+        self.recent_menu = self.file_menu.addMenu("Open Recent")
+        self._update_recent_menu()
+
         self.file_menu.addSeparator()
 
         save_act = QAction("Save", self)
@@ -694,10 +788,27 @@ class MacMainWindow(QMainWindow):
         save_as_act.triggered.connect(self._save_as_file)
         self.file_menu.addAction(save_as_act)
 
+        export_pdf_act = QAction("Export as PDF...", self)
+        export_pdf_act.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        export_pdf_act.triggered.connect(self._export_as_pdf)
+        self.file_menu.addAction(export_pdf_act)
+
         export_act = QAction("Export...", self)
         export_act.setShortcut(QKeySequence("Ctrl+E"))
         export_act.triggered.connect(self._export_file)
         self.file_menu.addAction(export_act)
+
+        self.file_menu.addSeparator()
+
+        print_act = QAction("Print...", self)
+        print_act.setShortcut(QKeySequence.StandardKey.Print)
+        print_act.triggered.connect(self._print_file)
+        self.file_menu.addAction(print_act)
+
+        print_prev_act = QAction("Print Preview...", self)
+        print_prev_act.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        print_prev_act.triggered.connect(self._print_preview_file)
+        self.file_menu.addAction(print_prev_act)
 
         self.file_menu.addSeparator()
 
@@ -718,6 +829,17 @@ class MacMainWindow(QMainWindow):
         redo_act.triggered.connect(self.canvas.redo)
         self.edit_menu.addAction(redo_act)
 
+        self.edit_menu.addSeparator()
+
+        copy_text_act = QAction("Copy Current Page Text", self)
+        copy_text_act.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        copy_text_act.triggered.connect(self._copy_current_page_text)
+        self.edit_menu.addAction(copy_text_act)
+
+        extract_all_act = QAction("Extract All Text to Clipboard", self)
+        extract_all_act.triggered.connect(self._extract_all_text)
+        self.edit_menu.addAction(extract_all_act)
+
         # 4. View Menu
         self.view_menu = self.top_menubar.addMenu("View")
         toggle_sb = QAction("Toggle Sidebar", self)
@@ -736,6 +858,11 @@ class MacMainWindow(QMainWindow):
         toggle_sb_bar.setChecked(True)
         toggle_sb_bar.toggled.connect(self._toggle_status_bar)
         self.view_menu.addAction(toggle_sb_bar)
+
+        slideshow_act = QAction("Start Slideshow", self)
+        slideshow_act.setShortcuts([QKeySequence("F11"), QKeySequence("Ctrl+Shift+F")])
+        slideshow_act.triggered.connect(self._toggle_slideshow)
+        self.view_menu.addAction(slideshow_act)
 
         frameless_act = QAction("macOS Frameless Window", self, checkable=True)
         frameless_act.setShortcut(QKeySequence("Ctrl+Alt+F"))
@@ -794,6 +921,11 @@ class MacMainWindow(QMainWindow):
         markup_act.triggered.connect(self._toggle_markup_bar)
         self.tools_menu.addAction(markup_act)
 
+        loupe_act = QAction("Show Magnifier (Loupe)", self)
+        loupe_act.setShortcuts([QKeySequence("~"), QKeySequence("`"), QKeySequence("Ctrl+Shift+M")])
+        loupe_act.triggered.connect(lambda: self.canvas.toggle_loupe())
+        self.tools_menu.addAction(loupe_act)
+
         crop_act = QAction("Crop", self)
         crop_act.setShortcut(QKeySequence("Ctrl+K"))
         crop_act.triggered.connect(self.canvas.apply_crop)
@@ -846,11 +978,13 @@ class MacMainWindow(QMainWindow):
         self.help_menu.addAction(about_h_act)
 
         # Register keyboard shortcuts into window actions
-        for a in [open_act, open_folder_act, save_act, save_as_act, export_act, close_act,
-                  undo_act, redo_act, toggle_sb, toggle_mb_act, toggle_sb_bar, frameless_act,
-                  actual_size, zoom_to_fit, zoom_in_act, zoom_out_act, next_act, prev_act,
-                  first_act, last_act, markup_act, crop_act, rot_l_act, rot_r_act, color_act,
-                  size_act, insp_act, min_act, zoom_win_act, theme_act, quit_act, pref_act, hide_act]:
+        for a in [open_act, open_folder_act, save_act, save_as_act, export_pdf_act, export_act,
+                  print_act, print_prev_act, close_act, undo_act, redo_act, copy_text_act,
+                  extract_all_act, toggle_sb, toggle_mb_act, toggle_sb_bar, slideshow_act,
+                  frameless_act, actual_size, zoom_to_fit, zoom_in_act, zoom_out_act, next_act,
+                  prev_act, first_act, last_act, markup_act, loupe_act, crop_act, rot_l_act,
+                  rot_r_act, color_act, size_act, insp_act, min_act, zoom_win_act, theme_act,
+                  quit_act, pref_act, hide_act]:
             self.addAction(a)
 
     def _toggle_menu_bar(self, checked: bool):
@@ -878,6 +1012,7 @@ class MacMainWindow(QMainWindow):
         try:
             self.document = Document(file_path)
             self._bind_document()
+            self._add_recent_file(file_path)
         except Exception as e:
             QMessageBox.critical(self, "Error Opening File", f"Could not open {file_path}:\n{str(e)}")
 
@@ -886,6 +1021,8 @@ class MacMainWindow(QMainWindow):
             self.document = Document()
             self.document.load_files(file_paths)
             self._bind_document()
+            if file_paths:
+                self._add_recent_file(file_paths[0])
         except Exception as e:
             QMessageBox.critical(self, "Error Opening Images", f"Could not open images:\n{str(e)}")
 
@@ -894,6 +1031,7 @@ class MacMainWindow(QMainWindow):
             self.document = Document()
             self.document.load_folder(folder_path)
             self._bind_document()
+            self._add_recent_file(folder_path)
             self._show_status(f"Loaded folder with {self.document.page_count} images.")
         except Exception as e:
             QMessageBox.critical(self, "Error Opening Folder", f"Could not open folder {folder_path}:\n{str(e)}")
@@ -974,8 +1112,238 @@ class MacMainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Save As Error", str(e))
 
+    # --- Open Recent Documents ---
+    def _add_recent_file(self, file_path: str):
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        recents = settings.value("recent_files", [], type=list) or []
+        path = os.path.abspath(file_path)
+        if path in recents:
+            recents.remove(path)
+        recents.insert(0, path)
+        recents = recents[:10]
+        settings.setValue("recent_files", recents)
+        self._update_recent_menu()
+
+    def _update_recent_menu(self):
+        if not hasattr(self, "recent_menu"):
+            return
+        self.recent_menu.clear()
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        recents = settings.value("recent_files", [], type=list) or []
+        valid_recents = [p for p in recents if os.path.exists(p)]
+        if not valid_recents:
+            no_act = QAction("No Recent Documents", self)
+            no_act.setEnabled(False)
+            self.recent_menu.addAction(no_act)
+            return
+
+        for p in valid_recents:
+            act = QAction(os.path.basename(p), self)
+            act.setToolTip(p)
+            act.triggered.connect(lambda _, path=p: self._open_recent_item(path))
+            self.recent_menu.addAction(act)
+
+        self.recent_menu.addSeparator()
+        clear_act = QAction("Clear Menu", self)
+        clear_act.triggered.connect(self._clear_recent_files)
+        self.recent_menu.addAction(clear_act)
+
+    def _open_recent_item(self, path: str):
+        if os.path.isdir(path):
+            self.open_folder(path)
+        elif os.path.isfile(path):
+            self.open_file(path)
+
+    def _clear_recent_files(self):
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        settings.setValue("recent_files", [])
+        self._update_recent_menu()
+
+    # --- Export & Print ---
+    def _export_as_pdf(self):
+        if not self.document:
+            return
+        default_dir = os.path.dirname(self.document.file_path) if self.document.file_path else os.path.expanduser("~/Documents")
+        base = os.path.splitext(self.document.file_name)[0]
+        initial_path = os.path.join(default_dir, f"{base}.pdf")
+        path, _ = QFileDialog.getSaveFileName(self, "Export as PDF", initial_path, "PDF Document (*.pdf)")
+        if path:
+            try:
+                self.document.export_all_to_pdf(path)
+                self._show_status(f"Exported to {os.path.basename(path)}")
+            except Exception as e:
+                QMessageBox.critical(self, "Export Error", str(e))
+
     def _export_file(self):
-        self._save_as_file()
+        if not self.document:
+            return
+        dlg = MacExportDialog(
+            current_file_path=self.document.file_path,
+            page_count=self.document.page_count,
+            current_page=self.canvas.current_page,
+            parent=self
+        )
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.selected_path:
+            try:
+                target_page = None if dlg.export_all_pages else self.canvas.current_page
+                if dlg.selected_format == "PDF" and dlg.export_all_pages:
+                    self.document.export_all_to_pdf(dlg.selected_path)
+                else:
+                    self.document.export_document(
+                        dlg.selected_path, 
+                        format_name=dlg.selected_format,
+                        quality=dlg.selected_quality,
+                        page_idx=target_page
+                    )
+                self._show_status(f"Exported to {os.path.basename(dlg.selected_path)}")
+            except Exception as e:
+                QMessageBox.critical(self, "Export Error", str(e))
+
+    def _print_file(self):
+        if not self.document:
+            return
+        try:
+            from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
+            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            dialog = QPrintDialog(printer, self)
+            dialog.setWindowTitle("Print Document")
+            if dialog.exec() == QPrintDialog.DialogCode.Accepted:
+                self._render_to_printer(printer)
+                self._show_status("Document sent to printer.")
+        except Exception as e:
+            QMessageBox.critical(self, "Print Error", str(e))
+
+    def _print_preview_file(self):
+        if not self.document:
+            return
+        try:
+            from PyQt6.QtPrintSupport import QPrinter, QPrintPreviewDialog
+            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            preview_dialog = QPrintPreviewDialog(printer, self)
+            preview_dialog.setWindowTitle("Print Preview")
+            preview_dialog.resize(900, 700)
+            preview_dialog.paintRequested.connect(self._render_to_printer)
+            preview_dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Print Preview Error", str(e))
+
+    def _render_to_printer(self, printer):
+        if not self.document:
+            return
+        from PyQt6.QtGui import QPainter
+        painter = QPainter(printer)
+        page_rect = printer.pageLayout().paintRectPixels(printer.resolution())
+
+        for p_idx in range(self.document.page_count):
+            if p_idx > 0:
+                printer.newPage()
+            pix = self.document.render_page(p_idx, zoom=2.0)
+            scaled = pix.scaled(
+                page_rect.size().toSize(), 
+                Qt.AspectRatioMode.KeepAspectRatio, 
+                Qt.TransformationMode.SmoothTransformation
+            )
+            x = page_rect.left() + (page_rect.width() - scaled.width()) / 2
+            y = page_rect.top() + (page_rect.height() - scaled.height()) / 2
+            painter.drawPixmap(int(x), int(y), scaled)
+        painter.end()
+
+    # --- Live Text Extraction ---
+    def _copy_current_page_text(self):
+        if not self.document:
+            return
+        txt = self.document.extract_text(self.canvas.current_page)
+        if txt.strip():
+            QApplication.clipboard().setText(txt)
+            self._show_status(f"Copied {len(txt)} characters to clipboard.")
+        else:
+            self._show_status("No selectable text on this page.")
+
+    def _extract_all_text(self):
+        if not self.document:
+            return
+        txt = self.document.extract_text(None)
+        if txt.strip():
+            QApplication.clipboard().setText(txt)
+            self._show_status(f"Copied full document text ({len(txt)} chars) to clipboard.")
+        else:
+            self._show_status("No selectable text in document.")
+
+    # --- Fullscreen Slideshow / Presentation Mode ---
+    def _toggle_slideshow(self):
+        if not hasattr(self, "_is_slideshow"):
+            self._is_slideshow = False
+            self._slideshow_timer = QTimer(self)
+            self._slideshow_timer.setInterval(3500)
+            self._slideshow_timer.timeout.connect(self._slideshow_advance)
+
+        self._is_slideshow = not self._is_slideshow
+
+        if self._is_slideshow:
+            self._saved_maximized = self.isMaximized()
+            self._saved_menubar_vis = self.top_menubar.isVisible()
+            self._saved_sidebar_vis = self.sidebar.isVisible()
+            self._saved_statusbar_vis = self.status_bar.isVisible()
+            self._saved_toolbar_vis = self.toolbar_widget.isVisible()
+
+            self.top_menubar.hide()
+            self.sidebar.hide()
+            self.status_bar.hide()
+            self.toolbar_widget.hide()
+            self.showFullScreen()
+            self.canvas.zoom_to_fit()
+            self._show_slideshow_controls(True)
+            self._slideshow_timer.start()
+            self.slideshow_hud.set_playing(True)
+            self._show_status("Slideshow started (Press Esc to exit, Space to pause/resume)")
+        else:
+            if hasattr(self, "_slideshow_timer"):
+                self._slideshow_timer.stop()
+            self._show_slideshow_controls(False)
+            self.showNormal()
+            if getattr(self, "_saved_maximized", False):
+                self.showMaximized()
+            if getattr(self, "_saved_menubar_vis", True):
+                self.top_menubar.show()
+            if getattr(self, "_saved_sidebar_vis", True):
+                self.sidebar.show()
+            if getattr(self, "_saved_statusbar_vis", True):
+                self.status_bar.show()
+            if getattr(self, "_saved_toolbar_vis", True):
+                self.toolbar_widget.show()
+            self.canvas.zoom_to_fit()
+            self._show_status("Exited slideshow mode.")
+
+    def _toggle_slideshow_timer(self):
+        if not hasattr(self, "_slideshow_timer"):
+            return
+        if self._slideshow_timer.isActive():
+            self._slideshow_timer.stop()
+            self.slideshow_hud.set_playing(False)
+            self._show_status("Slideshow paused")
+        else:
+            self._slideshow_timer.start()
+            self.slideshow_hud.set_playing(True)
+            self._show_status("Slideshow playing")
+
+    def _slideshow_advance(self):
+        if not self.document:
+            return
+        if self.canvas.current_page < self.document.page_count - 1:
+            self.next_page()
+        else:
+            self.canvas.set_page(0)
+            self.sidebar.select_page(0)
+            self._update_status()
+
+    def _show_slideshow_controls(self, show: bool):
+        if hasattr(self, "slideshow_hud") and self.slideshow_hud:
+            if show and self.document:
+                self.slideshow_hud.update_page_info(self.canvas.current_page + 1, self.document.page_count)
+                self.slideshow_hud.show()
+                self.slideshow_hud.raise_()
+            else:
+                self.slideshow_hud.hide()
 
     def _on_sidebar_page_selected(self, page_idx: int):
         self.canvas.set_page(page_idx)
@@ -1342,6 +1710,8 @@ class MacMainWindow(QMainWindow):
                     self.floating_pill.show_status(f"Page {curr} of {tot}  •  {zoom_str}")
                 else:
                     self.floating_pill.show_status(f"{zoom_str}  •  {int(w)} × {int(h)} pt")
+            if hasattr(self, "slideshow_hud") and self.slideshow_hud and getattr(self, "_is_slideshow", False):
+                self.slideshow_hud.update_page_info(curr, tot)
         else:
             self.page_status_label.setText("No document")
             self.page_badge.setVisible(False)
@@ -1355,6 +1725,31 @@ class MacMainWindow(QMainWindow):
     def _show_about(self):
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if getattr(self, "_is_slideshow", False):
+            if event.key() == Qt.Key.Key_Escape:
+                self._toggle_slideshow()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_Space:
+                self._toggle_slideshow_timer()
+                event.accept()
+                return
+            elif event.key() in (Qt.Key.Key_Right, Qt.Key.Key_Down):
+                self.next_page()
+                event.accept()
+                return
+            elif event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Up):
+                self.prev_page()
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "slideshow_hud") and self.slideshow_hud and self.slideshow_hud.isVisible():
+            self.slideshow_hud._reposition()
 
     # --- Drag and Drop ---
     def dragEnterEvent(self, event: QDragEnterEvent):

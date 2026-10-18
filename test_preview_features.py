@@ -227,5 +227,155 @@ class TestPreviewParity(unittest.TestCase):
         qss_light = MacTheme.get_stylesheet(MacTheme.LIGHT)
         self.assertIn("#ececf0", qss_light)
 
+    def test_13_pdf_and_image_page_deletion(self):
+        import tempfile
+        # Test image collection page deletion
+        tf1 = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tf2 = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tf1.close()
+        tf2.close()
+        Image.new("RGB", (100, 100), "red").save(tf1.name)
+        Image.new("RGB", (100, 100), "blue").save(tf2.name)
+
+        doc = Document([tf1.name, tf2.name])
+        self.assertEqual(doc.page_count, 2)
+        # Delete first page
+        success = doc.delete_page(0)
+        self.assertTrue(success)
+        self.assertEqual(doc.page_count, 1)
+        # Cannot delete the only remaining page
+        fail = doc.delete_page(0)
+        self.assertFalse(fail)
+        self.assertEqual(doc.page_count, 1)
+
+        os.remove(tf1.name)
+        os.remove(tf2.name)
+
+    def test_14_page_duplication_and_blank_insert(self):
+        import pymupdf
+        # Test with a PDF document
+        test_pdf = "/tmp/test_dup.pdf"
+        pdoc = pymupdf.open()
+        pdoc.new_page(width=300, height=300)
+        pdoc.save(test_pdf)
+        pdoc.close()
+
+        doc = Document(test_pdf)
+        self.assertEqual(doc.page_count, 1)
+        # Duplicate page
+        dup_ok = doc.duplicate_page(0)
+        self.assertTrue(dup_ok)
+        self.assertEqual(doc.page_count, 2)
+        # Insert blank page
+        insert_ok = doc.insert_blank_page(0)
+        self.assertTrue(insert_ok)
+        self.assertEqual(doc.page_count, 3)
+
+        if os.path.exists(test_pdf):
+            os.remove(test_pdf)
+
+    def test_15_text_extraction(self):
+        import pymupdf
+        test_pdf = "/tmp/test_extract.pdf"
+        pdoc = pymupdf.open()
+        p = pdoc.new_page(width=400, height=400)
+        p.insert_text((50, 50), "Hello Preview macOS")
+        pdoc.save(test_pdf)
+        pdoc.close()
+
+        doc = Document(test_pdf)
+        txt = doc.extract_text(0)
+        self.assertIn("Hello Preview macOS", txt)
+        full_txt = doc.extract_text(None)
+        self.assertIn("Hello Preview macOS", full_txt)
+
+        if os.path.exists(test_pdf):
+            os.remove(test_pdf)
+
+    def test_16_export_all_to_pdf(self):
+        import tempfile
+        tf1 = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tf2 = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tf1.close()
+        tf2.close()
+        Image.new("RGB", (150, 150), "green").save(tf1.name)
+        Image.new("RGB", (150, 150), "yellow").save(tf2.name)
+
+        doc = Document([tf1.name, tf2.name])
+        out_pdf = "/tmp/test_exported_collection.pdf"
+        doc.export_all_to_pdf(out_pdf)
+        self.assertTrue(os.path.exists(out_pdf))
+
+        import pymupdf
+        check_doc = pymupdf.open(out_pdf)
+        self.assertEqual(len(check_doc), 2)
+        check_doc.close()
+
+        os.remove(tf1.name)
+        os.remove(tf2.name)
+        os.remove(out_pdf)
+
+    def test_17_redact_annotation(self):
+        item = AnnotationItem(AnnotationType.REDACT)
+        item.rect = QRectF(20, 20, 150, 40)
+        self.assertEqual(item.item_type, AnnotationType.REDACT)
+        bounds = item.get_bounds()
+        self.assertEqual(bounds.width(), 150.0)
+        self.assertEqual(bounds.height(), 40.0)
+        self.assertTrue(item.contains_point(QPointF(50, 30)))
+
+    def test_18_loupe_magnifier(self):
+        win = MacMainWindow(initial_file=self.test_img_path)
+        canvas = win.canvas
+        self.assertFalse(canvas.loupe_enabled)
+        # Enable loupe
+        canvas.toggle_loupe(True)
+        self.assertTrue(canvas.loupe_enabled)
+        self.assertEqual(canvas.active_tool, AnnotationType.NONE)
+        # Disable loupe
+        canvas.toggle_loupe(False)
+        self.assertFalse(canvas.loupe_enabled)
+        win.close()
+
+    def test_19_mac_export_dialog(self):
+        from preview.ui.export_dialog import MacExportDialog
+        dlg = MacExportDialog(
+            current_file_path=self.test_img_path,
+            page_count=3,
+            current_page=1
+        )
+        self.assertEqual(dlg.selected_format, "PDF")
+        self.assertEqual(dlg.page_count, 3)
+        self.assertEqual(dlg.current_page, 1)
+        self.assertTrue(hasattr(dlg, "quality_slider"))
+        self.assertTrue(hasattr(dlg, "dpi_combo"))
+        dlg.close()
+
+    def test_20_recent_files_settings(self):
+        win = MacMainWindow(initial_file=self.test_img_path)
+        win._add_recent_file(self.test_img_path)
+        from PyQt6.QtCore import QSettings
+        settings = QSettings("TriviLabs", "PreviewMacOS")
+        recents = settings.value("recent_files", [], type=list)
+        self.assertIn(os.path.abspath(self.test_img_path), recents)
+        win._clear_recent_files()
+        cleared = settings.value("recent_files", [], type=list)
+        self.assertEqual(len(cleared), 0)
+        win.close()
+
+    def test_21_slideshow_mode_and_hud(self):
+        win = MacMainWindow(initial_file=self.test_img_path)
+        self.assertTrue(hasattr(win, "slideshow_hud"))
+        self.assertFalse(getattr(win, "_is_slideshow", False))
+        # Start slideshow
+        win._toggle_slideshow()
+        self.assertTrue(getattr(win, "_is_slideshow", True))
+        self.assertTrue(win.slideshow_hud.isVisible())
+        # Exit slideshow
+        win._toggle_slideshow()
+        self.assertFalse(getattr(win, "_is_slideshow", False))
+        self.assertFalse(win.slideshow_hud.isVisible())
+        win.close()
+
 if __name__ == "__main__":
     unittest.main()

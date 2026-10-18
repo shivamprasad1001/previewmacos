@@ -331,8 +331,183 @@ class Document(QObject):
         self.metadata["dimensions"] = f"{new_pil_image.width} × {new_pil_image.height}"
         self.document_changed.emit()
 
-    def export_document(self, output_path: str, format_name: str = "PDF", quality: int = 95):
+    def delete_page(self, page_idx: int) -> bool:
+        """Deletes a specific page from the document. Returns True if successful."""
+        if self.page_count <= 1 or not (0 <= page_idx < self.page_count):
+            return False
+
+        if self.is_pdf and self._pdf_doc:
+            try:
+                self._pdf_doc.delete_page(page_idx)
+                self.page_count = len(self._pdf_doc)
+            except Exception:
+                return False
+        else:
+            if 0 <= page_idx < len(self.image_paths):
+                del self.image_paths[page_idx]
+                self.page_count = len(self.image_paths)
+            else:
+                return False
+
+        # Adjust rotations map
+        new_rotations = {}
+        for idx, deg in self.rotations.items():
+            if idx < page_idx:
+                new_rotations[idx] = deg
+            elif idx > page_idx:
+                new_rotations[idx - 1] = deg
+        self.rotations = new_rotations
+
+        self._thumbnail_cache.clear()
+        self._rendered_cache.clear()
+        self._image_cache.clear()
+        self.is_dirty = True
+
+        if self.current_page >= self.page_count:
+            self.current_page = max(0, self.page_count - 1)
+
+        if not self.is_pdf and self.page_count > 0:
+            self._load_current_image(self.current_page)
+
+        self.document_changed.emit()
+        self.page_changed.emit(self.current_page)
+        return True
+
+    def duplicate_page(self, page_idx: int) -> bool:
+        """Duplicates the given page immediately after it."""
+        if not (0 <= page_idx < self.page_count):
+            return False
+
+        if self.is_pdf and self._pdf_doc:
+            try:
+                temp = pymupdf.open('pdf', self._pdf_doc.tobytes())
+                self._pdf_doc.insert_pdf(temp, from_page=page_idx, to_page=page_idx, start_at=page_idx + 1)
+                self.page_count = len(self._pdf_doc)
+            except Exception:
+                return False
+        else:
+            if 0 <= page_idx < len(self.image_paths):
+                self.image_paths.insert(page_idx + 1, self.image_paths[page_idx])
+                self.page_count = len(self.image_paths)
+            else:
+                return False
+
+        # Adjust rotations map
+        new_rotations = {}
+        for idx, deg in self.rotations.items():
+            if idx <= page_idx:
+                new_rotations[idx] = deg
+            else:
+                new_rotations[idx + 1] = deg
+        if page_idx in self.rotations:
+            new_rotations[page_idx + 1] = self.rotations[page_idx]
+        self.rotations = new_rotations
+
+        self._thumbnail_cache.clear()
+        self._rendered_cache.clear()
+        self._image_cache.clear()
+        self.is_dirty = True
+
+        self.document_changed.emit()
+        return True
+
+    def insert_blank_page(self, after_page_idx: int) -> bool:
+        """Inserts a blank page after the specified page index."""
+        if not (0 <= after_page_idx < self.page_count):
+            after_page_idx = max(0, self.page_count - 1)
+
+        w_pt, h_pt = self.get_page_size(after_page_idx)
+        insert_at = after_page_idx + 1
+
+        if self.is_pdf and self._pdf_doc:
+            try:
+                self._pdf_doc.new_page(pno=insert_at, width=w_pt, height=h_pt)
+                self.page_count = len(self._pdf_doc)
+            except Exception:
+                return False
+        else:
+            # For image collection, create a blank white canvas image
+            try:
+                blank_img = Image.new("RGB", (max(100, int(w_pt)), max(100, int(h_pt))), color="white")
+                import tempfile
+                tf = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tf.close()
+                blank_img.save(tf.name)
+                self.image_paths.insert(insert_at, tf.name)
+                self.page_count = len(self.image_paths)
+            except Exception:
+                return False
+
+        # Shift rotations
+        new_rotations = {}
+        for idx, deg in self.rotations.items():
+            if idx < insert_at:
+                new_rotations[idx] = deg
+            else:
+                new_rotations[idx + 1] = deg
+        self.rotations = new_rotations
+
+        self._thumbnail_cache.clear()
+        self._rendered_cache.clear()
+        self._image_cache.clear()
+        self.is_dirty = True
+
+        self.document_changed.emit()
+        return True
+
+    def extract_text(self, page_idx: Optional[int] = None) -> str:
+        """Extracts text from the current page or entire document."""
+        if not self.is_pdf or not self._pdf_doc:
+            return ""
+
+        try:
+            if page_idx is not None:
+                if 0 <= page_idx < len(self._pdf_doc):
+                    return self._pdf_doc[page_idx].get_text()
+                return ""
+            else:
+                pages_text = []
+                for p_idx, page in enumerate(self._pdf_doc):
+                    txt = page.get_text().strip()
+                    if txt:
+                        pages_text.append(f"--- Page {p_idx + 1} ---\n{txt}")
+                return "\n\n".join(pages_text)
+        except Exception:
+            return ""
+
+    def export_all_to_pdf(self, output_path: str):
+        """Exports the entire document (PDF or multi-image collection) to a clean PDF."""
+        import io
+        if self.is_pdf and self._pdf_doc:
+            for p_idx, deg in self.rotations.items():
+                if deg != 0 and p_idx < len(self._pdf_doc):
+                    page = self._pdf_doc[p_idx]
+                    page.set_rotation((page.rotation + deg) % 360)
+            self._pdf_doc.save(output_path)
+        else:
+            master = pymupdf.open()
+            for idx in range(self.page_count):
+                img = self._get_pil_for_page(idx)
+                if not img:
+                    continue
+                rot = self.rotations.get(idx, 0)
+                if rot != 0:
+                    img = img.rotate(-rot, expand=True)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=95)
+                img_doc = pymupdf.open(stream=buf.getvalue(), filetype="jpg")
+                pdf_bytes = img_doc.convert_to_pdf()
+                page_pdf = pymupdf.open("pdf", pdf_bytes)
+                master.insert_pdf(page_pdf)
+            master.save(output_path)
+            master.close()
+        self.is_dirty = False
+
+    def export_document(self, output_path: str, format_name: str = "PDF", quality: int = 95, page_idx: Optional[int] = None):
         ext = os.path.splitext(output_path)[1].lower()
+        target_page = self.current_page if page_idx is None else page_idx
         
         if self.is_pdf and self._pdf_doc:
             if ext == '.pdf':
@@ -342,24 +517,26 @@ class Document(QObject):
                         page.set_rotation((page.rotation + deg) % 360)
                 self._pdf_doc.save(output_path)
             else:
-                pix = self.render_page(self.current_page, zoom=2.0)
-                pix.save(output_path)
+                pix = self.render_page(target_page, zoom=2.0)
+                pix.save(output_path, quality=quality)
         else:
-            img = self._get_pil_for_page(self.current_page)
+            img = self._get_pil_for_page(target_page)
             if not img:
                 return
-            rot = self.rotations.get(self.current_page, 0)
+            rot = self.rotations.get(target_page, 0)
             if rot != 0:
                 img = img.rotate(-rot, expand=True)
 
             if ext == '.pdf':
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
-                img.save(output_path, "PDF", resolution=100.0)
+                img.save(output_path, "PDF", resolution=150.0)
             elif ext in ['.jpg', '.jpeg']:
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
                 img.save(output_path, "JPEG", quality=quality)
+            elif ext == '.webp':
+                img.save(output_path, "WEBP", quality=quality)
             else:
                 img.save(output_path, quality=quality)
         

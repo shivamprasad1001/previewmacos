@@ -8,3 +8,4 @@ from preview.ui.adjust_size_dialog import AdjustSizeDialog
 from preview.ui.signature_dialog import SignatureDialog
 from preview.ui.inspector_dialog import InspectorDialog
 from preview.ui.about_dialog import AboutDialog
+from preview.ui.export_dialog import MacExportDialog
