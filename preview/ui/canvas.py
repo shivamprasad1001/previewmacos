@@ -6,7 +6,7 @@ markup drawing, handle manipulation, search highlight, and cropping.
 from typing import List, Optional, Tuple, Dict
 from PIL import Image
 
-from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu
+from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu, QDialog
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPixmap, QCursor, QMouseEvent, 
     QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent, QPainterPath
@@ -14,8 +14,9 @@ from PyQt6.QtGui import (
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal, QTimer, QEvent, QVariantAnimation, QEasingCurve
 
 from preview.core.document import Document, SearchResult
-from preview.core.annotations import AnnotationItem, AnnotationType
+from preview.core.annotations import AnnotationItem, AnnotationType, Handle
 from preview.core.history import HistoryManager, ActionCommand
+from preview.ui.sticky_note_dialog import StickyNoteDialog
 
 class CanvasView(QWidget):
     """Interactive canvas rendering document pages and annotations."""
@@ -46,6 +47,7 @@ class CanvasView(QWidget):
         self.stroke_width: float = 3.0
         self.fill_color: QColor = QColor(Qt.GlobalColor.transparent)
         self.font_size: int = 16
+        self.font_family: str = "-apple-system"
         self.active_signature_pixmap: Optional[QPixmap] = None
 
         # Interaction state
@@ -60,6 +62,11 @@ class CanvasView(QWidget):
         self._drag_start_doc_pt: QPointF = QPointF()
         self._item_dragged_total_dx: float = 0.0
         self._item_dragged_total_dy: float = 0.0
+
+        # Handle Resizing State
+        self._active_handle: Handle = Handle.NONE
+        self._resize_orig_bounds: QRectF = QRectF()
+        self._resize_orig_points: List[QPointF] = []
 
         # Selection / Crop box
         self.crop_box: Optional[AnnotationItem] = None
@@ -285,6 +292,31 @@ class CanvasView(QWidget):
         else:
             self.setCursor(Qt.CursorShape.ArrowCursor)
 
+    def set_font_size(self, size: int):
+        self.font_size = size
+        if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
+            self._selected_annotation.font_size = size
+            self.update()
+
+    def set_font_family(self, family: str):
+        self.font_family = family
+        if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
+            self._selected_annotation.font_family = family
+            self.update()
+
+    def clamp_to_doc_bounds(self, pt: QPointF) -> QPointF:
+        if not self.document:
+            return pt
+        w_doc, h_doc = self.document.get_page_size(self.current_page)
+        return QPointF(max(0.0, min(float(w_doc), float(pt.x()))),
+                       max(0.0, min(float(h_doc), float(pt.y()))))
+
+    def is_inside_doc_bounds(self, pt: QPointF) -> bool:
+        if not self.document:
+            return False
+        w_doc, h_doc = self.document.get_page_size(self.current_page)
+        return (0.0 <= pt.x() <= w_doc) and (0.0 <= pt.y() <= h_doc)
+
     def get_document_page_rect(self) -> QRectF:
         """Returns the page rectangle in canvas view coordinates."""
         if not self.document:
@@ -319,7 +351,22 @@ class CanvasView(QWidget):
 
         if event.button() == Qt.MouseButton.LeftButton:
             doc_pt = self.view_to_doc_coords(event.position())
-            
+
+            # 0. Check if clicking on a resize handle of the currently selected annotation
+            if self._selected_annotation and self.active_tool == AnnotationType.NONE:
+                hit_h = self._selected_annotation.get_handle_at_point(doc_pt, self.zoom)
+                if hit_h != Handle.NONE:
+                    self._active_handle = hit_h
+                    self._resize_orig_bounds = QRectF(self._selected_annotation.get_bounds())
+                    self._resize_orig_points = [QPointF(p) for p in self._selected_annotation.points]
+                    return
+
+            # If drawing tool active, ignore clicks outside document page bounds
+            if self.active_tool != AnnotationType.NONE:
+                if not self.is_inside_doc_bounds(doc_pt):
+                    return
+                doc_pt = self.clamp_to_doc_bounds(doc_pt)
+
             # 1. Handle Crop Tool
             if self.active_tool == AnnotationType.CROP_BOX:
                 self.crop_box = AnnotationItem(AnnotationType.CROP_BOX)
@@ -356,13 +403,14 @@ class CanvasView(QWidget):
 
             # 4. Handle Text tool
             if self.active_tool == AnnotationType.TEXT:
-                text, ok = QInputDialog.getText(self, "Add Text", "Enter annotation text:")
+                text, ok = QInputDialog.getText(self, "Add Text", "Enter annotation text:", text="Text")
                 if ok and text.strip():
                     item = AnnotationItem(AnnotationType.TEXT)
                     item.text = text
                     item.stroke_color = QColor(self.stroke_color)
                     item.font_size = self.font_size
-                    item.rect = QRectF(doc_pt.x(), doc_pt.y(), 200, 40)
+                    item.font_family = self.font_family
+                    item.rect = QRectF(doc_pt.x(), doc_pt.y(), 180, 36)
                     self._get_current_annotations().append(item)
                     page = self.current_page
                     self._push_add_command(item, page)
@@ -371,15 +419,17 @@ class CanvasView(QWidget):
 
             # 5. Handle Note tool
             if self.active_tool == AnnotationType.NOTE:
-                text, ok = QInputDialog.getMultiLineText(self, "Sticky Note", "Enter note content:")
-                if ok and text.strip():
-                    item = AnnotationItem(AnnotationType.NOTE)
-                    item.text = text
-                    item.rect = QRectF(doc_pt.x(), doc_pt.y(), 32, 32)
-                    self._get_current_annotations().append(item)
-                    page = self.current_page
-                    self._push_add_command(item, page)
-                    self.update()
+                dlg = StickyNoteDialog(initial_text="", parent=self)
+                if dlg.exec() == QDialog.DialogCode.Accepted:
+                    note_text = dlg.get_text()
+                    if note_text.strip():
+                        item = AnnotationItem(AnnotationType.NOTE)
+                        item.text = note_text
+                        item.rect = QRectF(doc_pt.x(), doc_pt.y(), 32, 32)
+                        self._get_current_annotations().append(item)
+                        page = self.current_page
+                        self._push_add_command(item, page)
+                        self.update()
                 return
 
             # 6. Handle Signature tool
@@ -414,6 +464,61 @@ class CanvasView(QWidget):
             
             self.update()
 
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            doc_pt = self.view_to_doc_coords(event.position())
+            for item in reversed(self._get_current_annotations()):
+                if item.contains_point(doc_pt):
+                    if item.item_type == AnnotationType.TEXT:
+                        self._edit_text_annotation(item)
+                        return
+                    elif item.item_type == AnnotationType.NOTE:
+                        self._open_sticky_note_dialog(item)
+                        return
+
+    def _edit_text_annotation(self, item: AnnotationItem):
+        text, ok = QInputDialog.getMultiLineText(
+            self, "Edit Text Box", "Text content:", item.text
+        )
+        if ok and text is not None:
+            old_text = item.text
+            new_text = text
+            page = self.current_page
+            def undo_txt():
+                if self.current_page != page:
+                    self.set_page(page)
+                item.text = old_text
+                self.update()
+            def redo_txt():
+                if self.current_page != page:
+                    self.set_page(page)
+                item.text = new_text
+                self.update()
+            item.text = new_text
+            self.history.push(ActionCommand("Edit Text", undo_txt, redo_txt))
+            self.update()
+
+    def _open_sticky_note_dialog(self, item: AnnotationItem):
+        dlg = StickyNoteDialog(initial_text=item.text, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            new_text = dlg.get_text()
+            if new_text != item.text:
+                old_text = item.text
+                page = self.current_page
+                def undo_note():
+                    if self.current_page != page:
+                        self.set_page(page)
+                    item.text = old_text
+                    self.update()
+                def redo_note():
+                    if self.current_page != page:
+                        self.set_page(page)
+                    item.text = new_text
+                    self.update()
+                item.text = new_text
+                self.history.push(ActionCommand("Edit Sticky Note", undo_note, redo_note))
+                self.update()
+
     def _push_add_command(self, item: AnnotationItem, page: int):
         def undo_fn():
             if self.current_page != page:
@@ -445,30 +550,41 @@ class CanvasView(QWidget):
 
         doc_pt = self.view_to_doc_coords(event.position())
 
-        # Update Crop Box
-        if self.crop_box and (event.buttons() & Qt.MouseButton.LeftButton):
-            p1 = self.crop_box.rect.topLeft()
-            self.crop_box.rect = QRectF(p1, doc_pt).normalized()
+        # 0. Handle Active Resize Handle Dragging
+        if self._active_handle != Handle.NONE and self._selected_annotation and (event.buttons() & Qt.MouseButton.LeftButton):
+            doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
+            self._selected_annotation.resize_by_handle(
+                self._active_handle, doc_pt_clamped, self._resize_orig_bounds, self._resize_orig_points
+            )
             self.update()
             return
 
-        # Update Active Drawing Annotation
+        # 1. Update Crop Box (clamped to page bounds)
+        if self.crop_box and (event.buttons() & Qt.MouseButton.LeftButton):
+            doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
+            p1 = self.crop_box.rect.topLeft()
+            self.crop_box.rect = QRectF(p1, doc_pt_clamped).normalized()
+            self.update()
+            return
+
+        # 2. Update Active Drawing Annotation (clamped to page bounds)
         if self._active_annotation and (event.buttons() & Qt.MouseButton.LeftButton):
+            doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
             if self._active_annotation.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
-                self._active_annotation.points.append(doc_pt)
+                self._active_annotation.points.append(doc_pt_clamped)
             elif self._active_annotation.item_type in (AnnotationType.RECTANGLE, 
                                                         AnnotationType.ROUNDED_RECT, 
                                                         AnnotationType.ELLIPSE,
                                                         AnnotationType.REDACT):
                 p1 = self._active_annotation.rect.topLeft()
-                self._active_annotation.rect = QRectF(p1, doc_pt).normalized()
+                self._active_annotation.rect = QRectF(p1, doc_pt_clamped).normalized()
             elif self._active_annotation.item_type in (AnnotationType.LINE, AnnotationType.ARROW):
                 if len(self._active_annotation.points) >= 2:
-                    self._active_annotation.points[1] = doc_pt
+                    self._active_annotation.points[1] = doc_pt_clamped
             self.update()
             return
 
-        # Dragging Selected Annotation
+        # 3. Dragging Selected Annotation
         if self._is_dragging_item and self._selected_annotation and (event.buttons() & Qt.MouseButton.LeftButton):
             dx = doc_pt.x() - self._drag_start_doc_pt.x()
             dy = doc_pt.y() - self._drag_start_doc_pt.y()
@@ -479,11 +595,59 @@ class CanvasView(QWidget):
             self.update()
             return
 
+        # 4. Hover cursor update over resize handles
+        if self.active_tool == AnnotationType.NONE and self._selected_annotation and not event.buttons():
+            handle = self._selected_annotation.get_handle_at_point(doc_pt, self.zoom)
+            if handle in (Handle.NW, Handle.SE):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+            elif handle in (Handle.NE, Handle.SW):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+            elif handle in (Handle.N, Handle.S):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+            elif handle in (Handle.E, Handle.W):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+            elif handle in (Handle.START, Handle.END):
+                self.setCursor(Qt.CursorShape.CrossCursor)
+            elif self._selected_annotation.contains_point(doc_pt):
+                self.setCursor(Qt.CursorShape.SizeAllCursor)
+            else:
+                self._update_cursor()
+
     def mouseReleaseEvent(self, event: QMouseEvent):
         if self._is_panning:
             self._is_panning = False
             self._update_cursor()
             self._spring_to_bounds()
+            return
+
+        # Commit resize handle drag
+        if self._active_handle != Handle.NONE:
+            self._active_handle = Handle.NONE
+            if self._selected_annotation:
+                item = self._selected_annotation
+                old_b = QRectF(self._resize_orig_bounds)
+                old_pts = [QPointF(p) for p in self._resize_orig_points]
+                new_b = QRectF(item.get_bounds())
+                new_pts = [QPointF(p) for p in item.points]
+                page = self.current_page
+                def undo_resize():
+                    if self.current_page != page:
+                        self.set_page(page)
+                    if item.item_type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
+                        item.points = [QPointF(p) for p in old_pts]
+                    else:
+                        item.rect = QRectF(old_b)
+                    self.update()
+                def redo_resize():
+                    if self.current_page != page:
+                        self.set_page(page)
+                    if item.item_type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
+                        item.points = [QPointF(p) for p in new_pts]
+                    else:
+                        item.rect = QRectF(new_b)
+                    self.update()
+                self.history.push(ActionCommand("Resize Annotation", undo_resize, redo_resize))
+            self.update()
             return
 
         if self._active_annotation:
@@ -709,6 +873,8 @@ class CanvasView(QWidget):
         # 3. Draw Annotations on this page
         painter.save()
         painter.translate(page_rect.topLeft())
+        w_doc, h_doc = self.document.get_page_size(self.current_page)
+        painter.setClipRect(QRectF(0, 0, w_doc * self.zoom, h_doc * self.zoom))
         for item in self._get_current_annotations():
             item.draw(painter, zoom=self.zoom)
         

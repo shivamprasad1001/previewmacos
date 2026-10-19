@@ -25,6 +25,19 @@ class AnnotationType(Enum):
     CROP_BOX = auto()
     REDACT = auto()
 
+class Handle(Enum):
+    NONE = 0
+    NW = 1
+    N = 2
+    NE = 3
+    E = 4
+    SE = 5
+    S = 6
+    SW = 7
+    W = 8
+    START = 9
+    END = 10
+
 class AnnotationItem:
     """A single markup or annotation element."""
     
@@ -199,8 +212,17 @@ class AnnotationItem:
         painter.restore()
 
     def _draw_resize_handles(self, painter: QPainter, rect: QRectF):
-        """Draws 8 standard macOS resize handles."""
+        """Draws standard macOS resize handles."""
         h_sz = 8.0
+        painter.setBrush(QBrush(QColor("#ffffff")))
+        painter.setPen(QPen(QColor("#0a84ff"), 1.5))
+        
+        if self.item_type in (AnnotationType.LINE, AnnotationType.ARROW) and len(self.points) >= 2:
+            # Handles on start and end
+            for pt in [rect.topLeft(), rect.bottomRight()]:
+                painter.drawRect(QRectF(pt.x() - h_sz/2, pt.y() - h_sz/2, h_sz, h_sz))
+            return
+
         handles = [
             rect.topLeft(), rect.topRight(), rect.bottomLeft(), rect.bottomRight(),
             QPointF(rect.center().x(), rect.top()),
@@ -208,10 +230,88 @@ class AnnotationItem:
             QPointF(rect.left(), rect.center().y()),
             QPointF(rect.right(), rect.center().y())
         ]
-        painter.setBrush(QBrush(QColor("#ffffff")))
-        painter.setPen(QPen(QColor("#0a84ff"), 1.5))
         for pt in handles:
             painter.drawRect(QRectF(pt.x() - h_sz/2, pt.y() - h_sz/2, h_sz, h_sz))
+
+    def get_handles_positions(self, zoom: float = 1.0) -> dict:
+        """Returns dictionary of {Handle: QPointF} in document coordinates."""
+        if self.item_type in (AnnotationType.LINE, AnnotationType.ARROW):
+            if len(self.points) >= 2:
+                return {
+                    Handle.START: self.points[0],
+                    Handle.END: self.points[1]
+                }
+            return {}
+
+        b = self.get_bounds()
+        if not b.isValid() or b.isEmpty():
+            return {}
+        
+        return {
+            Handle.NW: b.topLeft(),
+            Handle.N: QPointF(b.center().x(), b.top()),
+            Handle.NE: b.topRight(),
+            Handle.E: QPointF(b.right(), b.center().y()),
+            Handle.SE: b.bottomRight(),
+            Handle.S: QPointF(b.center().x(), b.bottom()),
+            Handle.SW: b.bottomLeft(),
+            Handle.W: QPointF(b.left(), b.center().y()),
+        }
+
+    def get_handle_at_point(self, doc_pt: QPointF, zoom: float = 1.0) -> Handle:
+        """Returns which handle is hit by doc_pt (in doc coords), or Handle.NONE."""
+        hit_radius = 10.0 / max(0.1, zoom)
+        handles = self.get_handles_positions(zoom)
+        for handle, pt in handles.items():
+            dx = doc_pt.x() - pt.x()
+            dy = doc_pt.y() - pt.y()
+            if (dx * dx + dy * dy) <= (hit_radius * hit_radius):
+                return handle
+        return Handle.NONE
+
+    def resize_by_handle(self, handle: Handle, doc_pt: QPointF, orig_bounds: QRectF, orig_points: Optional[List[QPointF]] = None):
+        """Resizes the annotation based on handle dragging."""
+        min_sz = 10.0
+        if self.item_type in (AnnotationType.LINE, AnnotationType.ARROW):
+            if len(self.points) >= 2:
+                if handle == Handle.START:
+                    self.points[0] = doc_pt
+                elif handle == Handle.END:
+                    self.points[1] = doc_pt
+            return
+
+        l = orig_bounds.left()
+        r = orig_bounds.right()
+        t = orig_bounds.top()
+        b = orig_bounds.bottom()
+
+        if handle in (Handle.NW, Handle.W, Handle.SW):
+            l = min(doc_pt.x(), r - min_sz)
+        if handle in (Handle.NE, Handle.E, Handle.SE):
+            r = max(doc_pt.x(), l + min_sz)
+        if handle in (Handle.NW, Handle.N, Handle.NE):
+            t = min(doc_pt.y(), b - min_sz)
+        if handle in (Handle.SW, Handle.S, Handle.SE):
+            b = max(doc_pt.y(), t + min_sz)
+
+        new_rect = QRectF(l, t, r - l, b - t)
+
+        if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
+                              AnnotationType.ELLIPSE, AnnotationType.TEXT, 
+                              AnnotationType.NOTE, AnnotationType.SIGNATURE, 
+                              AnnotationType.CROP_BOX, AnnotationType.REDACT):
+            self.rect = new_rect
+
+        elif self.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER) and orig_points and orig_bounds.isValid():
+            ow = max(1.0, orig_bounds.width())
+            oh = max(1.0, orig_bounds.height())
+            new_pts = []
+            for p in orig_points:
+                rel_x = (p.x() - orig_bounds.left()) / ow
+                rel_y = (p.y() - orig_bounds.top()) / oh
+                new_pts.append(QPointF(new_rect.left() + rel_x * new_rect.width(),
+                                       new_rect.top() + rel_y * new_rect.height()))
+            self.points = new_pts
 
     def get_bounds(self) -> QRectF:
         """Calculates bounding box of annotation in document coordinates."""

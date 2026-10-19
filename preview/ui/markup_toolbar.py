@@ -6,7 +6,7 @@ text, note, signature, color palettes, and crop actions.
 from typing import Optional
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QToolButton, QColorDialog, QMenu, 
-    QSpinBox, QComboBox, QLabel, QButtonGroup
+    QSpinBox, QComboBox, QFontComboBox, QLabel, QButtonGroup
 )
 from PyQt6.QtGui import QColor, QAction, QIcon, QPixmap, QPainter, QBrush, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
@@ -22,6 +22,10 @@ class MarkupToolbar(QWidget):
     stroke_width_changed = pyqtSignal(float)
     fill_color_changed = pyqtSignal(QColor)
     font_size_changed = pyqtSignal(int)
+    font_family_changed = pyqtSignal(str)
+    adjust_color_requested = pyqtSignal()
+    adjust_size_requested = pyqtSignal()
+    rotate_requested = pyqtSignal()
     crop_requested = pyqtSignal()
     signature_requested = pyqtSignal()
 
@@ -126,7 +130,7 @@ class MarkupToolbar(QWidget):
         self._setup_width_menu()
         layout.addWidget(self.width_btn)
 
-        # 11. Font Size
+        # 11. Font Size & Family
         self.font_spin = QSpinBox()
         self.font_spin.setFixedHeight(28)
         self.font_spin.setRange(8, 72)
@@ -135,12 +139,46 @@ class MarkupToolbar(QWidget):
         self.font_spin.valueChanged.connect(self._on_font_size_changed)
         layout.addWidget(self.font_spin)
 
+        self.font_combo = QFontComboBox()
+        self.font_combo.setFixedHeight(28)
+        self.font_combo.setFixedWidth(130)
+        self.font_combo.setToolTip("Font Family")
+        self.font_combo.currentFontChanged.connect(lambda f: self.font_family_changed.emit(f.family()))
+        layout.addWidget(self.font_combo)
+
         layout.addStretch()
 
-        # 12. Crop Action Button
+        # Thin 1px separator
+        sep2 = QWidget()
+        sep2.setFixedSize(1, 18)
+        sep2.setStyleSheet("background-color: rgba(128, 128, 128, 0.25);")
+        layout.addWidget(sep2)
+
+        # 12. Adjust Color Action Button
+        self.color_adjust_btn = QToolButton()
+        self.color_adjust_btn.setFixedSize(28, 28)
+        self.color_adjust_btn.setToolTip("Adjust Color (Ctrl+Alt+C)")
+        self.color_adjust_btn.clicked.connect(self.adjust_color_requested.emit)
+        layout.addWidget(self.color_adjust_btn)
+
+        # 13. Adjust Size Action Button
+        self.size_adjust_btn = QToolButton()
+        self.size_adjust_btn.setFixedSize(28, 28)
+        self.size_adjust_btn.setToolTip("Adjust Size (Ctrl+Alt+S)")
+        self.size_adjust_btn.clicked.connect(self.adjust_size_requested.emit)
+        layout.addWidget(self.size_adjust_btn)
+
+        # 14. Rotate Left Action Button
+        self.rotate_btn = QToolButton()
+        self.rotate_btn.setFixedSize(28, 28)
+        self.rotate_btn.setToolTip("Rotate Left 90° (Ctrl+L)")
+        self.rotate_btn.clicked.connect(self.rotate_requested.emit)
+        layout.addWidget(self.rotate_btn)
+
+        # 15. Crop Action Button
         self.crop_btn = QToolButton()
         self.crop_btn.setFixedSize(28, 28)
-        self.crop_btn.setToolTip("Crop Selection")
+        self.crop_btn.setToolTip("Crop Selection (Ctrl+K)")
         self.crop_btn.setEnabled(False)
         self.crop_btn.clicked.connect(self.crop_requested.emit)
         layout.addWidget(self.crop_btn)
@@ -197,6 +235,9 @@ class MarkupToolbar(QWidget):
         self.redact_btn.setIcon(MacIconFactory.create_icon("redact", "#ffffff" if self.redact_btn.isChecked() else col, 16))
         self.sign_btn.setIcon(MacIconFactory.create_icon("sign", col, 16))
         self.width_btn.setIcon(MacIconFactory.create_icon("line_style", col, 16))
+        self.color_adjust_btn.setIcon(MacIconFactory.create_icon("color_adjust", col, 16))
+        self.size_adjust_btn.setIcon(MacIconFactory.create_icon("size_adjust", col, 16))
+        self.rotate_btn.setIcon(MacIconFactory.create_icon("rotate_left", col, 16))
         self.crop_btn.setIcon(MacIconFactory.create_icon("crop", col, 16))
 
     def _setup_shapes_menu(self):

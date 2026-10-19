@@ -718,7 +718,11 @@ class MacMainWindow(QMainWindow):
         self.markup_bar.stroke_color_changed.connect(lambda c: setattr(self.canvas, 'stroke_color', c))
         self.markup_bar.stroke_width_changed.connect(lambda w: setattr(self.canvas, 'stroke_width', w))
         self.markup_bar.fill_color_changed.connect(lambda f: setattr(self.canvas, 'fill_color', f))
-        self.markup_bar.font_size_changed.connect(lambda s: setattr(self.canvas, 'font_size', s))
+        self.markup_bar.font_size_changed.connect(self.canvas.set_font_size)
+        self.markup_bar.font_family_changed.connect(self.canvas.set_font_family)
+        self.markup_bar.adjust_color_requested.connect(self._open_adjust_color)
+        self.markup_bar.adjust_size_requested.connect(self._open_adjust_size)
+        self.markup_bar.rotate_requested.connect(self._rotate_left)
         self.markup_bar.crop_requested.connect(self.canvas.apply_crop)
         self.markup_bar.signature_requested.connect(self._open_signature_dialog)
         self.canvas.tool_deselected.connect(self.markup_bar.unselect_all)
@@ -1249,21 +1253,22 @@ class MacMainWindow(QMainWindow):
             return
         from PyQt6.QtGui import QPainter
         painter = QPainter(printer)
-        page_rect = printer.pageLayout().paintRectPixels(printer.resolution())
-
-        for p_idx in range(self.document.page_count):
-            if p_idx > 0:
-                printer.newPage()
-            pix = self.document.render_page(p_idx, zoom=2.0)
-            scaled = pix.scaled(
-                page_rect.size().toSize(), 
-                Qt.AspectRatioMode.KeepAspectRatio, 
-                Qt.TransformationMode.SmoothTransformation
-            )
-            x = page_rect.left() + (page_rect.width() - scaled.width()) / 2
-            y = page_rect.top() + (page_rect.height() - scaled.height()) / 2
-            painter.drawPixmap(int(x), int(y), scaled)
-        painter.end()
+        try:
+            page_rect = printer.pageLayout().paintRectPixels(printer.resolution())
+            for p_idx in range(self.document.page_count):
+                if p_idx > 0:
+                    printer.newPage()
+                pix = self.document.render_page(p_idx, zoom=2.0)
+                scaled = pix.scaled(
+                    page_rect.size(), 
+                    Qt.AspectRatioMode.KeepAspectRatio, 
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                x = page_rect.left() + (page_rect.width() - scaled.width()) / 2
+                y = page_rect.top() + (page_rect.height() - scaled.height()) / 2
+                painter.drawPixmap(int(x), int(y), scaled)
+        finally:
+            painter.end()
 
     # --- Live Text Extraction ---
     def _copy_current_page_text(self):

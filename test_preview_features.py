@@ -440,6 +440,67 @@ class TestPreviewParity(unittest.TestCase):
         worker.cancel()
         self.assertTrue(worker._is_cancelled)
 
+    def test_26_annotation_handle_resizing(self):
+        from preview.core.annotations import Handle
+        rect = AnnotationItem(AnnotationType.RECTANGLE)
+        rect.rect = QRectF(100, 100, 200, 150)
+        
+        # Test handle detection
+        handle = rect.get_handle_at_point(QPointF(300, 250), zoom=1.0)
+        self.assertEqual(handle, Handle.SE)
+        
+        # Test resizing SE handle
+        orig_bounds = rect.get_bounds()
+        orig_pts = list(rect.points)
+        rect.resize_by_handle(Handle.SE, QPointF(350, 280), orig_bounds, orig_pts)
+        self.assertEqual(rect.rect.width(), 250.0)
+        self.assertEqual(rect.rect.height(), 180.0)
+
+        # Test line resizing
+        line = AnnotationItem(AnnotationType.LINE)
+        line.points = [QPointF(50, 50), QPointF(150, 150)]
+        handle_end = line.get_handle_at_point(QPointF(150, 150), zoom=1.0)
+        self.assertEqual(handle_end, Handle.END)
+        line.resize_by_handle(Handle.END, QPointF(180, 200), line.get_bounds(), list(line.points))
+        self.assertEqual(line.points[1], QPointF(180, 200))
+
+    def test_27_sticky_note_dialog(self):
+        from preview.ui.sticky_note_dialog import StickyNoteDialog
+        note = AnnotationItem(AnnotationType.NOTE)
+        note.text = "Initial note text"
+        dlg = StickyNoteDialog(initial_text=note.text)
+        self.assertEqual(dlg.editor.toPlainText(), "Initial note text")
+        dlg.editor.setPlainText("Updated text")
+        dlg.text_saved.connect(lambda txt: setattr(note, "text", txt))
+        dlg.accept()
+        self.assertEqual(note.text, "Updated text")
+        dlg.close()
+
+    def test_28_markup_toolbar_font_and_actions(self):
+        from preview.ui.markup_toolbar import MarkupToolbar
+        tb = MarkupToolbar()
+        self.assertIsNotNone(tb.font_combo)
+        self.assertIsNotNone(tb.color_adjust_btn)
+        self.assertIsNotNone(tb.size_adjust_btn)
+        self.assertIsNotNone(tb.rotate_btn)
+        
+        # Verify signals
+        captured = []
+        tb.adjust_color_requested.connect(lambda: captured.append("color"))
+        tb.color_adjust_btn.click()
+        self.assertIn("color", captured)
+        tb.close()
+
+    def test_29_sidebar_and_thumbnail_slider(self):
+        win = MacMainWindow(initial_file=self.test_img_path)
+        self.assertTrue(win.sidebar.view_btn.isEnabled())
+        
+        # Test slider adjustment
+        initial_w = win.sidebar.thumbnail_width
+        win.sidebar.size_slider.setValue(160)
+        self.assertEqual(win.sidebar.thumbnail_width, 160)
+        win.close()
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -7,7 +7,7 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, 
     QTreeWidget, QTreeWidgetItem, QLabel, QStackedWidget, QToolButton,
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu, QMessageBox
+    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu, QMessageBox, QSlider
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QAction
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QRectF, QModelIndex, QEvent
@@ -33,7 +33,8 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             return
 
         page_idx = index.row()
-        pix = doc.get_thumbnail(page_idx, width=110)
+        thumb_w = float(getattr(self.sidebar, "thumbnail_width", 110))
+        pix = doc.get_thumbnail(page_idx, width=int(thumb_w))
         is_selected = bool(option.state & QStyle.StateFlag.State_Selected)
         is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
 
@@ -47,7 +48,7 @@ class MacThumbnailDelegate(QStyledItemDelegate):
 
         # 2. Compute thumbnail picture rect centered in top portion
         pw, ph = pix.width(), pix.height()
-        max_pw, max_ph = 110.0, 130.0
+        max_pw, max_ph = thumb_w, thumb_w * 1.25
         scale = min(max_pw / max(1, pw), max_ph / max(1, ph))
         draw_w = pw * scale
         draw_h = ph * scale
@@ -129,6 +130,7 @@ class MacSidebar(QWidget):
         
         self.document: Optional[Document] = None
         self.current_view_mode = "Thumbnails"
+        self.thumbnail_width: int = 110
         self._setup_ui()
 
     def _setup_ui(self):
@@ -156,17 +158,17 @@ class MacSidebar(QWidget):
         self.view_menu = QMenu(self)
         self.view_menu.setObjectName("sidebarViewMenu")
 
-        act_thumbs = QAction("Thumbnails", self)
-        act_thumbs.triggered.connect(lambda: self.set_view_mode("Thumbnails"))
-        self.view_menu.addAction(act_thumbs)
+        self.act_thumbs = QAction("Thumbnails", self)
+        self.act_thumbs.triggered.connect(lambda: self.set_view_mode("Thumbnails"))
+        self.view_menu.addAction(self.act_thumbs)
 
-        act_contact = QAction("Contact Sheet", self)
-        act_contact.triggered.connect(lambda: self.set_view_mode("Contact Sheet"))
-        self.view_menu.addAction(act_contact)
+        self.act_contact = QAction("Contact Sheet", self)
+        self.act_contact.triggered.connect(lambda: self.set_view_mode("Contact Sheet"))
+        self.view_menu.addAction(self.act_contact)
 
-        act_toc = QAction("Table of Contents", self)
-        act_toc.triggered.connect(lambda: self.set_view_mode("Table of Contents"))
-        self.view_menu.addAction(act_toc)
+        self.act_toc = QAction("Table of Contents", self)
+        self.act_toc.triggered.connect(lambda: self.set_view_mode("Table of Contents"))
+        self.view_menu.addAction(self.act_toc)
 
         self.view_dropdown.setMenu(self.view_menu)
         self.view_btn = self.view_dropdown  # Alias for compatibility
@@ -201,6 +203,42 @@ class MacSidebar(QWidget):
 
         layout.addWidget(self.stack)
 
+        # Footer with Thumbnail Size Slider
+        footer = QWidget()
+        footer.setFixedHeight(28)
+        footer.setObjectName("sidebarFooter")
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(12, 2, 12, 2)
+        footer_layout.setSpacing(6)
+
+        lbl_s = QLabel()
+        lbl_s.setPixmap(MacIconFactory.create_icon("thumbnails", "#8e8e93", 10).pixmap(10, 10))
+        footer_layout.addWidget(lbl_s)
+
+        self.size_slider = QSlider(Qt.Orientation.Horizontal)
+        self.size_slider.setRange(70, 220)
+        self.size_slider.setValue(110)
+        self.size_slider.setToolTip("Thumbnail Size Slider")
+        self.size_slider.setFixedHeight(16)
+        self.size_slider.valueChanged.connect(self._on_thumbnail_size_changed)
+        footer_layout.addWidget(self.size_slider)
+
+        lbl_l = QLabel()
+        lbl_l.setPixmap(MacIconFactory.create_icon("thumbnails", "#8e8e93", 16).pixmap(16, 16))
+        footer_layout.addWidget(lbl_l)
+
+        layout.addWidget(footer)
+
+    def _on_thumbnail_size_changed(self, size: int):
+        self.thumbnail_width = size
+        item_w = size + 30
+        item_h = int(size * 1.35) + 35
+        for i in range(self.thumb_list.count()):
+            it = self.thumb_list.item(i)
+            if it:
+                it.setSizeHint(QSize(item_w, item_h))
+        self.thumb_list.update()
+
     def set_document(self, doc: Document):
         self.document = doc
         self.reload_thumbnails()
@@ -217,9 +255,11 @@ class MacSidebar(QWidget):
 
         self.page_count_label.setText(f"{self.document.page_count} Pages" if self.document.page_count > 1 else "1 Page")
 
+        item_w = self.thumbnail_width + 30
+        item_h = int(self.thumbnail_width * 1.35) + 35
         for idx in range(self.document.page_count):
             item = QListWidgetItem()
-            item.setSizeHint(QSize(140, 175))
+            item.setSizeHint(QSize(item_w, item_h))
             self.thumb_list.addItem(item)
 
         if self.document.page_count > 0:
@@ -233,9 +273,14 @@ class MacSidebar(QWidget):
             return
             
         outline = self.document.get_outline()
+        # Keep view_dropdown ALWAYS enabled so users can toggle Thumbnails / Contact Sheet
+        self.view_dropdown.setEnabled(True)
+        if hasattr(self, "act_toc"):
+            self.act_toc.setEnabled(bool(outline))
+
         if not outline:
-            self.view_btn.setEnabled(False)
-            self.stack.setCurrentIndex(0)
+            if self.stack.currentIndex() == 1:
+                self.set_view_mode("Thumbnails")
             return
 
         self.view_btn.setEnabled(True)
