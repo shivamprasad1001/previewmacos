@@ -1,165 +1,293 @@
-# Preview (macOS Edition for Linux)
+<p align="center">
+  <img src="preview/assets/icon.png" width="128" height="128" alt="Preview macOS App Icon" />
+</p>
 
-A pixel-faithful, high-performance reconstruction of Apple's **macOS Preview.app** built for Linux with Python, **PyQt6**, **PyMuPDF**, and **Pillow**.
+<h1 align="center">Preview (macOS Edition)</h1>
 
-- **Developer**: Shivam Prasad
-- **Powered by**: [TriviLabs.in](https://trivilabs.in)
+<p align="center">
+  <strong>A pixel-faithful, high-performance reconstruction of Apple's macOS Preview app for Linux and Windows.</strong>
+</p>
 
-![Preview Icon](preview/assets/icon.png)
+<p align="center">
+  <a href="https://github.com/shivamprasad1001/previewmacos/releases"><img src="https://img.shields.io/github/v/release/shivamprasad1001/previewmacos?color=007AFF&style=for-the-badge&logo=apple" alt="Latest Release" /></a>
+  <a href="https://github.com/shivamprasad1001/previewmacos/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-34C759?style=for-the-badge&logo=githubactions&logoColor=white" alt="Build Status" /></a>
+  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" /></a>
+  <a href="https://riverbankcomputing.com/software/pyqt"><img src="https://img.shields.io/badge/GUI-PyQt6-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PyQt6" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
+  <a href="https://trivilabs.in"><img src="https://img.shields.io/badge/Powered%20by-TriviLabs.in-FF9500?style=for-the-badge" alt="Powered by TriviLabs" /></a>
+</p>
+
+<p align="center">
+  <a href="#-quick-download"><strong>Quick Download</strong></a> •
+  <a href="#-features"><strong>Features</strong></a> •
+  <a href="#-visual-tour"><strong>Visual Tour</strong></a> •
+  <a href="#-feature-comparison"><strong>Comparison</strong></a> •
+  <a href="#-installation"><strong>Installation</strong></a> •
+  <a href="#-keyboard-shortcuts"><strong>Shortcuts</strong></a> •
+  <a href="#-architecture"><strong>Architecture</strong></a>
+</p>
+
+---
+
+## 📥 Quick Download
+
+Get the official multiplatform installer for your operating system:
+
+| Platform | Package | Download Link |
+| :--- | :--- | :--- |
+| **Ubuntu / Debian / Kali / Mint** | `.deb` Package | [**Download preview-app_1.2.1_amd64.deb**](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.2.1/preview-app_1.2.1_amd64.deb) |
+| **Windows 10 / 11** | Setup Installer | [**Download Preview-Setup-v1.2.1.exe**](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.2.1/Preview-Setup-v1.2.1.exe) |
+| **All Platforms (Source)** | Python 3.10+ | [**GitHub Source Repository**](https://github.com/shivamprasad1001/previewmacos) |
+
+---
+
+## 📸 Hero Showcase
+
+<p align="center">
+  <img src="docs/screenshots/preview_main_dark.png" width="96%" alt="macOS Preview on Linux in Dark Mode" />
+  <br />
+  <em>macOS Sequoia Dark Mode with Unified Traffic Light Controls, Thumbnail Sidebar, and Document HUD</em>
+</p>
 
 ---
 
 ## ✨ Features
 
-### 📄 Document & Image Engine
-- **Multi-page PDF Engine**: Powered by `PyMuPDF` with crisp high-DPI rasterization, multi-page navigation, page rotation, and text extraction.
-- **Universal Image Support**: Fast viewing and editing of PNG, JPEG, WEBP, GIF, BMP, and TIFF files via Pillow.
-- **High-DPI Retina Rendering**: Clean anti-aliased display output at any zoom scale (10% to 1000%).
-- **Interactive Thumbnails Sidebar**: Collapsible left sidebar with page preview thumbnails and Table of Contents (PDF bookmarks).
+### 📄 Universal Document & Image Engine
+- **Crisp Multi-Page PDF Engine**: High-DPI anti-aliased vector rendering powered by `PyMuPDF`. Smooth page navigation, rotation, and sub-pixel text rendering.
+- **Universal Image Format Support**: Lightning-fast loading for PNG, JPEG, WebP, GIF, BMP, TIFF, and ICO formats via Pillow.
+- **Dynamic Retina Scaling**: Crystal-clear scaling from 10% to 1000% zoom with automatic aspect ratio preservation and continuous document panning.
+- **Collapsible Sidebar**: Authentic macOS thumbnail drawer with badge counters, page reordering, duplication, rotation, and deletion.
+- **PDF Text Search**: Live search bar with instant jump-to-result navigation across document pages.
 
-### 🖌️ Apple Markup & Annotation Toolbar
-Toggle with `Ctrl + Shift + A` or the pencil icon:
-- **Redaction Tool**: Solid blackout marker for permanently obscuring sensitive data (credit cards, passwords, names).
-- **Sketch / Pen**: Smooth freehand vector drawings with customizable stroke widths and colors.
-- **Highlighter**: Translucent highlighter pen for marking text or image areas.
-- **Shapes**: Rectangle, Rounded Rectangle, Oval/Circle, Line, and Arrow with arrowheads.
-- **Text Box**: Insert styled text annotations directly on documents.
-- **Sticky Notes**: macOS yellow sticky notes with folded corners and expandable content.
-- **Signatures**: Interactive trackpad/mouse signature drawing pad with save and insert.
-- **Cropping & Marquee Selection**: Drag-to-select marquee box with 8 resize handles and instant crop execution.
+### 🖌️ Apple Markup & Annotation Suite
+Toggle the secondary markup toolbar with `Ctrl + Shift + A`:
+- **Redaction Tool (Blackout Marker)**: Solid blackout tool for securely sanitizing private data (credit card numbers, passwords, identifiers) prior to exporting.
+- **Apple Pencil Stylus**: Freehand pen tool with customizable stroke widths and calibrated macOS color palettes.
+- **Highlighter Pen**: Semi-translucent highlighter for text and diagram highlighting.
+- **Vector Shapes**: Rectangle, Rounded Rectangle, Oval/Circle, Line, and Directional Arrow with sharp arrowheads.
+- **Text Box Annotator**: Add formatted typography overlays directly onto pages and pictures.
+- **macOS Sticky Notes**: Signature yellow Post-it notes with folded corners and expandable comments.
+- **Digital Signatures**: Interactive trackpad/mouse signature capture pad with permanent signature library and stamp placement.
+- **Marquee Selection & Instant Crop (`Ctrl + K`)**: Drag-to-select marquee box with 8-handle anchor resizing and lossless image cropping.
 
-### 🔍 Advanced Tools & Productivity
-- **Interactive Magnifier / Loupe Tool (`~`)**: Real-time circular magnifying glass with authentic glass rim, reticle, and drop shadow.
-- **Fullscreen Slideshow Mode (`F11`)**: Borderless presentation mode with floating glass HUD and auto-advance timer.
-- **Native Print & Print Preview (`Ctrl + P` / `Ctrl + Shift + P`)**: High-resolution printing for all documents and photo galleries.
-- **Export as PDF... & Advanced Export Sheet (`Ctrl + Shift + E` / `Ctrl + E`)**: One-click convert to PDF, or export to PNG, JPEG, WebP, TIFF with DPI and compression control.
-- **Live Text Extraction (`Ctrl + Shift + C`)**: Extract and copy selectable page text or entire document text to clipboard.
-- **Sidebar Page Management**: Right-click any thumbnail to Delete, Duplicate, Insert Blank Page, or Rotate.
-- **Open Recent Menu**: Automatically tracks and remembers the last 10 opened documents and folders.
-- **PDF Text Search**: Live search bar highlighting matching query occurrences across pages.
-- **Inspector Window (`Ctrl + I`)**: Detailed file stats, dimensions, DPI, color space, author, creator, and PDF metadata.
+### 🔍 Precision Productivity Tools
+- **Interactive Magnifier / Loupe Tool (`~` or `` ` ``)**: Real-time circular magnifying glass with authentic Apple glass rim, crosshair reticle, and soft drop shadow.
+- **Fullscreen Slideshow Mode (`F11`)**: Distraction-free presentation mode with dark borderless background, keyboard navigation, and floating glass control HUD.
+- **Live Text Extraction (`Ctrl + Shift + C`)**: One-click OCR-free text extraction from any PDF page directly to the system clipboard.
+- **Native Print & Print Preview (`Ctrl + P` / `Ctrl + Shift + P`)**: High-resolution print engine with full page layout, orientation, and margin controls.
+- **Export as PDF & Advanced Export Sheet (`Ctrl + E`)**: Convert any image to PDF, or export documents with configurable DPI, compression quality, and image formats (PNG, JPEG, WebP, TIFF).
+- **Inspector Window (`Ctrl + I`)**: Detailed document metadata inspection including dimensions, DPI resolution, color spaces, author, creator, and timestamps.
 
-### 🎨 Apple Adjust Color & Size
-- **Adjust Color Panel (`Ctrl + Alt + C`)**: Real-time multi-channel RGB histogram, Exposure, Contrast, Highlights, Shadows, Saturation, Temperature, Tint, Sharpness, Sepia, and instant **Auto Levels**.
-- **Adjust Size Panel (`Ctrl + Alt + S`)**: Preset dimensions (Full HD, 4K, 1024×768), proportional aspect ratio locking, pixels/percent unit conversion, and real-time output size estimation.
+### 🎨 Pro Image Adjustment Lab
+- **Adjust Color Panel (`Ctrl + Alt + C`)**: Interactive real-time RGB color histogram, Exposure, Contrast, Highlights, Shadows, Saturation, Temperature, Tint, Sharpness, Sepia, and instant **Auto Levels**.
+- **Adjust Size Panel (`Ctrl + Alt + S`)**: Preset resolution templates (Full HD, 4K, 1024×768), proportional aspect ratio locking, pixels/percentage unit switching, and live file size estimation.
 
-### 🌗 macOS Sequoia Aesthetics
-- Unified macOS toolbar with traffic light controls.
-- Dynamic **Dark Mode** and **Light Mode** switching.
-- Drag-and-drop support: drop any PDF or image into the window to open immediately.
+### 🔄 Sparkle-Style In-App Software Updater
+- **Automated Update Checking**: Background checking on startup and manual check via menu item.
+- **In-App Download Sheet**: Real-time progress bar displaying download speed, percentage, and formatted release notes.
+- **One-Click Native Reinstall**: Automatically invokes native package managers (`dpkg` via `pkexec` on Linux, silent installer on Windows) and relaunches the application.
 
 ---
 
-## 🚀 Quick Start
+## 🖼️ Visual Tour
 
-### 1. Requirements
-Ensure Python 3 and the required dependencies are installed:
+| Apple Markup Toolbar & Annotations | macOS Light Mode Interface |
+| :---: | :---: |
+| <img src="docs/screenshots/preview_markup_showcase.png" width="100%" alt="Markup Toolbar" /> | <img src="docs/screenshots/preview_main_light.png" width="100%" alt="Light Mode" /> |
+| *Redaction marker, sticky notes, and vector shapes* | *Clean, authentic macOS Light Mode interface* |
+
+| Image Color Adjustment & Histogram | Sparkle-Style In-App Auto-Updater |
+| :---: | :---: |
+| <img src="docs/screenshots/preview_adjust_color.png" width="100%" alt="Adjust Color Dialog" /> | <img src="docs/screenshots/preview_updater.png" width="100%" alt="Software Updater" /> |
+| *Real-time RGB histogram, exposure, and auto-levels* | *Live in-app download and native auto-relaunch* |
+
+---
+
+## 📊 Feature Comparison
+
+| Feature | macOS Preview | **Preview (This App)** | Evince / GNOME Document Viewer | Okular | Eye of GNOME (eog) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **macOS Sequoia Unified UI** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Multi-Page PDF & Image Support** | ✅ | ✅ | PDF only | Mixed | Images only |
+| **Redaction Tool (Data Blackout)** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Trackpad / Mouse Signature Pad** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Interactive Loupe / Magnifier Lens** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Adjust Color (Live RGB Histogram)** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Proportional Adjust Size Presets** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Sticky Notes & Vector Annotations** | ✅ | ✅ | Basic | Complex | ❌ |
+| **Fullscreen Presentation Slideshow** | ✅ | ✅ | Presentation | Presentation | Slideshow |
+| **Sparkle-Style Auto Updater** | ✅ | ✅ | System only | System only | System only |
+| **Cross-Platform (Linux & Windows)** | ❌ (macOS only) | ✅ | Linux only | Complex | Linux only |
+
+---
+
+## 🚀 Installation & Running
+
+### 🐧 Linux Installation (.deb Package)
+
+#### Option 1: Install from Release Binary
+Download and install the official Debian/Ubuntu package:
 ```bash
-pip install PyQt6 pymupdf pillow
+wget https://github.com/shivamprasad1001/previewmacos/releases/download/v1.2.1/preview-app_1.2.1_amd64.deb
+sudo dpkg -i preview-app_1.2.1_amd64.deb || sudo apt-get install -f -y
 ```
 
-### 2. Run the Application
-You can launch Preview directly or pass a document or image path:
+#### Option 2: Build Debian Package from Source
 ```bash
-# Launch empty
+git clone https://github.com/shivamprasad1001/previewmacos.git
+cd previewmacos
+chmod +x build_deb.sh
+./build_deb.sh
+sudo dpkg -i dist/preview-app_*.deb
+```
+
+---
+
+### 🪟 Windows Installation
+
+1. Download [`Preview-Setup-v1.2.1.exe`](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.2.1/Preview-Setup-v1.2.1.exe).
+2. Run the installer wizard and launch **Preview** from your Start Menu or Desktop shortcut.
+
+---
+
+### 🐍 Running from Source (Cross-Platform)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/shivamprasad1001/previewmacos.git
+cd previewmacos
+
+# 2. Set up virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run the application
 ./run.sh
 
-# Or open a PDF or image
-./run.sh ~/Downloads/document.pdf
-./run.sh ~/Pictures/wallpaper.png
+# Or open a file directly
+./run.sh path/to/document.pdf
 ```
-
-Or run with Python directly:
-```bash
-python3 main.py [optional_path]
-```
-
----
-
-## 📦 Installable Packages (Linux & Windows)
-
-### 🐧 Linux Installation (.deb)
-A pre-built Debian package is located in `dist/preview-app_1.2.1_amd64.deb`.
-To install it on Debian, Ubuntu, Kali, Linux Mint, or Pop!_OS:
-```bash
-sudo dpkg -i dist/preview-app_1.2.1_amd64.deb
-```
-Or rebuild the `.deb` package anytime with a single command:
-```bash
-./build_deb.sh
-```
-
-### 🪟 Windows Setup Installer
-1. On a Windows PC, run:
-   ```cmd
-   windows\build_win.bat
-   ```
-2. Compile `windows\setup.iss` with [Inno Setup](https://jrsoftware.org/isdl.php) to generate `dist\Preview-Setup-v1.2.1.exe`.
-3. Automated GitHub Actions will also build both `.deb` and Windows `.exe` installers automatically on push.
 
 ---
 
 ## ⌨️ Keyboard Shortcuts
 
+### File & Export
 | Shortcut | Action |
 | :--- | :--- |
-| `Ctrl + O` | Open File... |
-| `Ctrl + Shift + O` | Open Folder of Images... |
-| `Ctrl + S` | Save |
+| `Ctrl + O` | Open Document or Image... |
+| `Ctrl + Shift + O` | Open Directory of Photos as Gallery... |
+| `Ctrl + S` | Save Current Document |
 | `Ctrl + Shift + S` | Save As... |
-| `Ctrl + Shift + E` | Export as PDF... |
-| `Ctrl + E` | Export... (Format, Quality, DPI Sheet) |
-| `Ctrl + P` | Print Document... |
-| `Ctrl + Shift + P` | Print Preview... |
-| `Ctrl + Shift + C` | Copy Current Page Text |
-| `F11` / `Ctrl + Shift + F` | Toggle Fullscreen Slideshow |
-| `~` / `` ` `` | Toggle Magnifier / Loupe Tool |
-| `Ctrl + B` | Toggle Sidebar |
+| `Ctrl + Shift + E` | Quick Export as PDF... |
+| `Ctrl + E` | Advanced Export Sheet (Format, DPI, Quality) |
+| `Ctrl + P` | Native Print Document... |
+| `Ctrl + Shift + P` | Print Preview Sheet... |
+| `Ctrl + Shift + C` | Copy Current Page Text to Clipboard |
+| `Ctrl + Q` | Quit Application |
+
+### Viewing & Navigation
+| Shortcut | Action |
+| :--- | :--- |
 | `Ctrl + +` / `Ctrl + =` | Zoom In |
 | `Ctrl + -` | Zoom Out |
-| `Ctrl + 0` | Actual Size (100%) |
-| `Ctrl + 9` | Zoom to Fit |
-| `Ctrl + L` | Rotate Left 90° |
-| `Ctrl + R` | Rotate Right 90° |
-| `Ctrl + K` | Crop Selected Box |
-| `Ctrl + Shift + A` | Toggle Markup Toolbar |
-| `Ctrl + Alt + C` | Adjust Color... |
-| `Ctrl + Alt + S` | Adjust Size... |
-| `Ctrl + I` | Show Inspector |
-| `Space + Drag` | Pan / Hand Tool |
-| `Delete` / `Backspace` | Delete Selected Annotation / Page |
-| `Ctrl + Z` | Undo |
-| `Ctrl + Shift + Z` | Redo |
-| `Ctrl + Q` | Quit |
+| `Ctrl + 0` | Actual Size (100% Zoom) |
+| `Ctrl + 9` | Zoom to Fit Window |
+| `Ctrl + B` | Toggle Thumbnail Sidebar |
+| `F11` / `Ctrl + Shift + F` | Toggle Fullscreen Slideshow |
+| `~` / `` ` `` | Toggle Loupe / Magnifier Lens |
+| `Space + Drag` | Pan Document (Hand Tool) |
+| `Ctrl + L` / `Ctrl + R` | Rotate Left / Right 90° |
+| `Left` / `Right` Arrow | Previous / Next Page |
+
+### Markup & Image Adjustments
+| Shortcut | Action |
+| :--- | :--- |
+| `Ctrl + Shift + A` | Show / Hide Markup Toolbar |
+| `Ctrl + K` | Crop Selected Marquee Rectangle |
+| `Ctrl + Alt + C` | Open Adjust Color Panel & Histogram |
+| `Ctrl + Alt + S` | Open Adjust Size Panel |
+| `Ctrl + I` | Open Document & PDF Inspector |
+| `Ctrl + Z` | Undo Last Edit |
+| `Ctrl + Shift + Z` | Redo Edit |
+| `Delete` / `Backspace` | Delete Selected Annotation or Page |
 
 ---
 
-## 📁 Project Architecture
+## 📁 Architecture & Code Organization
 
 ```
 preview-macos/
-├── main.py                     # Application entry point
-├── run.sh                      # Shell launcher script
-├── preview.desktop             # Linux desktop menu entry
-├── requirements.txt            # Python dependencies
-├── README.md                   # Documentation
+├── main.py                     # High-performance application entry point
+├── run.sh                      # Instant shell launcher
+├── build_deb.sh                # Automated Debian package builder
+├── preview.desktop             # Linux XDG desktop menu definition
+├── requirements.txt            # Minimal runtime dependencies
+├── test_preview_features.py    # Comprehensive 25-point test suite
+├── docs/
+│   └── screenshots/            # Showcase documentation media
+├── windows/
+│   ├── build_win.bat           # Windows PyInstaller build script
+│   └── setup.iss               # Inno Setup installer script
 └── preview/
-    ├── theme.py                # macOS Dark & Light stylesheets
-    ├── icons.py                # Vector SF Symbols icon generator
+    ├── __init__.py             # Dynamic package metadata & version
+    ├── theme.py                # macOS Sequoia Dark & Light stylesheet tokens
+    ├── icons.py                # Vector SF Symbols iconography generator
     ├── core/
-    │   ├── document.py         # Unified PDF & Image document model
-    │   ├── annotations.py      # Vector annotations & markup engine
-    │   ├── color_adjust.py     # Image filtering & histogram engine
-    │   └── history.py          # Undo/Redo command manager
-    ├── ui/
-    │   ├── main_window.py      # Main macOS window with unified toolbar
-    │   ├── mac_sidebar.py      # Collapsible thumbnails & outline sidebar
-    │   ├── canvas.py           # Interactive high-DPI rendering canvas
-    │   ├── markup_toolbar.py   # Secondary annotation & style toolbar
-    │   ├── adjust_color_dialog.py # Apple Adjust Color modal with histogram
-    │   ├── adjust_size_dialog.py  # Apple Adjust Size modal
-    │   ├── signature_dialog.py # Vector signature drawing & stamping pad
-    │   └── inspector_dialog.py # Document & PDF metadata inspector
-    └── assets/
-        └── icon.png            # macOS squircle app icon
+    │   ├── document.py         # Unified PDF & Image dual-engine model
+    │   ├── annotations.py      # Vector annotations, hit-testing & serialization
+    │   ├── color_adjust.py     # Real-time RGB histogram & Pillow image filters
+    │   ├── updater.py          # Sparkle GitHub API updater & background downloader
+    │   └── history.py          # Undo/Redo command pattern manager
+    └── ui/
+        ├── main_window.py      # Unified macOS toolbar, traffic lights, canvas host
+        ├── mac_sidebar.py      # Asynchronous thumbnails & outline navigation drawer
+        ├── canvas.py           # Interactive high-DPI rasterization & markup canvas
+        ├── markup_toolbar.py   # Secondary Apple markup & style control bar
+        ├── adjust_color_dialog.py # Interactive RGB color curves & filter window
+        ├── adjust_size_dialog.py  # Resolution scaling & unit conversion panel
+        ├── signature_dialog.py # Vector trackpad signature pad
+        ├── update_dialog.py    # macOS Sparkle update sheet & notification banner
+        ├── export_dialog.py    # Multi-format export sheet with DPI control
+        ├── about_dialog.py     # Native macOS About sheet
+        └── inspector_dialog.py # Document metadata & PDF structure inspector
 ```
+
+---
+
+## 🧪 Testing & Verification
+
+A dedicated automated test suite validates parity, image decoding, PDF rasterization, undo/redo history, color engines, and updater logic:
+
+```bash
+python3 test_preview_features.py
+```
+
+All 25 test cases run in headless offscreen mode and complete in under one second.
+
+---
+
+## 🤝 Contributing
+
+Contributions, bug reports, and feature requests are welcome!
+
+1. Check existing issues or open a new [Bug Report](https://github.com/shivamprasad1001/previewmacos/issues/new?template=bug_report.md) or [Feature Request](https://github.com/shivamprasad1001/previewmacos/issues/new?template=feature_request.md).
+2. Read our [Contributing Guidelines](CONTRIBUTING.md).
+3. Ensure all tests pass prior to submitting your Pull Request.
+
+---
+
+## 👨‍💻 Author & Attribution
+
+- **Lead Developer**: **Shivam Prasad** ([@shivamprasad1001](https://github.com/shivamprasad1001))
+- **Powered by**: [**TriviLabs.in**](https://trivilabs.in) — Innovative Engineering & Research
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
