@@ -19,7 +19,8 @@ from PyQt6.QtCore import QPointF, QRectF
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 app = QApplication(sys.argv)
 
-from preview.core.document import Document
+import pymupdf
+from preview.core.document import Document, PasswordRequiredError
 from preview.core.annotations import AnnotationItem, AnnotationType
 from preview.core.color_adjust import ColorAdjustEngine
 from preview.core.history import HistoryManager, ActionCommand
@@ -500,6 +501,258 @@ class TestPreviewParity(unittest.TestCase):
         win.sidebar.size_slider.setValue(160)
         self.assertEqual(win.sidebar.thumbnail_width, 160)
         win.close()
+
+    def test_30_pdf_links_and_words(self):
+        pdf_path = "/tmp/test_pdf_links_words.pdf"
+        pdf = pymupdf.open()
+        p1 = pdf.new_page(width=612, height=792)
+        p1.insert_text(pymupdf.Point(72, 72), "Hello macOS Preview PDF Engine")
+        p2 = pdf.new_page(width=612, height=792)
+        p2.insert_text(pymupdf.Point(72, 72), "Target Page")
+        p1_ref = pdf[0]
+        p1_ref.insert_link({"kind": pymupdf.LINK_URI, "from": pymupdf.Rect(72, 60, 150, 80), "uri": "https://apple.com"})
+        p1_ref.insert_link({"kind": pymupdf.LINK_GOTO, "from": pymupdf.Rect(72, 90, 150, 110), "page": 1})
+        pdf.save(pdf_path)
+        pdf.close()
+
+        doc = Document(pdf_path)
+        self.assertTrue(doc.is_pdf)
+        self.assertEqual(doc.page_count, 2)
+        
+        # Test word extraction
+        words = doc.get_page_words(0)
+        self.assertGreaterEqual(len(words), 4)
+        word_texts = [w[1] for w in words]
+        self.assertIn("Hello", word_texts)
+        self.assertIn("macOS", word_texts)
+        self.assertIn("Preview", word_texts)
+
+        # Test link extraction
+        links = doc.get_page_links(0)
+        self.assertGreaterEqual(len(links), 2)
+        uri_links = [lk for lk in links if lk.get("uri")]
+        goto_links = [lk for lk in links if lk.get("page") is not None]
+        self.assertEqual(len(uri_links), 1)
+        self.assertEqual(uri_links[0]["uri"], "https://apple.com")
+        self.assertEqual(len(goto_links), 1)
+        self.assertEqual(goto_links[0]["page"], 1)
+
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+
+    def test_31_pdf_page_reordering_and_insertion(self):
+        pdf_path = "/tmp/test_pdf_reorder.pdf"
+        pdf = pymupdf.open()
+        p0 = pdf.new_page()
+        p0.insert_text(pymupdf.Point(72, 72), "Page Zero")
+        p1 = pdf.new_page()
+        p1.insert_text(pymupdf.Point(72, 72), "Page One")
+        p2 = pdf.new_page()
+        p2.insert_text(pymupdf.Point(72, 72), "Page Two")
+        pdf.save(pdf_path)
+        pdf.close()
+
+        doc = Document(pdf_path)
+        self.assertEqual(doc.page_count, 3)
+
+        # Reorder: move page 0 to index 2
+        moved = doc.move_page(0, 2)
+        self.assertTrue(moved)
+        self.assertEqual(doc.page_count, 3)
+        self.assertIn("Page Zero", doc.extract_text(2))
+        self.assertIn("Page One", doc.extract_text(0))
+
+        # Insert page from an image or pdf
+        insert_path = "/tmp/test_pdf_to_insert.pdf"
+        p_ins = pymupdf.open()
+        p_new = p_ins.new_page()
+        p_new.insert_text(pymupdf.Point(72, 72), "Inserted Fresh Page")
+        p_ins.save(insert_path)
+        p_ins.close()
+
+        ins_ok = doc.insert_file(insert_path, after_page_idx=0)
+        self.assertTrue(ins_ok)
+        self.assertEqual(doc.page_count, 4)
+        self.assertIn("Inserted Fresh Page", doc.extract_text(1))
+
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+        if os.path.exists(insert_path):
+            os.remove(insert_path)
+
+    def test_32_pdf_merge_and_split(self):
+        pdf1 = "/tmp/test_merge_1.pdf"
+        pdf2 = "/tmp/test_merge_2.pdf"
+        merged = "/tmp/test_merged_out.pdf"
+        split_out = "/tmp/test_split_out.pdf"
+
+        # Create two test PDFs
+        d1 = pymupdf.open()
+        d1.new_page()
+        d1.new_page()
+        d1.save(pdf1)
+        d1.close()
+
+        d2 = pymupdf.open()
+        d2.new_page()
+        d2.new_page()
+        d2.new_page()
+        d2.save(pdf2)
+        d2.close()
+
+        # Test merge
+        ok_merge = Document.merge_pdfs([pdf1, pdf2], merged)
+        self.assertTrue(ok_merge)
+        merged_doc = Document(merged)
+        self.assertEqual(merged_doc.page_count, 5)
+
+        # Test split: extract pages 0, 2, 4
+        ok_split = merged_doc.split_pdf(split_out, [0, 2, 4])
+        self.assertTrue(ok_split)
+        split_doc = Document(split_out)
+        self.assertEqual(split_doc.page_count, 3)
+
+        for p in [pdf1, pdf2, merged, split_out]:
+            if os.path.exists(p):
+                os.remove(p)
+
+    def test_33_pdf_password_protection(self):
+        pdf_path = "/tmp/test_pdf_plain.pdf"
+        enc_path = "/tmp/test_pdf_encrypted.pdf"
+
+        pdf = pymupdf.open()
+        p = pdf.new_page()
+        p.insert_text(pymupdf.Point(72, 72), "Super Secret Information")
+        pdf.save(pdf_path)
+        pdf.close()
+
+        doc = Document(pdf_path)
+        doc.set_pdf_password("Apple12345")
+        doc.save_with_annotations(enc_path, {})
+
+        # Opening without password should raise PasswordRequiredError
+        with self.assertRaises(PasswordRequiredError):
+            Document(enc_path)
+
+        # Opening with correct password in init should succeed
+        doc_authed = Document(enc_path, password="Apple12345")
+        self.assertEqual(doc_authed.page_count, 1)
+        self.assertIn("Super Secret", doc_authed.extract_text(0))
+
+        for p in [pdf_path, enc_path]:
+            if os.path.exists(p):
+                os.remove(p)
+
+    def test_34_pdf_save_with_annotations(self):
+        pdf_path = "/tmp/test_pdf_annot.pdf"
+        annot_out = "/tmp/test_pdf_annot_baked.pdf"
+
+        pdf = pymupdf.open()
+        p = pdf.new_page(width=600, height=800)
+        p.insert_text(pymupdf.Point(50, 50), "Document content before annotation")
+        pdf.save(pdf_path)
+        pdf.close()
+
+        doc = Document(pdf_path)
+        
+        # Build annotations
+        pen = AnnotationItem(AnnotationType.PEN)
+        pen.points = [QPointF(50, 100), QPointF(100, 150), QPointF(150, 100)]
+        pen.stroke_color = QColor(255, 0, 0)
+        pen.stroke_width = 3.0
+
+        rect = AnnotationItem(AnnotationType.RECTANGLE)
+        rect.rect = QRectF(50, 200, 100, 60)
+        rect.stroke_color = QColor(0, 122, 255)
+        rect.stroke_width = 2.0
+
+        txt = AnnotationItem(AnnotationType.TEXT)
+        txt.rect = QRectF(50, 300, 200, 40)
+        txt.text = "Native Preview Text Annot"
+        txt.stroke_color = QColor(0, 0, 0)
+
+        note = AnnotationItem(AnnotationType.NOTE)
+        note.rect = QRectF(50, 400, 32, 32)
+        note.text = "Mac Note popup content"
+
+        ok_save = doc.save_with_annotations(annot_out, {0: [pen, rect, txt, note]})
+        self.assertTrue(ok_save)
+
+        # Inspect baked annotations using PyMuPDF directly
+        baked = pymupdf.open(annot_out)
+        baked_page = baked[0]
+        annots = list(baked_page.annots())
+        self.assertGreaterEqual(len(annots), 3)
+        baked.close()
+
+        for p in [pdf_path, annot_out]:
+            if os.path.exists(p):
+                os.remove(p)
+
+    def test_35_canvas_pdf_text_selection_and_view_mode(self):
+        from preview.ui.canvas import CanvasView
+        canvas = CanvasView()
+        
+        # Test view mode switching
+        canvas.set_view_mode("Two-Up")
+        self.assertEqual(canvas.view_mode, "Two-Up")
+        canvas.set_view_mode("Single")
+        self.assertEqual(canvas.view_mode, "Single")
+
+        # Test text selection structures
+        canvas._is_selecting_text = False
+        canvas._selected_text = "Selected Parity Text"
+        canvas._copy_selected_text()
+        
+        # Test clipboard content
+        clipboard = QApplication.clipboard()
+        self.assertEqual(clipboard.text(), "Selected Parity Text")
+
+        canvas._clear_text_selection()
+        self.assertEqual(canvas._selected_text, "")
+        self.assertEqual(len(canvas._text_sel_rects), 0)
+        canvas.close()
+
+    def test_36_permanent_redactions_and_form_fields(self):
+        pdf_path = "/tmp/test_pdf_redact_form.pdf"
+        pdf = pymupdf.open()
+        page = pdf.new_page(width=600, height=800)
+        page.insert_text(pymupdf.Point(50, 100), "Sensitive Secret Token XYZ")
+        
+        # Add a text form widget
+        widget = pymupdf.Widget()
+        widget.rect = pymupdf.Rect(50, 200, 250, 240)
+        widget.field_name = "UserEmail"
+        widget.field_type = pymupdf.PDF_WIDGET_TYPE_TEXT
+        widget.field_value = "default@apple.com"
+        page.add_widget(widget)
+
+        # Add a redaction annotation over "Sensitive Secret Token XYZ"
+        page.add_redact_annot(pymupdf.Rect(45, 80, 300, 120))
+        pdf.save(pdf_path)
+        pdf.close()
+
+        doc = Document(pdf_path)
+        
+        # 1. Test form field inspection and update
+        fields = doc.get_form_fields(0)
+        self.assertEqual(len(fields), 1)
+        self.assertEqual(fields[0]["name"], "UserEmail")
+        self.assertEqual(fields[0]["value"], "default@apple.com")
+        
+        set_ok = doc.set_form_field_value(0, "UserEmail", "steve@apple.com")
+        self.assertTrue(set_ok)
+        updated_fields = doc.get_form_fields(0)
+        self.assertEqual(updated_fields[0]["value"], "steve@apple.com")
+
+        # 2. Test permanent redaction
+        self.assertIn("Sensitive Secret Token XYZ", doc.extract_text(0))
+        redact_ok = doc.apply_permanent_redactions(0)
+        self.assertTrue(redact_ok)
+        self.assertNotIn("Sensitive Secret Token XYZ", doc.extract_text(0))
+
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
 
 if __name__ == "__main__":
     unittest.main()

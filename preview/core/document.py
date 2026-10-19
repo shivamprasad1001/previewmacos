@@ -5,15 +5,22 @@ Provides high-DPI rendering, thumbnail caching, text extraction, search, and pag
 
 import os
 import re
+import io
+import shutil
+import tempfile
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 
 import pymupdf
 from PIL import Image
-from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtCore import QObject, pyqtSignal, QRectF
+from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen
+from PyQt6.QtCore import QObject, pyqtSignal, QRectF, Qt, QBuffer, QIODevice
 
 SUPPORTED_IMAGE_EXTS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif'}
+
+class PasswordRequiredError(Exception):
+    """Raised when an encrypted PDF requires a user password."""
+    pass
 
 def natural_sort_key(s: str):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
@@ -30,7 +37,7 @@ class Document(QObject):
     document_changed = pyqtSignal()
     page_changed = pyqtSignal(int)
 
-    def __init__(self, initial_target: Optional[Any] = None):
+    def __init__(self, initial_target: Optional[Any] = None, password: Optional[str] = None):
         super().__init__()
         self.file_path: Optional[str] = None
         self.file_name: str = "Untitled"
@@ -57,9 +64,9 @@ class Document(QObject):
             elif os.path.isdir(initial_target):
                 self.load_folder(initial_target)
             elif os.path.isfile(initial_target):
-                self.load_file(initial_target)
+                self.load_file(initial_target, password=password)
 
-    def load_file(self, file_path: str) -> bool:
+    def load_file(self, file_path: str, password: Optional[str] = None) -> bool:
         """Loads a PDF, single image, or folder."""
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -69,7 +76,7 @@ class Document(QObject):
 
         ext = os.path.splitext(file_path)[1].lower()
         if ext == '.pdf':
-            return self._load_single_pdf(file_path)
+            return self._load_single_pdf(file_path, password=password)
         elif ext in SUPPORTED_IMAGE_EXTS:
             return self.load_files([file_path])
         else:
@@ -135,12 +142,23 @@ class Document(QObject):
             self._pdf_doc = None
         self._pil_image = None
 
-    def _load_single_pdf(self, file_path: str) -> bool:
+    def _load_single_pdf(self, file_path: str, password: Optional[str] = None) -> bool:
         self._reset_state()
         self.file_path = os.path.abspath(file_path)
         self.file_name = os.path.basename(file_path)
         self.is_pdf = True
         self._pdf_doc = pymupdf.open(file_path)
+        
+        if self._pdf_doc.is_encrypted:
+            if password is not None:
+                rc = self._pdf_doc.authenticate(password)
+                if rc == 0:
+                    raise PasswordRequiredError("Incorrect password for PDF.")
+            else:
+                rc = self._pdf_doc.authenticate("")
+                if rc == 0:
+                    raise PasswordRequiredError(f"Password required to open '{self.file_name}'.")
+
         self.page_count = len(self._pdf_doc)
         
         meta = self._pdf_doc.metadata or {}
@@ -159,6 +177,17 @@ class Document(QObject):
         self.current_page = 0
         self.document_changed.emit()
         return True
+
+    def authenticate_password(self, password: str) -> bool:
+        """Authenticates an encrypted PDF with the given password."""
+        if self.is_pdf and self._pdf_doc and self._pdf_doc.is_encrypted:
+            rc = self._pdf_doc.authenticate(password)
+            if rc > 0:
+                self.page_count = len(self._pdf_doc)
+                self.current_page = 0
+                self.document_changed.emit()
+                return True
+        return False
 
     def _get_pil_for_page(self, page_idx: int) -> Optional[Image.Image]:
         if self.is_pdf:
@@ -316,6 +345,80 @@ class Document(QObject):
             except Exception:
                 return []
         return []
+
+    def get_page_links(self, page_idx: int) -> List[Dict[str, Any]]:
+        """Returns clickable internal and external hyperlinks on the specified PDF page."""
+        links: List[Dict[str, Any]] = []
+        if not self.is_pdf or not self._pdf_doc or not (0 <= page_idx < self.page_count):
+            return links
+        try:
+            page = self._pdf_doc[page_idx]
+            for l in page.get_links():
+                r = l.get("from")
+                if r:
+                    rect = QRectF(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0)
+                    links.append({
+                        "rect": rect,
+                        "uri": l.get("uri"),
+                        "page": l.get("page"),  # Destination page index
+                        "kind": l.get("kind")
+                    })
+        except Exception:
+            pass
+        return links
+
+    def get_page_words(self, page_idx: int) -> List[Tuple[QRectF, str]]:
+        """Returns individual word bounding boxes and strings for interactive text selection."""
+        words: List[Tuple[QRectF, str]] = []
+        if not self.is_pdf or not self._pdf_doc or not (0 <= page_idx < self.page_count):
+            return words
+        try:
+            page = self._pdf_doc[page_idx]
+            raw_words = page.get_text("words")
+            for w in raw_words:
+                rect = QRectF(w[0], w[1], w[2] - w[0], w[3] - w[1])
+                words.append((rect, w[4]))
+        except Exception:
+            pass
+        return words
+
+    def get_form_fields(self, page_idx: int) -> List[Dict[str, Any]]:
+        """Returns interactive form fields (widgets) on the specified page."""
+        fields: List[Dict[str, Any]] = []
+        if not self.is_pdf or not self._pdf_doc or not (0 <= page_idx < self.page_count):
+            return fields
+        try:
+            page = self._pdf_doc[page_idx]
+            for w in page.widgets():
+                r = w.rect
+                fields.append({
+                    "name": w.field_name,
+                    "type": w.field_type_string,
+                    "rect": QRectF(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0),
+                    "value": w.field_value
+                })
+        except Exception:
+            pass
+        return fields
+
+    def set_form_field_value(self, page_idx: int, field_name: str, value: Any) -> bool:
+        """Sets a form widget value and refreshes page rendering."""
+        if not self.is_pdf or not self._pdf_doc or not (0 <= page_idx < self.page_count):
+            return False
+        try:
+            page = self._pdf_doc[page_idx]
+            for w in page.widgets():
+                if w.field_name == field_name:
+                    w.field_value = value
+                    w.update()
+                    self.is_dirty = True
+                    self._rendered_cache.clear()
+                    self._thumbnail_cache.pop(page_idx, None)
+                    self.page_changed.emit(page_idx)
+                    return True
+        except Exception:
+            pass
+        return False
 
     def update_image(self, new_pil_image: Image.Image, page_idx: Optional[int] = None):
         """Updates internal image after adjustments, filters or crop."""
@@ -541,3 +644,320 @@ class Document(QObject):
                 img.save(output_path, quality=quality)
         
         self.is_dirty = False
+
+    def move_page(self, from_idx: int, to_idx: int) -> bool:
+        """Moves a page from from_idx to to_idx (supports both PDF and image collections)."""
+        if from_idx == to_idx or not (0 <= from_idx < self.page_count) or not (0 <= to_idx < self.page_count):
+            return False
+
+        if self.is_pdf and self._pdf_doc:
+            try:
+                target_to = -1 if (to_idx == self.page_count - 1 and from_idx < to_idx) else (to_idx + 1 if from_idx < to_idx else to_idx)
+                self._pdf_doc.move_page(from_idx, target_to)
+            except Exception:
+                return False
+        else:
+            if 0 <= from_idx < len(self.image_paths) and 0 <= to_idx < len(self.image_paths):
+                path = self.image_paths.pop(from_idx)
+                self.image_paths.insert(to_idx, path)
+            else:
+                return False
+
+        self._thumbnail_cache.clear()
+        self._rendered_cache.clear()
+        self._image_cache.clear()
+        self.rotations.clear()
+        self.is_dirty = True
+        self.current_page = to_idx
+        self.document_changed.emit()
+        self.page_changed.emit(to_idx)
+        return True
+
+    def insert_file(self, file_path: str, after_page_idx: int) -> bool:
+        """Inserts a PDF or image into the document after the specified page index."""
+        if not os.path.exists(file_path):
+            return False
+        if after_page_idx < 0:
+            after_page_idx = -1
+        elif after_page_idx >= self.page_count:
+            after_page_idx = self.page_count - 1
+
+        insert_pos = after_page_idx + 1
+
+        if self.is_pdf and self._pdf_doc:
+            ext = os.path.splitext(file_path)[1].lower()
+            try:
+                if ext == ".pdf":
+                    src_pdf = pymupdf.open(file_path)
+                    self._pdf_doc.insert_pdf(src_pdf, start_at=insert_pos)
+                    src_pdf.close()
+                elif ext in SUPPORTED_IMAGE_EXTS:
+                    img = Image.open(file_path)
+                    w, h = float(img.width), float(img.height)
+                    page = self._pdf_doc.new_page(pno=insert_pos, width=w, height=h)
+                    page.insert_image(page.rect, filename=file_path)
+                else:
+                    return False
+                self.page_count = len(self._pdf_doc)
+            except Exception:
+                return False
+        else:
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext in SUPPORTED_IMAGE_EXTS:
+                self.image_paths.insert(insert_pos, os.path.abspath(file_path))
+                self.page_count = len(self.image_paths)
+            elif ext == ".pdf":
+                src_pdf = pymupdf.open(file_path)
+                for pno in range(len(src_pdf)):
+                    p = src_pdf[pno]
+                    pix = p.get_pixmap(dpi=150)
+                    tf = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    pix.save(tf.name)
+                    tf.close()
+                    self.image_paths.insert(insert_pos + pno, tf.name)
+                src_pdf.close()
+                self.page_count = len(self.image_paths)
+            else:
+                return False
+
+        self._thumbnail_cache.clear()
+        self._rendered_cache.clear()
+        self.is_dirty = True
+        self.document_changed.emit()
+        return True
+
+    @classmethod
+    def merge_pdfs(cls, pdf_paths: List[str], output_path: str) -> bool:
+        """Merges multiple PDF files into a single destination PDF."""
+        if not pdf_paths:
+            return False
+        try:
+            merged = pymupdf.open()
+            for p in pdf_paths:
+                if os.path.isfile(p):
+                    doc = pymupdf.open(p)
+                    merged.insert_pdf(doc)
+                    doc.close()
+            merged.save(output_path)
+            merged.close()
+            return True
+        except Exception:
+            return False
+
+    def split_pdf(self, output_path: str, page_indices: List[int]) -> bool:
+        """Extracts specified page indices into a new standalone PDF."""
+        if not self.is_pdf or not self._pdf_doc:
+            return False
+        try:
+            split_doc = pymupdf.open()
+            for p_idx in page_indices:
+                if 0 <= p_idx < self.page_count:
+                    split_doc.insert_pdf(self._pdf_doc, from_page=p_idx, to_page=p_idx)
+            split_doc.save(output_path)
+            split_doc.close()
+            return True
+        except Exception:
+            return False
+
+    def set_pdf_password(self, user_pw: str, owner_pw: Optional[str] = None):
+        """Sets a security password to encrypt the document upon saving."""
+        self._pending_user_pw = user_pw
+        self._pending_owner_pw = owner_pw or user_pw
+        self.is_dirty = True
+
+    def apply_permanent_redactions(self, page_idx: Optional[int] = None) -> bool:
+        """Applies pending redactions to the PDF permanently, stripping text/graphics underneath."""
+        if not self.is_pdf or not self._pdf_doc:
+            return False
+        pages = [page_idx] if page_idx is not None else list(range(self.page_count))
+        for p in pages:
+            if 0 <= p < len(self._pdf_doc):
+                self._pdf_doc[p].apply_redactions()
+        self.is_dirty = True
+        self._rendered_cache.clear()
+        self._thumbnail_cache.clear()
+        self.document_changed.emit()
+        return True
+
+    def save_with_annotations(
+        self, 
+        output_path: str, 
+        annotations_map: Dict[int, List[Any]], 
+        user_pw: Optional[str] = None, 
+        owner_pw: Optional[str] = None
+    ) -> bool:
+        """
+        Saves document to output_path while baking user annotations (pen, highlighter,
+        shapes, text, notes, signatures, redactions) directly into the file.
+        """
+        abs_out = os.path.abspath(output_path)
+        ext = os.path.splitext(output_path)[1].lower()
+
+        if self.is_pdf and self._pdf_doc:
+            for p_idx, deg in self.rotations.items():
+                if deg != 0 and p_idx < len(self._pdf_doc):
+                    page = self._pdf_doc[p_idx]
+                    page.set_rotation((page.rotation + deg) % 360)
+            self.rotations.clear()
+
+            from preview.core.annotations import AnnotationType
+
+            for p_idx, annots in annotations_map.items():
+                if 0 <= p_idx < len(self._pdf_doc):
+                    page = self._pdf_doc[p_idx]
+                    for item in annots:
+                        itype = getattr(item, "item_type", None)
+                        if not itype:
+                            continue
+
+                        def qcol_to_rgb(qc):
+                            if qc and qc.isValid():
+                                return (qc.red() / 255.0, qc.green() / 255.0, qc.blue() / 255.0)
+                            return (0.0, 0.0, 0.0)
+
+                        stroke_rgb = qcol_to_rgb(getattr(item, "stroke_color", None))
+                        fill_qc = getattr(item, "fill_color", None)
+                        has_fill = fill_qc and fill_qc.isValid() and fill_qc.alpha() > 0
+                        fill_rgb = qcol_to_rgb(fill_qc) if has_fill else None
+                        w = getattr(item, "stroke_width", 2.0)
+
+                        if itype == AnnotationType.PEN:
+                            if len(item.points) > 1:
+                                pt_list = [(float(p.x()), float(p.y())) for p in item.points]
+                                annot = page.add_ink_annot([pt_list])
+                                annot.set_colors(stroke=stroke_rgb)
+                                annot.set_border(width=w)
+                                annot.update()
+
+                        elif itype == AnnotationType.HIGHLIGHTER:
+                            if len(item.points) > 1:
+                                pt_list = [(float(p.x()), float(p.y())) for p in item.points]
+                                annot = page.add_ink_annot([pt_list])
+                                annot.set_colors(stroke=stroke_rgb)
+                                annot.set_border(width=max(12.0, w * 3))
+                                annot.set_opacity(0.4)
+                                annot.update()
+
+                        elif itype in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT):
+                            r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
+                            annot = page.add_rect_annot(r)
+                            annot.set_colors(stroke=stroke_rgb, fill=fill_rgb)
+                            annot.set_border(width=w)
+                            annot.update()
+
+                        elif itype == AnnotationType.ELLIPSE:
+                            r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
+                            annot = page.add_circle_annot(r)
+                            annot.set_colors(stroke=stroke_rgb, fill=fill_rgb)
+                            annot.set_border(width=w)
+                            annot.update()
+
+                        elif itype in (AnnotationType.LINE, AnnotationType.ARROW):
+                            if len(item.points) >= 2:
+                                p1 = pymupdf.Point(item.points[0].x(), item.points[0].y())
+                                p2 = pymupdf.Point(item.points[1].x(), item.points[1].y())
+                                annot = page.add_line_annot(p1, p2)
+                                annot.set_colors(stroke=stroke_rgb)
+                                annot.set_border(width=w)
+                                annot.update()
+
+                        elif itype == AnnotationType.TEXT:
+                            r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
+                            fsize = getattr(item, "font_size", 16)
+                            annot = page.add_freetext_annot(r, item.text, fontsize=fsize, text_color=stroke_rgb, fill_color=fill_rgb)
+                            annot.update()
+
+                        elif itype == AnnotationType.NOTE:
+                            pt = pymupdf.Point(item.rect.left(), item.rect.top())
+                            annot = page.add_text_annot(pt, item.text)
+                            annot.update()
+
+                        elif itype == AnnotationType.REDACT:
+                            r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
+                            page.add_redact_annot(r, fill=(0, 0, 0))
+                            page.apply_redactions()
+
+                        elif itype == AnnotationType.SIGNATURE:
+                            if len(item.points) > 1 or item.rect.isValid():
+                                r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
+                                if r.width > 0 and r.height > 0:
+                                    pix = QPixmap(int(r.width * 2), int(r.height * 2))
+                                    pix.fill(Qt.GlobalColor.transparent)
+                                    p = QPainter(pix)
+                                    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                                    pen = QPen(item.stroke_color, item.stroke_width * 2)
+                                    p.setPen(pen)
+                                    for i in range(1, len(item.points)):
+                                        p1 = (item.points[i-1] - item.rect.topLeft()) * 2
+                                        p2 = (item.points[i] - item.rect.topLeft()) * 2
+                                        p.drawLine(p1, p2)
+                                    p.end()
+                                    buf = QBuffer()
+                                    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+                                    pix.save(buf, "PNG")
+                                    page.insert_image(r, stream=buf.data().data())
+                                    buf.close()
+
+            is_same_file = (self.file_path and os.path.abspath(self.file_path) == abs_out)
+            save_kwargs: Dict[str, Any] = {"deflate": True}
+            pw = user_pw or getattr(self, "_pending_user_pw", None)
+            if pw:
+                save_kwargs["encryption"] = pymupdf.PDF_ENCRYPT_AES_256
+                save_kwargs["user_pw"] = pw
+                save_kwargs["owner_pw"] = owner_pw or pw
+
+            if is_same_file:
+                dir_name = os.path.dirname(abs_out)
+                with tempfile.NamedTemporaryFile(suffix=".pdf", dir=dir_name, delete=False) as tf:
+                    tmp_name = tf.name
+                self._pdf_doc.save(tmp_name, **save_kwargs)
+                self._pdf_doc.close()
+                shutil.move(tmp_name, abs_out)
+                self._pdf_doc = pymupdf.open(abs_out)
+            else:
+                self._pdf_doc.save(abs_out, **save_kwargs)
+
+            self.file_path = abs_out
+            self.file_name = os.path.basename(abs_out)
+            self.is_dirty = False
+            self._thumbnail_cache.clear()
+            self._rendered_cache.clear()
+            self.document_changed.emit()
+            return True
+
+        else:
+            if ext == ".pdf":
+                master = pymupdf.open()
+                for idx in range(self.page_count):
+                    page_pix = self.render_page(idx, zoom=2.0)
+                    annot_painter = QPainter(page_pix)
+                    if idx in annotations_map:
+                        for item in annotations_map[idx]:
+                            item.draw(annot_painter, zoom=2.0)
+                    annot_painter.end()
+                    
+                    buf = QBuffer()
+                    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+                    page_pix.save(buf, "PNG")
+                    img_doc = pymupdf.open(stream=buf.data().data(), filetype="png")
+                    pdf_bytes = img_doc.convert_to_pdf()
+                    p_pdf = pymupdf.open("pdf", pdf_bytes)
+                    master.insert_pdf(p_pdf)
+                    buf.close()
+                master.save(abs_out)
+                master.close()
+            else:
+                idx = self.current_page
+                page_pix = self.render_page(idx, zoom=1.0)
+                annot_painter = QPainter(page_pix)
+                if idx in annotations_map:
+                    for item in annotations_map[idx]:
+                        item.draw(annot_painter, zoom=1.0)
+                annot_painter.end()
+                page_pix.save(abs_out)
+
+            self.is_dirty = False
+            self._thumbnail_cache.clear()
+            self._rendered_cache.clear()
+            self.document_changed.emit()
+            return True

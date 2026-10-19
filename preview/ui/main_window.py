@@ -815,6 +815,20 @@ class MacMainWindow(QMainWindow):
 
         self.file_menu.addSeparator()
 
+        merge_pdf_act = QAction("Merge PDFs...", self)
+        merge_pdf_act.triggered.connect(self._merge_pdfs)
+        self.file_menu.addAction(merge_pdf_act)
+
+        split_pdf_act = QAction("Split PDF / Extract Pages...", self)
+        split_pdf_act.triggered.connect(self._split_pdf)
+        self.file_menu.addAction(split_pdf_act)
+
+        pass_pdf_act = QAction("Set PDF Password / Encryption...", self)
+        pass_pdf_act.triggered.connect(self._set_pdf_password)
+        self.file_menu.addAction(pass_pdf_act)
+
+        self.file_menu.addSeparator()
+
         print_act = QAction("Print...", self)
         print_act.setShortcut(QKeySequence.StandardKey.Print)
         print_act.triggered.connect(self._print_file)
@@ -855,6 +869,17 @@ class MacMainWindow(QMainWindow):
         extract_all_act.triggered.connect(self._extract_all_text)
         self.edit_menu.addAction(extract_all_act)
 
+        self.edit_menu.addSeparator()
+
+        insert_page_act = QAction("Insert Page from File...", self)
+        insert_page_act.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        insert_page_act.triggered.connect(self._insert_page_from_file_menu)
+        self.edit_menu.addAction(insert_page_act)
+
+        apply_redact_act = QAction("Apply Permanent Redactions", self)
+        apply_redact_act.triggered.connect(self._apply_redactions_menu)
+        self.edit_menu.addAction(apply_redact_act)
+
         # 4. View Menu
         self.view_menu = self.top_menubar.addMenu("View")
         toggle_sb = QAction("Toggle Sidebar", self)
@@ -873,6 +898,16 @@ class MacMainWindow(QMainWindow):
         toggle_sb_bar.setChecked(True)
         toggle_sb_bar.toggled.connect(self._toggle_status_bar)
         self.view_menu.addAction(toggle_sb_bar)
+
+        view_mode_menu = self.view_menu.addMenu("PDF View Mode")
+        self.single_mode_act = QAction("Single Page", self, checkable=True)
+        self.single_mode_act.setChecked(True)
+        self.single_mode_act.triggered.connect(lambda: self._set_pdf_view_mode("Single"))
+        view_mode_menu.addAction(self.single_mode_act)
+
+        self.two_up_mode_act = QAction("Two Pages (Two-Up)", self, checkable=True)
+        self.two_up_mode_act.triggered.connect(lambda: self._set_pdf_view_mode("Two-Up"))
+        view_mode_menu.addAction(self.two_up_mode_act)
 
         slideshow_act = QAction("Start Slideshow", self)
         slideshow_act.setShortcuts([QKeySequence("F11"), QKeySequence("Ctrl+Shift+F")])
@@ -928,6 +963,11 @@ class MacMainWindow(QMainWindow):
         last_act.setShortcut(QKeySequence("End"))
         last_act.triggered.connect(self._last_page)
         self.go_menu.addAction(last_act)
+
+        goto_act = QAction("Go to Page...", self)
+        goto_act.setShortcut(QKeySequence("Ctrl+G"))
+        goto_act.triggered.connect(self._go_to_page_dialog)
+        self.go_menu.addAction(goto_act)
 
         # 6. Tools Menu
         self.tools_menu = self.top_menubar.addMenu("Tools")
@@ -1035,6 +1075,24 @@ class MacMainWindow(QMainWindow):
             self._bind_document()
             self._add_recent_file(file_path)
         except Exception as e:
+            from preview.core.document import PasswordRequiredError
+            if isinstance(e, PasswordRequiredError) or "password" in str(e).lower():
+                pwd, ok = QInputDialog.getText(
+                    self, "Password Required",
+                    f"'{os.path.basename(file_path)}' is password protected.\nEnter Password:",
+                    QLineEdit.EchoMode.Password
+                )
+                if ok and pwd:
+                    try:
+                        doc = Document()
+                        doc.load_file(file_path, password=pwd)
+                        self.document = doc
+                        self._bind_document()
+                        self._add_recent_file(file_path)
+                        return
+                    except Exception as err:
+                        QMessageBox.critical(self, "Password Error", str(err))
+                        return
             QMessageBox.critical(self, "Error Opening File", f"Could not open {file_path}:\n{str(e)}")
 
     def open_files(self, file_paths: List[str]):
@@ -1111,7 +1169,7 @@ class MacMainWindow(QMainWindow):
             return
         if self.document.file_path:
             try:
-                self.document.export_document(self.document.file_path)
+                self.document.save_with_annotations(self.document.file_path, self.canvas.annotations)
                 self._show_status("Document saved successfully.")
             except Exception as e:
                 QMessageBox.critical(self, "Save Error", str(e))
@@ -1127,7 +1185,7 @@ class MacMainWindow(QMainWindow):
         )
         if path:
             try:
-                self.document.export_document(path)
+                self.document.save_with_annotations(path, self.canvas.annotations)
                 self.open_file(path)
                 self._show_status(f"Saved to {os.path.basename(path)}")
             except Exception as e:
@@ -1180,6 +1238,122 @@ class MacMainWindow(QMainWindow):
         settings.setValue("recent_files", [])
         self._update_recent_menu()
 
+    # --- PDF View & Manipulation Operations ---
+    def _set_pdf_view_mode(self, mode: str):
+        self.canvas.set_view_mode(mode)
+        if hasattr(self, "single_mode_act"):
+            self.single_mode_act.setChecked(mode == "Single")
+        if hasattr(self, "two_up_mode_act"):
+            self.two_up_mode_act.setChecked(mode == "Two-Up")
+        self._show_status(f"PDF view mode: {mode}")
+
+    def _set_pdf_password(self):
+        if not self.document or not self.document.is_pdf:
+            QMessageBox.information(self, "PDF Password", "A PDF document must be open to configure encryption.")
+            return
+        pwd, ok = QInputDialog.getText(
+            self, "Set PDF Password",
+            "Enter password to encrypt document with AES-256 upon saving:",
+            QLineEdit.EchoMode.Password
+        )
+        if ok and pwd:
+            self.document.set_pdf_password(pwd)
+            self._show_status("PDF security password set. Save document to apply encryption.")
+
+    def _merge_pdfs(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select PDF Files to Merge", "", "PDF Documents (*.pdf)"
+        )
+        if len(paths) < 2:
+            QMessageBox.information(self, "Merge PDFs", "Please select at least 2 PDF files to merge.")
+            return
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Merged PDF As", "Merged.pdf", "PDF Document (*.pdf)"
+        )
+        if out_path:
+            if Document.merge_pdfs(paths, out_path):
+                self.open_file(out_path)
+                self._show_status(f"Successfully merged {len(paths)} PDFs.")
+            else:
+                QMessageBox.critical(self, "Merge Error", "Could not merge selected PDFs.")
+
+    def _split_pdf(self):
+        if not self.document or not self.document.is_pdf:
+            QMessageBox.information(self, "Split PDF", "A PDF document must be open to extract pages.")
+            return
+        rng_str, ok = QInputDialog.getText(
+            self, "Split PDF / Extract Pages",
+            f"Enter page numbers or ranges to extract (e.g. 1-3, 5) [1 - {self.document.page_count}]:",
+            text=f"1-{self.document.page_count}"
+        )
+        if ok and rng_str.strip():
+            page_indices = []
+            try:
+                for part in rng_str.split(","):
+                    part = part.strip()
+                    if "-" in part:
+                        start_s, end_s = part.split("-", 1)
+                        s = int(start_s.strip()) - 1
+                        e = int(end_s.strip()) - 1
+                        for i in range(max(0, s), min(self.document.page_count, e + 1)):
+                            if i not in page_indices:
+                                page_indices.append(i)
+                    else:
+                        idx = int(part) - 1
+                        if 0 <= idx < self.document.page_count and idx not in page_indices:
+                            page_indices.append(idx)
+            except Exception:
+                QMessageBox.warning(self, "Invalid Range", "Invalid page range specified.")
+                return
+
+            if not page_indices:
+                QMessageBox.warning(self, "No Pages", "No valid pages specified in range.")
+                return
+
+            out_path, _ = QFileDialog.getSaveFileName(
+                self, "Save Extracted PDF As", "Extracted.pdf", "PDF Document (*.pdf)"
+            )
+            if out_path:
+                if self.document.split_pdf(out_path, page_indices):
+                    self.open_file(out_path)
+                    self._show_status(f"Extracted {len(page_indices)} pages.")
+                else:
+                    QMessageBox.critical(self, "Split Error", "Could not extract pages.")
+
+    def _insert_page_from_file_menu(self):
+        if self.document:
+            self.sidebar._insert_page_from_file(self.document.current_page)
+
+    def _apply_redactions_menu(self):
+        if not self.document or not self.document.is_pdf:
+            return
+        reply = QMessageBox.question(
+            self, "Apply Permanent Redactions",
+            "Are you sure you want to permanently burn all redactions into this PDF?\nThis will sanitize and permanently remove underlying text and imagery.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.document.apply_permanent_redactions()
+            self.canvas.update()
+            self._show_status("Permanent redactions applied.")
+
+    def _go_to_page_dialog(self):
+        if not self.document or self.document.page_count <= 0:
+            return
+        page_num, ok = QInputDialog.getInt(
+            self, "Go to Page",
+            f"Enter page number (1 - {self.document.page_count}):",
+            value=self.document.current_page + 1,
+            min=1, max=self.document.page_count
+        )
+        if ok:
+            idx = page_num - 1
+            self.canvas.set_page(idx)
+            self.document.set_current_page(idx)
+            self.sidebar.select_page(idx)
+            self._update_status()
+
     # --- Export & Print ---
     def _export_as_pdf(self):
         if not self.document:
@@ -1190,7 +1364,7 @@ class MacMainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "Export as PDF", initial_path, "PDF Document (*.pdf)")
         if path:
             try:
-                self.document.export_all_to_pdf(path)
+                self.document.save_with_annotations(path, self.canvas.annotations)
                 self._show_status(f"Exported to {os.path.basename(path)}")
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", str(e))

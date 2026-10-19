@@ -90,6 +90,18 @@ class CanvasView(QWidget):
         self._loupe_radius: float = 80.0
         self._loupe_zoom: float = 2.5
 
+        # PDF Text Selection State
+        self._is_selecting_text: bool = False
+        self._text_sel_start: Optional[QPointF] = None
+        self._text_sel_rects: List[QRectF] = []
+        self._selected_text: str = ""
+
+        # PDF Hyperlinks & Form Fields
+        self._hovered_link: Optional[Dict[str, Any]] = None
+
+        # View Mode: "Single", "Two-Up"
+        self.view_mode: str = "Single"
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._auto_fit and self.document:
@@ -121,13 +133,26 @@ class CanvasView(QWidget):
         self.zoom_changed.emit(self.zoom)
         self.update()
 
+    def set_view_mode(self, mode: str):
+        """Sets display mode: 'Single' or 'Two-Up'."""
+        if mode in ("Single", "Two-Up"):
+            self.view_mode = mode
+            if self._auto_fit:
+                self.zoom_to_fit()
+            self.update()
+
     def _get_resting_bounds(self) -> Tuple[float, float, float, float]:
         """Calculates (min_x, max_x, min_y, max_y) for page resting positions."""
         if not self.document:
             return (0.0, 0.0, 0.0, 0.0)
         w_doc, h_doc = self.document.get_page_size(self.current_page)
-        pw = w_doc * self.zoom
-        ph = h_doc * self.zoom
+        if self.view_mode == "Two-Up" and self.current_page + 1 < self.document.page_count:
+            w2, h2 = self.document.get_page_size(self.current_page + 1)
+            pw = (w_doc + w2) * self.zoom + 12.0
+            ph = max(h_doc, h2) * self.zoom
+        else:
+            pw = w_doc * self.zoom
+            ph = h_doc * self.zoom
         vw = float(self.width())
         vh = float(self.height())
         padding = 24.0
@@ -231,16 +256,25 @@ class CanvasView(QWidget):
         if not self.document:
             return
         w_doc, h_doc = self.document.get_page_size(self.current_page)
+        has_two_up = (self.view_mode == "Two-Up" and self.current_page + 1 < self.document.page_count)
+        if has_two_up:
+            w2, h2 = self.document.get_page_size(self.current_page + 1)
+            total_w = w_doc + w2 + 12.0
+            total_h = max(h_doc, h2)
+        else:
+            total_w = w_doc
+            total_h = h_doc
         padding = 24.0
         vw = max(50.0, float(self.width()) - 2.0 * padding)
         vh = max(50.0, float(self.height()) - 2.0 * padding)
-        if w_doc > 0 and h_doc > 0:
-            scale = min(vw / w_doc, vh / h_doc)
+        if total_w > 0 and total_h > 0:
+            scale = min(vw / total_w, vh / total_h)
             self.set_zoom(scale)
-            # Center offset with 24px padding bounds
+            actual_pw = (w_doc + w2) * self.zoom + 12.0 if has_two_up else w_doc * self.zoom
+            actual_ph = max(h_doc, h2) * self.zoom if has_two_up else h_doc * self.zoom
             self._pan_offset = QPointF(
-                (float(self.width()) - w_doc * self.zoom) / 2.0,
-                (float(self.height()) - h_doc * self.zoom) / 2.0
+                (float(self.width()) - actual_pw) / 2.0,
+                (float(self.height()) - actual_ph) / 2.0
             )
             self.update()
 
@@ -318,11 +352,23 @@ class CanvasView(QWidget):
         return (0.0 <= pt.x() <= w_doc) and (0.0 <= pt.y() <= h_doc)
 
     def get_document_page_rect(self) -> QRectF:
-        """Returns the page rectangle in canvas view coordinates."""
+        """Returns the primary page rectangle in canvas view coordinates."""
         if not self.document:
             return QRectF()
         w_doc, h_doc = self.document.get_page_size(self.current_page)
         return QRectF(self._pan_offset.x(), self._pan_offset.y(), w_doc * self.zoom, h_doc * self.zoom)
+
+    def get_second_page_rect(self) -> Optional[QRectF]:
+        """Returns the second page rectangle when in Two-Up mode."""
+        if not self.document or self.view_mode != "Two-Up":
+            return None
+        next_p = self.current_page + 1
+        if next_p >= self.document.page_count:
+            return None
+        w1, _ = self.document.get_page_size(self.current_page)
+        w2, h2 = self.document.get_page_size(next_p)
+        x2 = self._pan_offset.x() + (w1 * self.zoom) + 12.0
+        return QRectF(x2, self._pan_offset.y(), w2 * self.zoom, h2 * self.zoom)
 
     def view_to_doc_coords(self, pt: QPointF) -> QPointF:
         """Transforms canvas pixel coordinates to document point coordinates."""
@@ -352,7 +398,38 @@ class CanvasView(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             doc_pt = self.view_to_doc_coords(event.position())
 
-            # 0. Check if clicking on a resize handle of the currently selected annotation
+            # 0. Check if clicking on an internal or external hyperlink
+            if self._hovered_link and self.active_tool == AnnotationType.NONE:
+                link = self._hovered_link
+                if link.get("uri"):
+                    from PyQt6.QtGui import QDesktopServices
+                    from PyQt6.QtCore import QUrl
+                    QDesktopServices.openUrl(QUrl(link["uri"]))
+                    return
+                elif link.get("page") is not None:
+                    self.set_page(link["page"])
+                    return
+
+            # Check if clicking on an interactive PDF form field
+            if self.document and self.document.is_pdf and self.active_tool == AnnotationType.NONE:
+                fields = self.document.get_form_fields(self.current_page)
+                for f in fields:
+                    if f["rect"].contains(doc_pt):
+                        ftype = f.get("type", "")
+                        if "check" in ftype.lower() or "button" in ftype.lower():
+                            cur_val = bool(f["value"])
+                            self.document.set_form_field_value(self.current_page, f["name"], not cur_val)
+                        else:
+                            text, ok = QInputDialog.getText(
+                                self, "Edit Form Field", f["name"] + ":",
+                                text=str(f["value"] or "")
+                            )
+                            if ok:
+                                self.document.set_form_field_value(self.current_page, f["name"], text)
+                        self.update()
+                        return
+
+            # 0b. Check if clicking on a resize handle of the currently selected annotation
             if self._selected_annotation and self.active_tool == AnnotationType.NONE:
                 hit_h = self._selected_annotation.get_handle_at_point(doc_pt, self.zoom)
                 if hit_h != Handle.NONE:
@@ -461,6 +538,15 @@ class CanvasView(QWidget):
                 self._drag_start_doc_pt = doc_pt
                 self._item_dragged_total_dx = 0.0
                 self._item_dragged_total_dy = 0.0
+                self._clear_text_selection()
+            elif self.active_tool == AnnotationType.NONE and self.document and self.document.is_pdf:
+                # Initiate interactive text selection
+                self._is_selecting_text = True
+                self._text_sel_start = doc_pt
+                self._text_sel_rects.clear()
+                self._selected_text = ""
+            else:
+                self._clear_text_selection()
             
             self.update()
 
@@ -474,6 +560,16 @@ class CanvasView(QWidget):
                         return
                     elif item.item_type == AnnotationType.NOTE:
                         self._open_sticky_note_dialog(item)
+                        return
+            
+            # Select word on double click in PDF
+            if self.document and self.document.is_pdf and self.active_tool == AnnotationType.NONE:
+                words = self.document.get_page_words(self.current_page)
+                for r, w in words:
+                    if r.contains(doc_pt):
+                        self._text_sel_rects = [r]
+                        self._selected_text = w
+                        self.update()
                         return
 
     def _edit_text_annotation(self, item: AnnotationItem):
@@ -559,7 +655,17 @@ class CanvasView(QWidget):
             self.update()
             return
 
-        # 1. Update Crop Box (clamped to page bounds)
+        # 1. Handle Interactive PDF Text Selection Dragging
+        if self._is_selecting_text and self._text_sel_start and (event.buttons() & Qt.MouseButton.LeftButton):
+            sel_rect = QRectF(self._text_sel_start, doc_pt).normalized()
+            words = self.document.get_page_words(self.current_page)
+            matched = [w for w in words if sel_rect.intersects(w[0])]
+            self._text_sel_rects = [w[0] for w in matched]
+            self._selected_text = " ".join(w[1] for w in matched)
+            self.update()
+            return
+
+        # 2. Update Crop Box (clamped to page bounds)
         if self.crop_box and (event.buttons() & Qt.MouseButton.LeftButton):
             doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
             p1 = self.crop_box.rect.topLeft()
@@ -567,7 +673,7 @@ class CanvasView(QWidget):
             self.update()
             return
 
-        # 2. Update Active Drawing Annotation (clamped to page bounds)
+        # 3. Update Active Drawing Annotation (clamped to page bounds)
         if self._active_annotation and (event.buttons() & Qt.MouseButton.LeftButton):
             doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
             if self._active_annotation.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
@@ -584,7 +690,7 @@ class CanvasView(QWidget):
             self.update()
             return
 
-        # 3. Dragging Selected Annotation
+        # 4. Dragging Selected Annotation
         if self._is_dragging_item and self._selected_annotation and (event.buttons() & Qt.MouseButton.LeftButton):
             dx = doc_pt.x() - self._drag_start_doc_pt.x()
             dy = doc_pt.y() - self._drag_start_doc_pt.y()
@@ -595,7 +701,26 @@ class CanvasView(QWidget):
             self.update()
             return
 
-        # 4. Hover cursor update over resize handles
+        # 5. Check hyperlinks hover
+        if self.document and self.document.is_pdf and self.active_tool == AnnotationType.NONE and not event.buttons():
+            links = self.document.get_page_links(self.current_page)
+            hit_link = None
+            for l in links:
+                if l["rect"].contains(doc_pt):
+                    hit_link = l
+                    break
+            self._hovered_link = hit_link
+            if hit_link:
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+                if hit_link.get("uri"):
+                    self.status_message.emit(f"Link: {hit_link['uri']}")
+                elif hit_link.get("page") is not None:
+                    self.status_message.emit(f"Go to Page {hit_link['page'] + 1}")
+                return
+            else:
+                self._hovered_link = None
+
+        # 6. Hover cursor update over resize handles
         if self.active_tool == AnnotationType.NONE and self._selected_annotation and not event.buttons():
             handle = self._selected_annotation.get_handle_at_point(doc_pt, self.zoom)
             if handle in (Handle.NW, Handle.SE):
@@ -619,6 +744,11 @@ class CanvasView(QWidget):
             self._update_cursor()
             self._spring_to_bounds()
             return
+
+        if self._is_selecting_text:
+            self._is_selecting_text = False
+            if self._selected_text:
+                self.status_message.emit(f"Selected: \"{self._selected_text[:40]}{'...' if len(self._selected_text) > 40 else ''}\" (Ctrl+C to copy)")
 
         # Commit resize handle drag
         if self._active_handle != Handle.NONE:
@@ -733,7 +863,18 @@ class CanvasView(QWidget):
             return
 
         if (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            if event.key() == Qt.Key.Key_Z:
+            if event.key() == Qt.Key.Key_C and self._selected_text:
+                self._copy_selected_text()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_A and self.document and self.document.is_pdf:
+                words = self.document.get_page_words(self.current_page)
+                self._text_sel_rects = [w[0] for w in words]
+                self._selected_text = " ".join(w[1] for w in words)
+                self.update()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_Z:
                 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                     self.redo()
                 else:
@@ -883,7 +1024,44 @@ class CanvasView(QWidget):
             self.crop_box.draw(painter, zoom=self.zoom)
         painter.restore()
 
-        # 5. Draw Loupe / Magnifier Lens if active
+        # 5. Draw Interactive Text Selection Highlights
+        if self._text_sel_rects:
+            painter.save()
+            painter.translate(page_rect.topLeft())
+            painter.setBrush(QBrush(QColor(0, 122, 255, 75)))
+            painter.setPen(QPen(QColor(0, 122, 255, 180), 1.0))
+            for r in self._text_sel_rects:
+                scaled_r = QRectF(r.left() * self.zoom, r.top() * self.zoom, r.width() * self.zoom, r.height() * self.zoom)
+                painter.drawRect(scaled_r)
+            painter.restore()
+
+        # 6. Render Second Page in Two-Up View Mode
+        if self.view_mode == "Two-Up" and self.document and self.current_page + 1 < self.document.page_count:
+            p2_idx = self.current_page + 1
+            p2_pix = self.document.render_page(p2_idx, zoom=self.zoom)
+            p2_rect = self.get_second_page_rect()
+            if p2_rect:
+                painter.setPen(Qt.PenStyle.NoPen)
+                p2_shadow = p2_rect.adjusted(-2, 1, 2, 4)
+                painter.setBrush(QBrush(QColor(0, 0, 0, 28)))
+                painter.drawRoundedRect(p2_shadow, 4, 4)
+
+                painter.drawPixmap(int(p2_rect.left()), int(p2_rect.top()), p2_pix)
+
+                painter.setPen(QPen(QColor(0, 0, 0, 30), 1))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(p2_rect)
+
+                if p2_idx in self.annotations:
+                    painter.save()
+                    painter.translate(p2_rect.topLeft())
+                    w2, h2 = self.document.get_page_size(p2_idx)
+                    painter.setClipRect(QRectF(0, 0, w2 * self.zoom, h2 * self.zoom))
+                    for item in self.annotations[p2_idx]:
+                        item.draw(painter, zoom=self.zoom)
+                    painter.restore()
+
+        # 7. Draw Loupe / Magnifier Lens if active
         pos_pt = self._loupe_pos.toPoint() if hasattr(self._loupe_pos, "toPoint") else self._loupe_pos
         if self.loupe_enabled and self.document and self.rect().contains(pos_pt):
             painter.save()
@@ -952,7 +1130,28 @@ class CanvasView(QWidget):
         menu = QMenu(self)
         menu.setObjectName("canvasContextMenu")
         
-        # Copy page text
+        # Text selection actions
+        if self._selected_text:
+            act_copy_sel = QAction("Copy Selection", self)
+            act_copy_sel.setShortcut("Ctrl+C")
+            act_copy_sel.triggered.connect(self._copy_selected_text)
+            menu.addAction(act_copy_sel)
+
+            act_hl_sel = QAction("Highlight Selected Text", self)
+            act_hl_sel.triggered.connect(self._highlight_selected_text)
+            menu.addAction(act_hl_sel)
+
+            act_redact_sel = QAction("Redact Selected Text", self)
+            act_redact_sel.triggered.connect(self._redact_selected_text)
+            menu.addAction(act_redact_sel)
+
+            act_strike_sel = QAction("Strikethrough Selected Text", self)
+            act_strike_sel.triggered.connect(self._strikethrough_selected_text)
+            menu.addAction(act_strike_sel)
+
+            menu.addSeparator()
+
+        # Copy entire page text
         if self.document.is_pdf:
             act_copy = QAction("Copy Page Text", self)
             act_copy.triggered.connect(self._copy_page_text)
@@ -964,6 +1163,21 @@ class CanvasView(QWidget):
         act_loupe.setShortcut("~")
         act_loupe.triggered.connect(lambda: self.toggle_loupe())
         menu.addAction(act_loupe)
+        menu.addSeparator()
+
+        # View Mode Submenu
+        view_menu = menu.addMenu("View Mode")
+        act_single = QAction("Single Page", self)
+        act_single.setCheckable(True)
+        act_single.setChecked(self.view_mode == "Single")
+        act_single.triggered.connect(lambda: self.set_view_mode("Single"))
+        view_menu.addAction(act_single)
+
+        act_two_up = QAction("Two Pages (Two-Up)", self)
+        act_two_up.setCheckable(True)
+        act_two_up.setChecked(self.view_mode == "Two-Up")
+        act_two_up.triggered.connect(lambda: self.set_view_mode("Two-Up"))
+        view_menu.addAction(act_two_up)
         menu.addSeparator()
 
         # Zoom
@@ -982,6 +1196,61 @@ class CanvasView(QWidget):
         menu.addAction(act_rot)
 
         menu.exec(self.mapToGlobal(pos.toPoint()))
+
+    def _copy_selected_text(self):
+        if self._selected_text:
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(self._selected_text)
+            self.status_message.emit(f"Copied {len(self._selected_text)} characters")
+
+    def _highlight_selected_text(self):
+        if not self._text_sel_rects:
+            return
+        for r in self._text_sel_rects:
+            item = AnnotationItem(AnnotationType.HIGHLIGHTER)
+            item.rect = QRectF(r)
+            cy = r.center().y()
+            item.points = [QPointF(r.left(), cy), QPointF(r.right(), cy)]
+            item.stroke_color = QColor("#ffeb3b")
+            item.stroke_width = max(10.0, r.height())
+            self._get_current_annotations().append(item)
+            self._push_add_command(item, self.current_page)
+        self._clear_text_selection()
+        self.update()
+
+    def _redact_selected_text(self):
+        if not self._text_sel_rects:
+            return
+        for r in self._text_sel_rects:
+            item = AnnotationItem(AnnotationType.REDACT)
+            item.rect = QRectF(r)
+            item.points = [r.topLeft(), r.bottomRight()]
+            item.stroke_color = QColor("#000000")
+            item.fill_color = QColor("#000000")
+            self._get_current_annotations().append(item)
+            self._push_add_command(item, self.current_page)
+        self._clear_text_selection()
+        self.update()
+
+    def _strikethrough_selected_text(self):
+        if not self._text_sel_rects:
+            return
+        for r in self._text_sel_rects:
+            item = AnnotationItem(AnnotationType.LINE)
+            cy = r.center().y()
+            item.points = [QPointF(r.left(), cy), QPointF(r.right(), cy)]
+            item.stroke_color = QColor("#ff3b30")
+            item.stroke_width = 1.5
+            self._get_current_annotations().append(item)
+            self._push_add_command(item, self.current_page)
+        self._clear_text_selection()
+        self.update()
+
+    def _clear_text_selection(self):
+        self._text_sel_rects.clear()
+        self._selected_text = ""
+        self._is_selecting_text = False
+        self.update()
 
     def _copy_page_text(self):
         if self.document and self.document.is_pdf:

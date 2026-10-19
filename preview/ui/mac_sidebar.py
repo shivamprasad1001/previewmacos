@@ -189,10 +189,14 @@ class MacSidebar(QWidget):
         self.thumb_list.setItemDelegate(MacThumbnailDelegate(self))
         self.thumb_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.thumb_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.thumb_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.thumb_list.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.thumb_list.currentRowChanged.connect(self._on_row_changed)
         self.thumb_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.thumb_list.customContextMenuRequested.connect(self._show_thumb_context_menu)
         self.thumb_list.installEventFilter(self)
+        if self.thumb_list.model():
+            self.thumb_list.model().rowsMoved.connect(self._on_rows_moved)
         self.stack.addWidget(self.thumb_list)
 
         # 2. Outline / Table of contents tree
@@ -365,6 +369,10 @@ class MacSidebar(QWidget):
         act_insert.triggered.connect(lambda: self._insert_blank_page(idx))
         menu.addAction(act_insert)
 
+        act_insert_file = QAction("Insert Page from File...", self)
+        act_insert_file.triggered.connect(lambda: self._insert_page_from_file(idx))
+        menu.addAction(act_insert_file)
+
         menu.addSeparator()
 
         act_del = QAction("Delete Page", self)
@@ -374,6 +382,28 @@ class MacSidebar(QWidget):
         menu.addAction(act_del)
 
         menu.exec(self.thumb_list.mapToGlobal(pos))
+
+    def _on_rows_moved(self, parent, start: int, end: int, destination, row: int):
+        if not self.document:
+            return
+        to_idx = row - 1 if row > start else row
+        if 0 <= start < self.document.page_count and 0 <= to_idx < self.document.page_count and start != to_idx:
+            self.thumb_list.blockSignals(True)
+            self.document.move_page(start, to_idx)
+            self.thumb_list.blockSignals(False)
+            self.page_selected.emit(to_idx)
+
+    def _insert_page_from_file(self, idx: int):
+        if not self.document:
+            return
+        from PyQt6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Insert Page from File", "",
+            "Supported Files (*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.tiff);;PDF Files (*.pdf);;All Files (*.*)"
+        )
+        if path and self.document.insert_file(path, idx):
+            self.reload_thumbnails()
+            self.page_selected.emit(idx + 1)
 
     def _duplicate_page(self, idx: int):
         if self.document and self.document.duplicate_page(idx):
