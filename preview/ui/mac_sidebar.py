@@ -37,25 +37,32 @@ class MacThumbnailDelegate(QStyledItemDelegate):
         pix = doc.get_thumbnail(page_idx, width=int(thumb_w))
         is_selected = bool(option.state & QStyle.StateFlag.State_Selected)
         is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
+        is_dark = getattr(self.sidebar.window(), "current_theme", "dark") == "dark"
 
         r = option.rect
 
-        # 1. Background hover highlight (subtle rounded card)
-        if is_hovered and not is_selected:
-            painter.setBrush(QBrush(QColor(255, 255, 255, 12)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(QRectF(r).adjusted(4, 2, -4, -2), 6, 6)
-
-        # 2. Compute thumbnail picture rect centered in top portion
+        # 1. Compute thumbnail picture rect centered in top portion
         pw, ph = pix.width(), pix.height()
-        max_pw, max_ph = thumb_w, thumb_w * 1.25
+        max_pw = float(thumb_w)
+        max_ph = float(thumb_w) * 1.3
         scale = min(max_pw / max(1, pw), max_ph / max(1, ph))
         draw_w = pw * scale
         draw_h = ph * scale
 
+        box_top = r.top() + 6.0
         pic_x = r.left() + (r.width() - draw_w) / 2.0
-        pic_y = r.top() + 8.0 + (max_ph - draw_h) / 2.0
+        pic_y = box_top + (max_ph - draw_h) / 2.0
         pic_rect = QRectF(pic_x, pic_y, draw_w, draw_h)
+
+        # 2. Background hover highlight (subtle rounded card around thumbnail + badge)
+        if is_hovered and not is_selected:
+            card_w = max(draw_w + 14.0, 48.0)
+            card_x = r.left() + (r.width() - card_w) / 2.0
+            card_h = max_ph + 32.0
+            hover_bg = QColor(255, 255, 255, 14) if is_dark else QColor(0, 0, 0, 10)
+            painter.setBrush(QBrush(hover_bg))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(QRectF(card_x, box_top - 4.0, card_w, card_h), 6.0, 6.0)
 
         # 3. Draw subtle paper drop shadow
         shadow_rect = pic_rect.adjusted(-1.0, 1.0, 1.0, 3.0)
@@ -72,20 +79,18 @@ class MacThumbnailDelegate(QStyledItemDelegate):
         painter.restore()
 
         # 5. Draw 3px accent-colored selection ring or subtle border
-        is_dark = getattr(self.sidebar.window(), "current_theme", "dark") == "dark"
         if is_selected:
-            # 3px accent-colored selection ring with 4px radius
-            sel_ring = pic_rect.adjusted(-2.0, -2.0, 2.0, 2.0)
+            sel_ring = pic_rect.adjusted(-2.5, -2.5, 2.5, 2.5)
             painter.setPen(QPen(QColor("#0a84ff"), 3.0))
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRoundedRect(sel_ring, 4.0, 4.0)
+            painter.drawRoundedRect(sel_ring, 5.0, 5.0)
         else:
             border_col = QColor(255, 255, 255, 30) if is_dark else QColor(0, 0, 0, 35)
             painter.setPen(QPen(border_col, 1.0))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(pic_rect, 4.0, 4.0)
 
-        # 6. Draw Page Number Pill below thumbnail
+        # 6. Draw Page Number Pill below thumbnail (never overlapping image or adjacent items)
         badge_text = str(page_idx + 1)
         font = QFont("Inter", 10, QFont.Weight.Medium if not is_selected else QFont.Weight.Bold)
         painter.setFont(font)
@@ -93,17 +98,15 @@ class MacThumbnailDelegate(QStyledItemDelegate):
         badge_w = max(24.0, len(badge_text) * 7.5 + 14.0)
         badge_h = 17.0
         badge_x = r.left() + (r.width() - badge_w) / 2.0
-        badge_y = pic_y + max_ph + 6.0
+        badge_y = box_top + max_ph + 5.0
         badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
 
         if is_selected:
-            # Solid accent blue pill
             painter.setBrush(QBrush(QColor("#0a84ff")))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(badge_rect, 8.5, 8.5)
             painter.setPen(QColor("#ffffff"))
         else:
-            # Subtle pill under each thumbnail
             pill_bg = QColor(255, 255, 255, 20) if is_dark else QColor(0, 0, 0, 16)
             painter.setBrush(QBrush(pill_bg))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -111,14 +114,16 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             painter.setPen(QColor("#98989d") if is_dark else QColor("#6e6e73"))
 
         painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, badge_text)
-
         painter.restore()
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
-        return QSize(140, 175)
+        thumb_w = float(getattr(self.sidebar, "thumbnail_width", 110))
+        item_w = int(thumb_w + 24)
+        item_h = int(thumb_w * 1.3) + 38
+        return QSize(item_w, item_h)
 
 class MacSidebar(QWidget):
-    """Collapsible macOS sidebar (about 190px) providing Thumbnails, Contact Sheet, and Table of Contents."""
+    """Collapsible macOS sidebar providing Thumbnails, Contact Sheet, and Table of Contents."""
     
     page_selected = pyqtSignal(int)
     
@@ -126,7 +131,7 @@ class MacSidebar(QWidget):
         super().__init__(parent)
         self.setObjectName("macSidebar")
         self.setMinimumWidth(140)
-        self.setMaximumWidth(450)
+        self.setMaximumWidth(850)
         
         self.document: Optional[Document] = None
         self.current_view_mode = "Thumbnails"
@@ -208,10 +213,10 @@ class MacSidebar(QWidget):
         layout.addWidget(self.stack)
 
         # Footer with Thumbnail Size Slider
-        footer = QWidget()
-        footer.setFixedHeight(28)
-        footer.setObjectName("sidebarFooter")
-        footer_layout = QHBoxLayout(footer)
+        self.footer = QWidget()
+        self.footer.setFixedHeight(28)
+        self.footer.setObjectName("sidebarFooter")
+        footer_layout = QHBoxLayout(self.footer)
         footer_layout.setContentsMargins(12, 2, 12, 2)
         footer_layout.setSpacing(6)
 
@@ -231,17 +236,58 @@ class MacSidebar(QWidget):
         lbl_l.setPixmap(MacIconFactory.create_icon("thumbnails", "#8e8e93", 16).pixmap(16, 16))
         footer_layout.addWidget(lbl_l)
 
-        layout.addWidget(footer)
+        layout.addWidget(self.footer)
 
-    def _on_thumbnail_size_changed(self, size: int):
-        self.thumbnail_width = size
-        item_w = size + 30
-        item_h = int(size * 1.35) + 35
+    def _apply_thumbnail_layout(self):
+        size = self.thumbnail_width
+        item_w = int(size + 24)
+        item_h = int(size * 1.3) + 38
+        item_size = QSize(item_w, item_h)
+
+        if self.current_view_mode == "Contact Sheet":
+            self.thumb_list.setViewMode(QListWidget.ViewMode.IconMode)
+            self.thumb_list.setFlow(QListWidget.Flow.LeftToRight)
+            self.thumb_list.setWrapping(True)
+            self.thumb_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+            self.thumb_list.setMovement(QListWidget.Movement.Static)
+            self.thumb_list.setSpacing(8)
+            grid_size = QSize(item_w + 12, item_h + 10)
+            self.thumb_list.setGridSize(grid_size)
+        elif self.current_view_mode == "Thumbnails":
+            self.thumb_list.setViewMode(QListWidget.ViewMode.ListMode)
+            self.thumb_list.setFlow(QListWidget.Flow.TopToBottom)
+            self.thumb_list.setWrapping(False)
+            self.thumb_list.setResizeMode(QListWidget.ResizeMode.Fixed)
+            self.thumb_list.setSpacing(6)
+            self.thumb_list.setGridSize(QSize())
+
         for i in range(self.thumb_list.count()):
             it = self.thumb_list.item(i)
             if it:
-                it.setSizeHint(QSize(item_w, item_h))
-        self.thumb_list.update()
+                it.setSizeHint(item_size)
+
+        self.thumb_list.doItemsLayout()
+        self.thumb_list.viewport().update()
+
+    def _on_thumbnail_size_changed(self, size: int):
+        self.thumbnail_width = size
+        if self.current_view_mode == "Thumbnails":
+            needed_w = int(size + 48)
+            if needed_w > self.width() and self.window():
+                splitter = getattr(self.window(), "splitter", None)
+                if splitter:
+                    sizes = splitter.sizes()
+                    if len(sizes) >= 2 and sizes[0] < needed_w:
+                        diff = needed_w - sizes[0]
+                        sizes[0] = min(650, needed_w)
+                        sizes[1] = max(200, sizes[1] - diff)
+                        splitter.setSizes(sizes)
+        self._apply_thumbnail_layout()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.current_view_mode == "Contact Sheet":
+            self.thumb_list.doItemsLayout()
 
     def set_document(self, doc: Document):
         self.document = doc
@@ -259,12 +305,15 @@ class MacSidebar(QWidget):
 
         self.page_count_label.setText(f"{self.document.page_count} Pages" if self.document.page_count > 1 else "1 Page")
 
-        item_w = self.thumbnail_width + 30
-        item_h = int(self.thumbnail_width * 1.35) + 35
+        item_w = int(self.thumbnail_width + 24)
+        item_h = int(self.thumbnail_width * 1.3) + 38
+        item_size = QSize(item_w, item_h)
         for idx in range(self.document.page_count):
             item = QListWidgetItem()
-            item.setSizeHint(QSize(item_w, item_h))
+            item.setSizeHint(item_size)
             self.thumb_list.addItem(item)
+
+        self._apply_thumbnail_layout()
 
         if self.document.page_count > 0:
             self.thumb_list.setCurrentRow(self.document.current_page)
@@ -317,22 +366,27 @@ class MacSidebar(QWidget):
         self.view_dropdown.setText(mode_name)
         if mode_name == "Thumbnails":
             self.stack.setCurrentIndex(0)
-            self.thumb_list.setViewMode(QListWidget.ViewMode.ListMode)
-            self.thumb_list.setFlow(QListWidget.Flow.TopToBottom)
-            self.thumb_list.setWrapping(False)
-            self.thumb_list.setSpacing(4)
             self.view_dropdown.setIcon(MacIconFactory.create_icon("thumbnails", "#0a84ff", 14))
+            self.footer.setVisible(True)
+            self._apply_thumbnail_layout()
         elif mode_name == "Contact Sheet":
             self.stack.setCurrentIndex(0)
-            self.thumb_list.setViewMode(QListWidget.ViewMode.IconMode)
-            self.thumb_list.setFlow(QListWidget.Flow.LeftToRight)
-            self.thumb_list.setWrapping(True)
-            self.thumb_list.setResizeMode(QListWidget.ResizeMode.Adjust)
-            self.thumb_list.setSpacing(8)
             self.view_dropdown.setIcon(MacIconFactory.create_icon("thumbnails", "#0a84ff", 14))
+            self.footer.setVisible(True)
+            if self.window():
+                splitter = getattr(self.window(), "splitter", None)
+                if splitter:
+                    sizes = splitter.sizes()
+                    if len(sizes) >= 2 and sizes[0] < 380:
+                        diff = 380 - sizes[0]
+                        sizes[0] = 380
+                        sizes[1] = max(200, sizes[1] - diff)
+                        splitter.setSizes(sizes)
+            self._apply_thumbnail_layout()
         elif mode_name == "Table of Contents":
             self.stack.setCurrentIndex(1)
             self.view_dropdown.setIcon(MacIconFactory.create_icon("doc_proxy", "#0a84ff", 14))
+            self.footer.setVisible(False)
 
     def _toggle_view_mode(self):
         if self.current_view_mode == "Thumbnails":

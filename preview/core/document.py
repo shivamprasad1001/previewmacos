@@ -295,8 +295,8 @@ class Document(QObject):
     def get_thumbnail(self, page_idx: int, width: int = 120) -> QPixmap:
         """Generates a high-quality thumbnail for the sidebar with caching."""
         rot = self.rotations.get(page_idx, 0)
-        cache_key = page_idx
-        if cache_key in self._thumbnail_cache and rot == 0:
+        cache_key = (page_idx, int(width), rot)
+        if cache_key in self._thumbnail_cache:
             return self._thumbnail_cache[cache_key]
 
         w_pt, h_pt = self.get_page_size(page_idx)
@@ -304,15 +304,23 @@ class Document(QObject):
             w_pt = 1
         zoom = width / w_pt
         pixmap = self.render_page(page_idx, zoom=zoom)
-        if rot == 0:
-            self._thumbnail_cache[cache_key] = pixmap
+        self._thumbnail_cache[cache_key] = pixmap
         return pixmap
+
+    def _invalidate_thumbnail(self, page_idx: Optional[int] = None):
+        if page_idx is None:
+            self._thumbnail_cache.clear()
+        else:
+            self._thumbnail_cache = {
+                k: v for k, v in self._thumbnail_cache.items() 
+                if not ((isinstance(k, tuple) and k[0] == page_idx) or k == page_idx)
+            }
 
     def rotate_page(self, page_idx: int, degrees: int = 90):
         """Rotates a specific page by +90 or -90 degrees."""
         current = self.rotations.get(page_idx, 0)
         self.rotations[page_idx] = (current + degrees) % 360
-        self._thumbnail_cache.pop(page_idx, None)
+        self._invalidate_thumbnail(page_idx)
         self._rendered_cache = {k: v for k, v in self._rendered_cache.items() if k[0] != page_idx}
         self.is_dirty = True
         self.page_changed.emit(page_idx)
@@ -413,7 +421,7 @@ class Document(QObject):
                     w.update()
                     self.is_dirty = True
                     self._rendered_cache.clear()
-                    self._thumbnail_cache.pop(page_idx, None)
+                    self._invalidate_thumbnail(page_idx)
                     self.page_changed.emit(page_idx)
                     return True
         except Exception:
@@ -426,7 +434,7 @@ class Document(QObject):
         self._image_cache[idx] = new_pil_image
         if idx == self.current_page:
             self._pil_image = new_pil_image
-        self._thumbnail_cache.pop(idx, None)
+        self._invalidate_thumbnail(idx)
         self._rendered_cache = {k: v for k, v in self._rendered_cache.items() if k[0] != idx}
         self.is_dirty = True
         self.metadata["width"] = new_pil_image.width
