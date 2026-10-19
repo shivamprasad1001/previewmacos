@@ -3,7 +3,7 @@
 ; Powered by: TriviLabs.in
 
 #define MyAppName "Preview"
-#define MyAppVersion "1.2.1"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "TriviLabs"
 #define MyAppURL "https://trivilabs.in"
 #define MyAppExeName "Preview.exe"
