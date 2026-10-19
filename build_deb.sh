@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 APP_NAME="preview-app"
-VERSION="1.3.0"
+VERSION="1.3.1"
 ARCH="amd64"
 PACKAGE_NAME="${APP_NAME}_${VERSION}_${ARCH}"
 BUILD_DIR="$SCRIPT_DIR/build/deb/$PACKAGE_NAME"
@@ -22,6 +22,7 @@ rm -rf "$DIST_DIR/preview-app"
 pyinstaller --noconfirm --onedir --windowed \
     --name="preview-app" \
     --add-data "preview/assets:preview/assets" \
+    --collect-all pymupdf \
     --hidden-import fitz \
     --hidden-import pymupdf \
     main.py

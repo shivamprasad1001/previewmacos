@@ -66,7 +66,7 @@ jobs:
 
       - name: Build Standalone Executable with PyInstaller
         run: |
-          pyinstaller --noconfirm --onedir --windowed --name="Preview" --icon="preview/assets/icon.ico" --add-data "preview/assets;preview/assets" --hidden-import fitz --hidden-import pymupdf main.py
+          pyinstaller --noconfirm --onedir --windowed --name="Preview" --icon="preview/assets/icon.ico" --add-data "preview/assets;preview/assets" --collect-all pymupdf --hidden-import fitz --hidden-import pymupdf main.py
 
       - name: Compile Inno Setup Installer
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2

@@ -1,3 +1,16 @@
+# Preview macOS v1.3.1 Release Notes
+
+Welcome to **Preview macOS v1.3.1**! This patch release addresses a critical standalone packaging and startup failure encountered in the v1.3.0 release binaries.
+
+---
+
+### 🐛 Critical Packaging & Startup Fixes
+* **Resolved PyMuPDF 2.0 Startup Crash:** Fixed `FileNotFoundError: No such file or directory: '.../pymupdf/layout/resources/onnx/layout_rf2.4.1+imf1.yaml'` when launching packaged release builds (`.deb` and Windows `.exe`).
+* **Dependency Version Constraints:** Capped `pymupdf>=1.24.0,<2.0.0` in `requirements.txt` to prevent automatic retrieval of PyMuPDF 2.0 and its unneeded ONNX layout models.
+* **Full PyInstaller Asset Bundling:** Added `--collect-all pymupdf` across all build specifications and GitHub Actions CI pipelines to ensure all PyMuPDF native shared libraries, package metadata, and resources are bundled without missing dependencies.
+
+---
+
 # Preview macOS v1.3.0 Release Notes
 
 Welcome to **Preview macOS v1.3.0**! This major release delivers full parity with Apple macOS Preview for PDF viewing, interactive forms, annotation baking, multi-page layouts, and sidebar management.

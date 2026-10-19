@@ -14,6 +14,7 @@ pyinstaller --noconfirm --onedir --windowed ^
     --name="Preview" ^
     --icon="preview/assets/icon.ico" ^
     --add-data "preview/assets;preview/assets" ^
+    --collect-all pymupdf ^
     --hidden-import fitz ^
     --hidden-import pymupdf ^
     main.py
