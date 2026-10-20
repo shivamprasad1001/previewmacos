@@ -1,0 +1,74 @@
+{
+  "id": "keyboard-shortcuts",
+  "title": "Keyboard Shortcuts",
+  "summary": "Reference guide for all global and contextual keyboard shortcuts in Preview.",
+  "categories": [
+    {
+      "name": "File and Document",
+      "shortcuts": [
+        {"action": "Open Document or Image", "key": "Ctrl + O"},
+        {"action": "Open Folder of Images", "key": "Ctrl + Shift + O"},
+        {"action": "Save Changes", "key": "Ctrl + S"},
+        {"action": "Duplicate / Save As New Copy", "key": "Ctrl + Shift + S"},
+        {"action": "Export as PDF", "key": "Ctrl + Shift + E"},
+        {"action": "Export Image or Document", "key": "Ctrl + E"},
+        {"action": "Print Document", "key": "Ctrl + P"},
+        {"action": "Print Preview", "key": "Ctrl + Shift + P"},
+        {"action": "Close Window", "key": "Ctrl + W"},
+        {"action": "Quit Document Viewer", "key": "Ctrl + Q"}
+      ]
+    },
+    {
+      "name": "Edit and Markup",
+      "shortcuts": [
+        {"action": "Undo Action", "key": "Ctrl + Z"},
+        {"action": "Redo Action", "key": "Ctrl + Shift + Z"},
+        {"action": "Copy Selected Text", "key": "Ctrl + C"},
+        {"action": "Insert Blank Page", "key": "Ctrl + Shift + N"},
+        {"action": "Toggle Markup Toolbar", "key": "Ctrl + Shift + A"},
+        {"action": "Crop Active Selection", "key": "Ctrl + K"},
+        {"action": "Rotate Selection 90 Degrees", "key": "Ctrl + R"},
+        {"action": "Delete Selected Annotation or Page", "key": "Delete"},
+        {"action": "Reset to Pointer Mode", "key": "Esc"}
+      ]
+    },
+    {
+      "name": "Navigation and View",
+      "shortcuts": [
+        {"action": "Next Page or Image", "key": "Right Arrow / Down Arrow / Page Down"},
+        {"action": "Previous Page or Image", "key": "Left Arrow / Up Arrow / Page Up"},
+        {"action": "First Page", "key": "Home"},
+        {"action": "Last Page", "key": "End"},
+        {"action": "Go to Page Dialog", "key": "Ctrl + G"},
+        {"action": "Toggle Sidebar", "key": "Ctrl + B"},
+        {"action": "Actual Size (100%)", "key": "Ctrl + 0"},
+        {"action": "Zoom to Fit Window", "key": "Ctrl + 9"},
+        {"action": "Zoom In", "key": "Ctrl + = (or Ctrl + +)"},
+        {"action": "Zoom Out", "key": "Ctrl + -"},
+        {"action": "Toggle Magnifier Loupe", "key": "` / ~ / Ctrl + Shift + M"},
+        {"action": "Slideshow Presentation Mode", "key": "F5"},
+        {"action": "Frameless Mode", "key": "F11"}
+      ]
+    },
+    {
+      "name": "Tools and Settings",
+      "shortcuts": [
+        {"action": "Rotate Left 90 Degrees", "key": "Ctrl + L"},
+        {"action": "Rotate Right 90 Degrees", "key": "Ctrl + R"},
+        {"action": "Adjust Color Dialog", "key": "Ctrl + Alt + C"},
+        {"action": "Adjust Size Dialog", "key": "Ctrl + Alt + S"},
+        {"action": "Show Inspector", "key": "Ctrl + I"},
+        {"action": "Toggle Dark / Light Theme", "key": "Ctrl + T"},
+        {"action": "Preferences", "key": "Ctrl + ,"},
+        {"action": "Preview Help", "key": "F1"},
+        {"action": "Search within Document", "key": "Ctrl + F"}
+      ]
+    }
+  ],
+  "note": "Shortcuts use Ctrl on Linux and Windows, or Cmd on macOS.",
+  "related": [
+    "view-and-navigate",
+    "annotate-and-markup",
+    "window-overview"
+  ]
+}

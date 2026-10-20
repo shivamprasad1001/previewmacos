@@ -1,0 +1,23 @@
+{
+  "id": "adjust-color",
+  "title": "Adjust color",
+  "summary": "Tune image exposure, contrast, saturation, temperature, tint, and sharpness with live histogram feedback.",
+  "sections": [
+    {
+      "heading": "Color Sliders",
+      "text": "Adjust sliders smoothly with immediate real-time canvas updates. The RGB histogram reflects tone distribution."
+    }
+  ],
+  "steps": [
+    "Select Tools > Adjust Color... or click the Adjust Color button on the Markup Toolbar.",
+    "Click Auto Levels for automatic tonal correction, or drag individual sliders.",
+    "Check Sepia Tone for a vintage warm monochromatic effect if desired.",
+    "Click Done to apply the color adjustments, or click Revert to restore original colors."
+  ],
+  "note": "Adjust Color is designed for images and photos, not text-only PDF pages.",
+  "related": [
+    "adjust-size",
+    "select-crop-and-rotate",
+    "save-safely"
+  ]
+}

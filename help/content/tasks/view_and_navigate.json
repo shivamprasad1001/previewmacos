@@ -1,0 +1,30 @@
+{
+  "id": "view-and-navigate",
+  "title": "View and navigate documents",
+  "summary": "Navigate pages, adjust zoom levels, and search text within documents.",
+  "sections": [
+    {
+      "heading": "Scrolling and Panning",
+      "text": "Scroll using your mouse wheel or trackpad. Hold the Spacebar and drag with the mouse to pan the document."
+    },
+    {
+      "heading": "Zoom Controls",
+      "text": "Click the minus and plus buttons on the toolbar to zoom. Select View > Actual Size or View > Zoom to Fit."
+    },
+    {
+      "heading": "Searching Text",
+      "text": "Click the Search box on the toolbar or press Ctrl + F. Type your search term and press Enter."
+    }
+  ],
+  "steps": [
+    "Press the Right Arrow key or Left Arrow key to move between pages.",
+    "Select Go > Go to Page... or press Ctrl + G to jump directly to a page number.",
+    "Press Ctrl + 9 to fit the page to the window, or press Ctrl + 0 for actual size."
+  ],
+  "note": "Press the tilde (~) key or backtick (`) to toggle the circular magnifier loupe.",
+  "related": [
+    "use-the-sidebar",
+    "organize-pdf-pages",
+    "window-overview"
+  ]
+}

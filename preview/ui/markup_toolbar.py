@@ -30,6 +30,7 @@ class MarkupToolbar(QWidget):
     adjust_color_requested = pyqtSignal()
     adjust_size_requested = pyqtSignal()
     rotate_requested = pyqtSignal()
+    rotate_selection_requested = pyqtSignal(int)
     crop_requested = pyqtSignal()
     signature_requested = pyqtSignal()
 
@@ -61,7 +62,7 @@ class MarkupToolbar(QWidget):
         self.pointer_btn.setFixedSize(28, 28)
         self.pointer_btn.setCheckable(True)
         self.pointer_btn.setChecked(True)
-        self.pointer_btn.setToolTip("Pointer / Select (Esc)")
+        self.pointer_btn.setToolTip("Pointer / Select (Esc) - Learn more (F1)")
         self.pointer_btn.clicked.connect(self.unselect_all)
         self.btn_group.addButton(self.pointer_btn)
         layout.addWidget(self.pointer_btn)
@@ -70,7 +71,7 @@ class MarkupToolbar(QWidget):
         self.select_btn = QToolButton()
         self.select_btn.setFixedSize(36, 28)
         self.select_btn.setCheckable(True)
-        self.select_btn.setToolTip("Selection Tools (Rectangular, Oval, Lasso)")
+        self.select_btn.setToolTip("Selection Tools (Rectangular, Oval, Lasso) - Learn more (F1)")
         self.select_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_select_menu()
         self.btn_group.addButton(self.select_btn)
@@ -80,35 +81,35 @@ class MarkupToolbar(QWidget):
         self.shapes_btn = QToolButton()
         self.shapes_btn.setFixedSize(36, 28)
         self.shapes_btn.setCheckable(True)
-        self.shapes_btn.setToolTip("Shapes (Rectangle, Oval, Line, Arrow)")
+        self.shapes_btn.setToolTip("Shapes (Rectangle, Oval, Line, Arrow) - Learn more (F1)")
         self.shapes_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_shapes_menu()
         layout.addWidget(self.shapes_btn)
 
         # 3. Sketch / Pen
-        self.pen_btn = self._create_tool_button("pen", "Sketch / Pen", AnnotationType.PEN)
+        self.pen_btn = self._create_tool_button("pen", "Sketch / Pen - Learn more (F1)", AnnotationType.PEN)
         layout.addWidget(self.pen_btn)
 
         # 4. Highlighter
-        self.highlighter_btn = self._create_tool_button("highlighter", "Highlighter", AnnotationType.HIGHLIGHTER)
+        self.highlighter_btn = self._create_tool_button("highlighter", "Highlighter - Learn more (F1)", AnnotationType.HIGHLIGHTER)
         layout.addWidget(self.highlighter_btn)
 
         # 5. Text Box
-        self.text_btn = self._create_tool_button("text", "Text Box", AnnotationType.TEXT)
+        self.text_btn = self._create_tool_button("text", "Text Box - Learn more (F1)", AnnotationType.TEXT)
         layout.addWidget(self.text_btn)
 
         # 6. Sticky Note
-        self.note_btn = self._create_tool_button("note", "Sticky Note", AnnotationType.NOTE)
+        self.note_btn = self._create_tool_button("note", "Sticky Note - Learn more (F1)", AnnotationType.NOTE)
         layout.addWidget(self.note_btn)
 
         # 6.5 Redaction Tool
-        self.redact_btn = self._create_tool_button("redact", "Redact / Blackout Info", AnnotationType.REDACT)
+        self.redact_btn = self._create_tool_button("redact", "Redact / Blackout Info - Learn more (F1)", AnnotationType.REDACT)
         layout.addWidget(self.redact_btn)
 
         # 7. Signature Tool
         self.sign_btn = QToolButton()
         self.sign_btn.setFixedSize(28, 28)
-        self.sign_btn.setToolTip("Sign Document")
+        self.sign_btn.setToolTip("Sign Document - Learn more (F1)")
         self.sign_btn.clicked.connect(self.signature_requested.emit)
         layout.addWidget(self.sign_btn)
 
@@ -209,31 +210,39 @@ class MarkupToolbar(QWidget):
         # 12. Adjust Color Action Button
         self.color_adjust_btn = QToolButton()
         self.color_adjust_btn.setFixedSize(28, 28)
-        self.color_adjust_btn.setToolTip("Adjust Color (Ctrl+Alt+C)")
+        self.color_adjust_btn.setToolTip("Adjust Color (Ctrl+Alt+C) - Learn more (F1)")
         self.color_adjust_btn.clicked.connect(self.adjust_color_requested.emit)
         layout.addWidget(self.color_adjust_btn)
 
         # 13. Adjust Size Action Button
         self.size_adjust_btn = QToolButton()
         self.size_adjust_btn.setFixedSize(28, 28)
-        self.size_adjust_btn.setToolTip("Adjust Size (Ctrl+Alt+S)")
+        self.size_adjust_btn.setToolTip("Adjust Size (Ctrl+Alt+S) - Learn more (F1)")
         self.size_adjust_btn.clicked.connect(self.adjust_size_requested.emit)
         layout.addWidget(self.size_adjust_btn)
 
         # 14. Rotate Left Action Button
         self.rotate_btn = QToolButton()
         self.rotate_btn.setFixedSize(28, 28)
-        self.rotate_btn.setToolTip("Rotate Left 90° (Ctrl+L)")
+        self.rotate_btn.setToolTip("Rotate Left 90° (Ctrl+L) - Learn more (F1)")
         self.rotate_btn.clicked.connect(self.rotate_requested.emit)
         layout.addWidget(self.rotate_btn)
 
         # 15. Crop Action Button
         self.crop_btn = QToolButton()
         self.crop_btn.setFixedSize(28, 28)
-        self.crop_btn.setToolTip("Crop Selection (Ctrl+K)")
+        self.crop_btn.setToolTip("Crop Selection (Ctrl+K) - Learn more (F1)")
         self.crop_btn.setEnabled(False)
         self.crop_btn.clicked.connect(self.crop_requested.emit)
         layout.addWidget(self.crop_btn)
+
+        # 16. Rotate Selection Action Button
+        self.rotate_selection_btn = QToolButton()
+        self.rotate_selection_btn.setFixedSize(28, 28)
+        self.rotate_selection_btn.setToolTip("Rotate Selection 90° (Ctrl+R) - Learn more (F1)")
+        self.rotate_selection_btn.setEnabled(False)
+        self.rotate_selection_btn.clicked.connect(lambda: self.rotate_selection_requested.emit(90))
+        layout.addWidget(self.rotate_selection_btn)
 
         self._refresh_tool_icons()
 
@@ -297,6 +306,7 @@ class MarkupToolbar(QWidget):
         self.size_adjust_btn.setIcon(MacIconFactory.create_icon("size_adjust", col, 16))
         self.rotate_btn.setIcon(MacIconFactory.create_icon("rotate_left", col, 16))
         self.crop_btn.setIcon(MacIconFactory.create_icon("crop", col, 16))
+        self.rotate_selection_btn.setIcon(MacIconFactory.create_icon("rotate_right", col, 16))
 
     def _setup_select_menu(self):
         menu = QMenu(self)
@@ -541,3 +551,5 @@ class MarkupToolbar(QWidget):
 
     def set_crop_enabled(self, enabled: bool):
         self.crop_btn.setEnabled(enabled)
+        self.rotate_selection_btn.setEnabled(enabled)
+        self.rotate_selection_btn.setToolTip("Rotate Selection 90° (Ctrl+R)" if enabled else "Rotate Selection (select an area first)")

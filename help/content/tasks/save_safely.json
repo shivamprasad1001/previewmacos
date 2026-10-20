@@ -1,0 +1,26 @@
+{
+  "id": "save-safely",
+  "title": "Save safely",
+  "summary": "Save updates directly, export duplicate copies, revert changes, and prevent accidental data loss.",
+  "sections": [
+    {
+      "heading": "Saving Modifications",
+      "text": "Saving writes your annotations and edits into the document. Save As creates an independent duplicate."
+    },
+    {
+      "heading": "Unsaved Edits Confirmation",
+      "text": "Closing the window with unsaved edits displays a prompt offering Don't Save, Cancel, or Save."
+    }
+  ],
+  "steps": [
+    "Select File > Save or press Ctrl + S to update the current file.",
+    "Select File > Duplicate / Save As New Copy... or press Ctrl + Shift + S for a new file.",
+    "Select File > Revert to Original... to discard all session modifications and reload the file."
+  ],
+  "note": "The prompt lets you press Alt + D to discard changes or Enter to save safely.",
+  "related": [
+    "export-and-print",
+    "organize-pdf-pages",
+    "what-is-preview"
+  ]
+}

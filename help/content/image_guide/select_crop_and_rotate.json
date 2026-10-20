@@ -1,0 +1,71 @@
+{
+  "id": "select-crop-and-rotate",
+  "task_id": "select-crop-and-rotate",
+  "title": "Select, crop and rotate",
+  "source_image": "help/screenshots_clean/guide-markup-tools-light.png",
+  "output_image": "guide-select-crop-and-rotate-1.png",
+  "caption": "Selection dropdown, crop button, and rotate selection action.",
+  "alt_text": "Selection marquee tool and crop button on the Markup Toolbar",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 46,
+      "y": 4,
+      "w": 40,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 66,
+      "y1": 55,
+      "x2": 66,
+      "y2": 36
+    },
+    {
+      "type": "number",
+      "x": 66,
+      "y": 68,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 780,
+      "y": 4,
+      "w": 32,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 796,
+      "y1": 55,
+      "x2": 796,
+      "y2": 36
+    },
+    {
+      "type": "number",
+      "x": 796,
+      "y": 68,
+      "text": "2"
+    },
+    {
+      "type": "box",
+      "x": 816,
+      "y": 4,
+      "w": 32,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 832,
+      "y1": 55,
+      "x2": 832,
+      "y2": 36
+    },
+    {
+      "type": "number",
+      "x": 832,
+      "y": 68,
+      "text": "3"
+    }
+  ]
+}

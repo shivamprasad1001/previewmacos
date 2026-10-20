@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import (
     QAction, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
-    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap
+    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap, QCloseEvent
 )
 from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
@@ -33,6 +33,7 @@ from preview.ui.signature_dialog import SignatureDialog
 from preview.ui.inspector_dialog import InspectorDialog
 from preview.ui.about_dialog import AboutDialog
 from preview.ui.export_dialog import MacExportDialog
+from preview.ui.save_dialog import MacSaveConfirmationDialog
 from preview.core.updater import UpdateCheckWorker, UpdateInfo
 from preview.ui.update_dialog import UpdateDialog, UpdateBanner
 
@@ -191,7 +192,7 @@ class FloatingSlideshowHUD(QWidget):
         self.move(max(0, x), max(0, y))
 
 class TrafficLightButton(QToolButton):
-    """Traffic light button (12px circle) displaying hover glyphs (✕, −, +) when active, grey when window is inactive."""
+    """Traffic light button (12px circle) displaying hover glyphs (✕, −, +) when active, grey when window is inactive, and modified dot when dirty."""
 
     def __init__(self, color_bg: str, border_col: str, symbol: str, glyph_col: str, parent=None):
         super().__init__(parent)
@@ -201,8 +202,14 @@ class TrafficLightButton(QToolButton):
         self.glyph_col = glyph_col
         self._hovered = False
         self._active = True
+        self._modified = False
         self.setFixedSize(12, 12)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def set_modified(self, modified: bool):
+        if self._modified != modified:
+            self._modified = modified
+            self.update()
 
     def set_cluster_hovered(self, hovered: bool):
         self._hovered = hovered
@@ -233,6 +240,10 @@ class TrafficLightButton(QToolButton):
             p.setBrush(QBrush(QColor(fill_col)))
             p.setPen(QPen(QColor(stroke_col), 0.75))
             p.drawEllipse(QRectF(0.5, 0.5, 11.0, 11.0))
+            if self._modified and not self._hovered:
+                p.setBrush(QBrush(QColor("#454548" if is_dark else "#808085")))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawEllipse(QRectF(3.75, 3.75, 4.5, 4.5))
         else:
             p.setBrush(QBrush(QColor(self.color_bg)))
             p.setPen(QPen(QColor(self.border_col), 0.75))
@@ -242,6 +253,11 @@ class TrafficLightButton(QToolButton):
                 font = QFont("Inter", 7, QFont.Weight.Bold)
                 p.setFont(font)
                 p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.symbol)
+            elif self._modified:
+                # macOS dirty indicator dot (4.5px circle in center)
+                p.setBrush(QBrush(QColor(self.glyph_col)))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawEllipse(QRectF(3.75, 3.75, 4.5, 4.5))
         p.end()
 
 class TrafficLightCluster(QWidget):
@@ -470,6 +486,7 @@ class MacMainWindow(QMainWindow):
         self.canvas.status_message.connect(self._show_status)
         self.canvas.page_next_requested.connect(self.next_page)
         self.canvas.page_prev_requested.connect(self.prev_page)
+        self.canvas.document_modified.connect(lambda _: self._update_modified_ui())
 
         # 2. Secondary Markup Toolbar (collapsible 38px)
         self.markup_bar = MarkupToolbar(self)
@@ -530,7 +547,7 @@ class MacMainWindow(QMainWindow):
         self.sidebar_btn = QToolButton()
         self.sidebar_btn.setObjectName("sidebarBtn")
         self.sidebar_btn.setFixedSize(28, 28)
-        self.sidebar_btn.setToolTip("Toggle Sidebar (Ctrl+B)")
+        self.sidebar_btn.setToolTip("Toggle Sidebar (Ctrl+B) - Learn more (F1)")
         self.sidebar_btn.clicked.connect(self._toggle_sidebar)
         toolbar_layout.addWidget(self.sidebar_btn)
 
@@ -575,7 +592,7 @@ class MacMainWindow(QMainWindow):
         self.open_btn.setFixedHeight(28)
         self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.open_btn.setText("Open")
-        self.open_btn.setToolTip("Open Document or Images (Ctrl+O)")
+        self.open_btn.setToolTip("Open Document or Images (Ctrl+O) - Learn more (F1)")
         self.open_btn.clicked.connect(self._open_file_dialog)
         open_seg_layout.addWidget(self.open_btn)
 
@@ -635,14 +652,14 @@ class MacMainWindow(QMainWindow):
         self.zoom_out_btn = QToolButton()
         self.zoom_out_btn.setObjectName("zoomOutBtn")
         self.zoom_out_btn.setFixedSize(28, 28)
-        self.zoom_out_btn.setToolTip("Zoom Out (Ctrl+-)")
+        self.zoom_out_btn.setToolTip("Zoom Out (Ctrl+-) - Learn more (F1)")
         self.zoom_out_btn.clicked.connect(self.canvas.zoom_out)
         zoom_layout.addWidget(self.zoom_out_btn)
 
         self.zoom_in_btn = QToolButton()
         self.zoom_in_btn.setObjectName("zoomInBtn")
         self.zoom_in_btn.setFixedSize(28, 28)
-        self.zoom_in_btn.setToolTip("Zoom In (Ctrl++)")
+        self.zoom_in_btn.setToolTip("Zoom In (Ctrl++) - Learn more (F1)")
         self.zoom_in_btn.clicked.connect(self.canvas.zoom_in)
         zoom_layout.addWidget(self.zoom_in_btn)
 
@@ -654,7 +671,7 @@ class MacMainWindow(QMainWindow):
         self.rotate_btn = QToolButton()
         self.rotate_btn.setObjectName("rotateBtn")
         self.rotate_btn.setFixedSize(28, 28)
-        self.rotate_btn.setToolTip("Rotate (Ctrl+R)")
+        self.rotate_btn.setToolTip("Rotate (Ctrl+R) - Learn more (F1)")
         self.rotate_btn.clicked.connect(self._rotate_right)
         self.rotate_right_btn = self.rotate_btn
         self.rotate_left_btn = self.rotate_btn
@@ -669,7 +686,7 @@ class MacMainWindow(QMainWindow):
         self.markup_toggle_btn.setText("Markup")
         self.markup_toggle_btn.setFixedHeight(28)
         self.markup_toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.markup_toggle_btn.setToolTip("Show/Hide Markup Toolbar (Ctrl+Shift+A)")
+        self.markup_toggle_btn.setToolTip("Show/Hide Markup Toolbar (Ctrl+Shift+A) - Learn more (F1)")
         self.markup_toggle_btn.clicked.connect(self._toggle_markup_bar)
         toolbar_layout.addWidget(self.markup_toggle_btn)
 
@@ -694,7 +711,7 @@ class MacMainWindow(QMainWindow):
         self.inspector_btn = QToolButton()
         self.inspector_btn.setObjectName("inspectorBtn")
         self.inspector_btn.setFixedSize(28, 28)
-        self.inspector_btn.setToolTip("Show Inspector (Ctrl+I)")
+        self.inspector_btn.setToolTip("Show Inspector (Ctrl+I) - Learn more (F1)")
         self.inspector_btn.clicked.connect(self._show_inspector)
         toolbar_layout.addWidget(self.inspector_btn)
 
@@ -703,7 +720,7 @@ class MacMainWindow(QMainWindow):
         self.theme_btn.setObjectName("themeBtn")
         self.theme_btn.setFixedSize(28, 28)
         self.theme_btn.setText("☀️" if self.current_theme == MacTheme.DARK else "🌙")
-        self.theme_btn.setToolTip("Toggle Dark/Light Mode (Ctrl+T)")
+        self.theme_btn.setToolTip("Toggle Dark/Light Mode (Ctrl+T) - Learn more (F1)")
         self.theme_btn.clicked.connect(self._toggle_theme)
         toolbar_layout.addWidget(self.theme_btn)
 
@@ -748,6 +765,7 @@ class MacMainWindow(QMainWindow):
         self.markup_bar.adjust_color_requested.connect(self._open_adjust_color)
         self.markup_bar.adjust_size_requested.connect(self._open_adjust_size)
         self.markup_bar.rotate_requested.connect(self._rotate_left)
+        self.markup_bar.rotate_selection_requested.connect(lambda deg: self.canvas.rotate_selection(deg))
         self.markup_bar.crop_requested.connect(self.canvas.apply_crop)
         self.markup_bar.signature_requested.connect(self._open_signature_dialog)
         self.canvas.tool_deselected.connect(self.markup_bar.unselect_all)
@@ -818,15 +836,20 @@ class MacMainWindow(QMainWindow):
 
         self.file_menu.addSeparator()
 
-        save_act = QAction("Save", self)
-        save_act.setShortcut(QKeySequence.StandardKey.Save)
-        save_act.triggered.connect(self._save_file)
-        self.file_menu.addAction(save_act)
+        self.save_act = QAction("Save", self)
+        self.save_act.setShortcut(QKeySequence.StandardKey.Save)
+        self.save_act.triggered.connect(self._save_file)
+        self.file_menu.addAction(self.save_act)
 
-        save_as_act = QAction("Save As...", self)
-        save_as_act.setShortcut(QKeySequence("Ctrl+Shift+S"))
-        save_as_act.triggered.connect(self._save_as_file)
-        self.file_menu.addAction(save_as_act)
+        self.save_as_act = QAction("Duplicate / Save As New Copy...", self)
+        self.save_as_act.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.save_as_act.triggered.connect(self._save_as_file)
+        self.file_menu.addAction(self.save_as_act)
+
+        self.revert_act = QAction("Revert to Original...", self)
+        self.revert_act.setEnabled(False)
+        self.revert_act.triggered.connect(self._revert_to_original)
+        self.file_menu.addAction(self.revert_act)
 
         export_pdf_act = QAction("Export as PDF...", self)
         export_pdf_act.setShortcut(QKeySequence("Ctrl+Shift+E"))
@@ -1058,6 +1081,17 @@ class MacMainWindow(QMainWindow):
 
         # 8. Help Menu
         self.help_menu = self.top_menubar.addMenu("Help")
+        preview_help_act = QAction("Preview Help", self)
+        preview_help_act.setShortcut(QKeySequence("F1"))
+        preview_help_act.triggered.connect(lambda: self._show_help())
+        self.help_menu.addAction(preview_help_act)
+
+        shortcuts_guide_act = QAction("Keyboard Shortcuts Guide", self)
+        shortcuts_guide_act.triggered.connect(self._show_shortcuts_guide)
+        self.help_menu.addAction(shortcuts_guide_act)
+
+        self.help_menu.addSeparator()
+
         check_up_h_act = QAction("Check for Updates...", self)
         check_up_h_act.triggered.connect(self._check_for_updates_manual)
         self.help_menu.addAction(check_up_h_act)
@@ -1069,13 +1103,14 @@ class MacMainWindow(QMainWindow):
         self.help_menu.addAction(about_h_act)
 
         # Register keyboard shortcuts into window actions
-        for a in [open_act, open_folder_act, save_act, save_as_act, export_pdf_act, export_act,
+        for a in [open_act, open_folder_act, self.save_act, self.save_as_act, self.revert_act, export_pdf_act, export_act,
                   print_act, print_prev_act, close_act, undo_act, redo_act, copy_text_act,
                   extract_all_act, toggle_sb, toggle_mb_act, toggle_sb_bar, slideshow_act,
                   frameless_act, actual_size, zoom_to_fit, zoom_in_act, zoom_out_act, next_act,
                   prev_act, first_act, last_act, markup_act, loupe_act, crop_act, rot_l_act,
                   rot_r_act, color_act, size_act, insp_act, min_act, zoom_win_act, theme_act,
-                  quit_act, pref_act, hide_act, check_updates_act, check_up_h_act]:
+                  quit_act, pref_act, hide_act, check_updates_act, check_up_h_act,
+                  preview_help_act, shortcuts_guide_act]:
             self.addAction(a)
 
     def _toggle_menu_bar(self, checked: bool):
@@ -1099,7 +1134,80 @@ class MacMainWindow(QMainWindow):
             self.sidebar.select_page(last)
             self._update_status()
 
+    def is_document_modified(self) -> bool:
+        """Returns True if the document has any unsaved annotations, edits, crops, or transformations."""
+        if getattr(self, "_force_modified", False):
+            return True
+        if hasattr(self, "canvas") and self.canvas and self.canvas.is_modified:
+            return True
+        if hasattr(self, "document") and self.document and getattr(self.document, "is_dirty", False):
+            return True
+        return False
+
+    def set_modified(self, modified: bool):
+        """Sets the document modified state and synchronizes canvas history and UI indicators."""
+        self._force_modified = modified
+        if not modified:
+            if hasattr(self, "document") and self.document:
+                self.document.is_dirty = False
+            if hasattr(self, "canvas") and self.canvas:
+                self.canvas.history.mark_saved()
+        self._update_modified_ui()
+
+    def _update_modified_ui(self):
+        """Updates window title ('— Edited'), traffic light dirty dot, and menu actions based on modification status."""
+        is_mod = self.is_document_modified()
+        if hasattr(self, "document") and self.document:
+            base_name = self.document.file_name or "Untitled"
+            title = f"{base_name} — Edited" if is_mod else base_name
+            if hasattr(self, "title_label") and self.title_label:
+                self.title_label.setText(title)
+            self.setWindowTitle(title)
+            if hasattr(self, "toolbar_widget") and self.toolbar_widget:
+                self.toolbar_widget.update_title_geometry()
+        if hasattr(self, "traffic_cluster") and self.traffic_cluster:
+            self.traffic_cluster.btn_close.set_modified(is_mod)
+        if hasattr(self, "revert_act") and self.revert_act:
+            self.revert_act.setEnabled(is_mod and bool(self.document and self.document.file_path))
+
+    def maybe_save_changes(self) -> bool:
+        """
+        Prompts user if document has unsaved modifications.
+        Offers Don't Save, Cancel, and Save (as new copy).
+        Returns True if safe to close or navigate away, False if cancelled.
+        """
+        if not self.is_document_modified():
+            return True
+        if not self.document:
+            return True
+
+        has_path = bool(self.document.file_path and os.path.exists(self.document.file_path))
+        doc_name = self.document.file_name or "Untitled"
+        theme = getattr(self, "current_theme", MacTheme.DARK)
+
+        dialog = MacSaveConfirmationDialog(doc_name, has_file_path=has_path, theme=theme, parent=self)
+        dialog.exec()
+
+        if dialog.result_code == MacSaveConfirmationDialog.CANCEL:
+            return False
+        elif dialog.result_code == MacSaveConfirmationDialog.DONT_SAVE:
+            self.set_modified(False)
+            return True
+        elif dialog.result_code in (MacSaveConfirmationDialog.SAVE, MacSaveConfirmationDialog.SAVE_AS_NEW_COPY):
+            return self._save_as_new_copy_direct()
+
+        return False
+
+    def closeEvent(self, event: QCloseEvent):
+        """Intercepts window close to prompt for unsaved edits."""
+        if self.maybe_save_changes():
+            event.accept()
+        else:
+            event.ignore()
+
     def open_file(self, file_path: str):
+        if not self.maybe_save_changes():
+            return
         try:
             self.document = Document(file_path)
             self._bind_document()
@@ -1126,6 +1234,8 @@ class MacMainWindow(QMainWindow):
             QMessageBox.critical(self, "Error Opening File", f"Could not open {file_path}:\n{str(e)}")
 
     def open_files(self, file_paths: List[str]):
+        if not self.maybe_save_changes():
+            return
         try:
             self.document = Document()
             self.document.load_files(file_paths)
@@ -1136,6 +1246,8 @@ class MacMainWindow(QMainWindow):
             QMessageBox.critical(self, "Error Opening Images", f"Could not open images:\n{str(e)}")
 
     def open_folder(self, folder_path: str):
+        if not self.maybe_save_changes():
+            return
         try:
             self.document = Document()
             self.document.load_folder(folder_path)
@@ -1154,9 +1266,8 @@ class MacMainWindow(QMainWindow):
         self.sidebar.set_document(self.document)
         self.canvas.set_document(self.document)
         
-        self.title_label.setText(self.document.file_name)
-        self.setWindowTitle(self.document.file_name)
-        self.toolbar_widget.update_title_geometry()
+        self.set_modified(False)
+        self._update_modified_ui()
         self._update_status()
 
         # Re-fit image/page to canvas after layout is settled
@@ -1195,31 +1306,80 @@ class MacMainWindow(QMainWindow):
             self.open_folder(folder)
 
     def _save_file(self):
+        return self._save_file_direct()
+
+    def _save_file_direct(self) -> bool:
+        """Saves document in-place, replacing the original file."""
         if not self.document:
-            return
+            return True
         if self.document.file_path:
             try:
                 self.document.save_with_annotations(self.document.file_path, self.canvas.annotations)
+                self.set_modified(False)
                 self._show_status("Document saved successfully.")
+                return True
             except Exception as e:
-                QMessageBox.critical(self, "Save Error", str(e))
+                QMessageBox.critical(self, "Save Error", f"Could not save document:\n{str(e)}")
+                return False
         else:
-            self._save_as_file()
+            return self._save_as_file()
 
     def _save_as_file(self):
+        return self._save_as_new_copy_direct()
+
+    def _save_as_new_copy_direct(self) -> bool:
+        """Prompts for a new file location and saves the document as a new copy, leaving the original untouched."""
         if not self.document:
-            return
+            return True
+
+        orig_path = self.document.file_path
+        if orig_path:
+            dir_name = os.path.dirname(orig_path)
+            base, ext = os.path.splitext(os.path.basename(orig_path))
+            suggested_name = os.path.join(dir_name, f"{base} (Edited){ext}")
+        else:
+            ext = ".pdf" if getattr(self.document, "is_pdf", False) else ".png"
+            suggested_name = f"Untitled (Edited){ext}"
+
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save Document As", self.document.file_name,
+            self, "Save As New Copy", suggested_name,
             "PDF Document (*.pdf);;PNG Image (*.png);;JPEG Image (*.jpg);;All Files (*.*)"
         )
-        if path:
-            try:
-                self.document.save_with_annotations(path, self.canvas.annotations)
-                self.open_file(path)
-                self._show_status(f"Saved to {os.path.basename(path)}")
-            except Exception as e:
-                QMessageBox.critical(self, "Save As Error", str(e))
+        if not path:
+            return False
+
+        try:
+            self.document.save_with_annotations(path, self.canvas.annotations)
+            self.document.file_path = os.path.abspath(path)
+            self.document.file_name = os.path.basename(path)
+            self._add_recent_file(path)
+            self.set_modified(False)
+            self._show_status(f"Saved new copy to {os.path.basename(path)}")
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "Save As Error", f"Could not save copy:\n{str(e)}")
+            return False
+
+    def _revert_to_original(self):
+        """Prompts and reloads original document from disk, discarding all unsaved edits."""
+        if not self.document or not self.document.file_path:
+            return
+        if not self.is_document_modified():
+            self._show_status("Document has not been modified.")
+            return
+
+        res = QMessageBox.question(
+            self,
+            "Revert Document",
+            f"Are you sure you want to revert “{self.document.file_name}” to its original version?\n\nAll unsaved annotations, crops, and edits will be discarded.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if res == QMessageBox.StandardButton.Yes:
+            orig_path = self.document.file_path
+            self.set_modified(False)
+            self.open_file(orig_path)
+            self._show_status("Reverted to original document.")
 
     # --- Open Recent Documents ---
     def _add_recent_file(self, file_path: str):
@@ -1596,6 +1756,7 @@ class MacMainWindow(QMainWindow):
         self.sidebar.reload_outline()
         self.canvas.update()
         self._update_status()
+        self._update_modified_ui()
 
     def _on_doc_page_changed(self, page_idx: int):
         self.sidebar.reload_thumbnails()
@@ -1639,6 +1800,7 @@ class MacMainWindow(QMainWindow):
         is_vis = not self.markup_bar.isVisible()
         self.markup_bar.setVisible(is_vis)
         self.markup_toggle_btn.setChecked(is_vis)
+        self.canvas.set_markup_enabled(is_vis)
         if not is_vis:
             # Unselect and reset active tool when markup bar is hidden
             self.markup_bar.unselect_all()
@@ -1807,6 +1969,9 @@ class MacMainWindow(QMainWindow):
             self.traffic_cluster.update()
 
     def _rotate_left(self):
+        if self.canvas and (self.canvas.crop_box or self.canvas._selected_annotation):
+            self.canvas.rotate_selection(-90)
+            return
         if self.document:
             page = self.canvas.current_page
             self.document.rotate_page(page, -90)
@@ -1820,6 +1985,9 @@ class MacMainWindow(QMainWindow):
             self.canvas.history.push(ActionCommand("Rotate Left", undo_rot, redo_rot))
 
     def _rotate_right(self):
+        if self.canvas and (self.canvas.crop_box or self.canvas._selected_annotation):
+            self.canvas.rotate_selection(90)
+            return
         if self.document:
             page = self.canvas.current_page
             self.document.rotate_page(page, 90)
@@ -1990,7 +2158,27 @@ class MacMainWindow(QMainWindow):
         dialog = AboutDialog(self)
         dialog.exec()
 
+    def _show_help(self, page_id: str = "what-is-preview"):
+        if not hasattr(self, "_help_window") or self._help_window is None:
+            from preview.ui.help_window import HelpWindow
+            self._help_window = HelpWindow(theme=self.current_theme, parent=self)
+        else:
+            self._help_window.current_theme = self.current_theme
+            self._help_window._apply_theme()
+        if page_id:
+            self._help_window.navigate_to(page_id)
+        self._help_window.show()
+        self._help_window.raise_()
+        self._help_window.activateWindow()
+
+    def _show_shortcuts_guide(self):
+        self._show_help(page_id="shortcuts")
+
     def keyPressEvent(self, event: QKeyEvent):
+        if event.key() == Qt.Key.Key_F1:
+            self._show_help()
+            event.accept()
+            return
         if getattr(self, "_is_slideshow", False):
             if event.key() == Qt.Key.Key_Escape:
                 self._toggle_slideshow()

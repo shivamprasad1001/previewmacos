@@ -1,0 +1,51 @@
+{
+  "id": "organize-pdf-pages",
+  "task_id": "organize-pdf-pages",
+  "title": "Organize PDF pages",
+  "source_image": "help/screenshots_clean/guide-sidebar-thumbnails-light.png",
+  "output_image": "guide-organize-pdf-pages-1.png",
+  "caption": "Reorder, duplicate, insert, or delete pages in sidebar.",
+  "alt_text": "Thumbnail cards in sidebar for page reordering and context actions",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 12,
+      "y": 48,
+      "w": 140,
+      "h": 160
+    },
+    {
+      "type": "arrow",
+      "x1": 175,
+      "y1": 120,
+      "x2": 155,
+      "y2": 120
+    },
+    {
+      "type": "number",
+      "x": 190,
+      "y": 120,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 12,
+      "y": 220,
+      "w": 140,
+      "h": 160
+    },
+    {
+      "type": "arrow",
+      "x1": 175,
+      "y1": 290,
+      "x2": 155,
+      "y2": 290
+    },
+    {
+      "type": "number",
+      "x": 190,
+      "y": 290,
+      "text": "2"
+    }
+  ]
+}

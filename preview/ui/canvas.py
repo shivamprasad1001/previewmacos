@@ -4,6 +4,8 @@ markup drawing, handle manipulation, search highlight, and cropping.
 """
 
 from typing import List, Optional, Tuple, Dict
+import copy
+import math
 from PIL import Image, ImageDraw, ImageChops
 from PIL.ImageQt import ImageQt
 
@@ -28,6 +30,7 @@ class CanvasView(QWidget):
     tool_deselected = pyqtSignal()
     page_next_requested = pyqtSignal()
     page_prev_requested = pyqtSignal()
+    document_modified = pyqtSignal(bool)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -37,7 +40,7 @@ class CanvasView(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.document: Optional[Document] = None
-        self.history: HistoryManager = HistoryManager()
+        self.history: HistoryManager = HistoryManager(on_changed=lambda m: self.document_modified.emit(m))
         self.current_page: int = 0
         self.zoom: float = 1.0
 
@@ -81,6 +84,7 @@ class CanvasView(QWidget):
         # Selection / Crop box
         self.crop_box: Optional[AnnotationItem] = None
         self._resizing_handle: int = -1  # 0 to 7
+        self.markup_enabled: bool = False
 
         # Search highlights
         self.search_results: List[SearchResult] = []
@@ -119,10 +123,16 @@ class CanvasView(QWidget):
         if hasattr(self, "floating_pill") and self.floating_pill:
             self.floating_pill._reposition()
 
+    @property
+    def is_modified(self) -> bool:
+        """Returns True if canvas has pending unsaved history commands or annotations."""
+        return self.history.is_modified
+
     def set_document(self, doc: Document):
         self.document = doc
         self.current_page = 0
         self.annotations.clear()
+        self.history.clear()
         self.crop_box = None
         self._pan_offset = QPointF(0, 0)
         self._auto_fit = True
@@ -512,7 +522,19 @@ class CanvasView(QWidget):
                         self.update()
                         return
 
-            # 0b. Check if clicking on a resize handle of the currently selected annotation
+            # 0b. If markup is disabled, do not allow creating or interacting with annotations/selections
+            if not self.markup_enabled:
+                if self.document and self.document.is_pdf:
+                    self._is_selecting_text = True
+                    self._text_sel_start = doc_pt
+                    self._text_sel_rects.clear()
+                    self._selected_text = ""
+                else:
+                    self._is_panning = True
+                    self._pan_start = event.position()
+                return
+
+            # Check if clicking on a resize handle of the currently selected annotation
             if self._selected_annotation and self.active_tool == AnnotationType.NONE:
                 hit_h = self._selected_annotation.get_handle_at_point(doc_pt, self.zoom)
                 if hit_h != Handle.NONE:
@@ -644,6 +666,19 @@ class CanvasView(QWidget):
             self.update()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if not self.markup_enabled:
+            # When markup is closed, only allow selecting words in PDF
+            if event.button() == Qt.MouseButton.LeftButton and self.document and self.document.is_pdf:
+                doc_pt = self.view_to_doc_coords(event.position())
+                words = self.document.get_page_words(self.current_page)
+                for r, w in words:
+                    if r.contains(doc_pt):
+                        self._text_sel_rects = [r]
+                        self._selected_text = w
+                        self.update()
+                        return
+            return
+
         if event.button() == Qt.MouseButton.LeftButton:
             doc_pt = self.view_to_doc_coords(event.position())
             for item in reversed(self._get_current_annotations()):
@@ -922,6 +957,19 @@ class CanvasView(QWidget):
         else:
             self.status_message.emit("Nothing to redo")
 
+    def set_markup_enabled(self, enabled: bool):
+        """Controls whether annotation and selection tools are active or if canvas is in view-only mode."""
+        self.markup_enabled = enabled
+        if not enabled:
+            self.unselect_tools()
+            if self._selected_annotation:
+                self._selected_annotation.is_selected = False
+                self._selected_annotation = None
+            self.crop_box = None
+            self.crop_available.emit(False)
+            self._update_cursor()
+            self.update()
+
     def unselect_tools(self):
         """Resets active drawing/crop tools to standard pointer mode."""
         self.set_active_tool(AnnotationType.NONE)
@@ -1193,6 +1241,244 @@ class CanvasView(QWidget):
             self.document.update_image(img, page)
             self.update()
         self.history.push(ActionCommand("Delete Selection", undo_del, redo_del))
+
+    def rotate_selection(self, angle_degrees: int = 90):
+        """Rotates the currently selected region (Rectangular, Oval, or Lasso) by angle_degrees."""
+        if not self.crop_box or not self.document or self.document.is_pdf:
+            if self._selected_annotation:
+                self._rotate_annotation(self._selected_annotation, angle_degrees)
+            return
+        if not self.document._pil_image:
+            return
+
+        old_img = self.document._pil_image.copy()
+        page = self.current_page
+        
+        # 1. Determine bounding box and extract masked selection
+        if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+            r = self.crop_box.rect.normalized()
+            min_x = max(0, int(r.left()))
+            min_y = max(0, int(r.top()))
+            max_x = min(old_img.width, int(r.right()))
+            max_y = min(old_img.height, int(r.bottom()))
+            w = max_x - min_x
+            h = max_y - min_y
+            if w < 4 or h < 4:
+                return
+
+            patch = old_img.crop((min_x, min_y, max_x, max_y)).convert("RGBA")
+            mask = Image.new("L", (w, h), 255)
+            if self.crop_box.item_type == AnnotationType.CROP_OVAL:
+                mask = Image.new("L", (w, h), 0)
+                draw_m = ImageDraw.Draw(mask)
+                draw_m.ellipse([(0, 0), (w, h)], fill=255)
+
+        elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+            pts = self.crop_box.points
+            if len(pts) < 3:
+                return
+            min_x = max(0, int(min(p.x() for p in pts)))
+            max_x = min(old_img.width, int(max(p.x() for p in pts)))
+            min_y = max(0, int(min(p.y() for p in pts)))
+            max_y = min(old_img.height, int(max(p.y() for p in pts)))
+            w = max_x - min_x
+            h = max_y - min_y
+            if w < 4 or h < 4:
+                return
+
+            patch = old_img.crop((min_x, min_y, max_x, max_y)).convert("RGBA")
+            mask = Image.new("L", (w, h), 0)
+            draw_m = ImageDraw.Draw(mask)
+            poly_local = [(int(p.x() - min_x), int(p.y() - min_y)) for p in pts]
+            draw_m.polygon(poly_local, fill=255)
+        else:
+            return
+
+        # Combine patch alpha with mask
+        if "A" in patch.getbands():
+            orig_alpha = patch.split()[-1]
+            mask = ImageChops.multiply(orig_alpha, mask)
+        patch.putalpha(mask)
+
+        # 2. Rotate patch and mask (clockwise: -angle_degrees in PIL)
+        rotated_patch = patch.rotate(-angle_degrees, expand=True, resample=Image.Resampling.BICUBIC)
+
+        # 3. Compute paste location (centered around original selection center)
+        cx = (min_x + max_x) / 2.0
+        cy = (min_y + max_y) / 2.0
+        rw, rh = rotated_patch.size
+        paste_x = int(cx - rw / 2.0)
+        paste_y = int(cy - rh / 2.0)
+
+        # 4. Clear original area on base image
+        base = old_img.convert("RGBA")
+        draw_base = ImageDraw.Draw(base)
+        clear_col = (0, 0, 0, 0)
+        if self.crop_box.item_type == AnnotationType.CROP_OVAL:
+            draw_base.ellipse([(min_x, min_y), (max_x, max_y)], fill=clear_col)
+        elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+            draw_base.polygon([(int(p.x()), int(p.y())) for p in pts], fill=clear_col)
+        else:
+            draw_base.rectangle([(min_x, min_y), (max_x, max_y)], fill=clear_col)
+
+        # 5. Composite rotated patch
+        patch_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+        patch_layer.paste(rotated_patch, (paste_x, paste_y), rotated_patch)
+        result = Image.alpha_composite(base, patch_layer)
+
+        if old_img.mode != "RGBA" and self.crop_box.item_type == AnnotationType.CROP_BOX and paste_x >= 0 and paste_y >= 0 and paste_x + rw <= base.width and paste_y + rh <= base.height:
+            result = result.convert(old_img.mode)
+
+        # 6. Update crop_box bounds
+        old_crop_box = copy.deepcopy(self.crop_box)
+        self.crop_box.rect = QRectF(paste_x, paste_y, rw, rh)
+        if self.crop_box.item_type == AnnotationType.CROP_LASSO:
+            rad = math.radians(angle_degrees)
+            cos_a = math.cos(rad)
+            sin_a = math.sin(rad)
+            new_pts = []
+            for p in self.crop_box.points:
+                dx = p.x() - cx
+                dy = p.y() - cy
+                rx = cx + dx * cos_a - dy * sin_a
+                ry = cy + dx * sin_a + dy * cos_a
+                new_pts.append(QPointF(rx, ry))
+            self.crop_box.points = new_pts
+
+        new_crop_box = copy.deepcopy(self.crop_box)
+
+        # 7. Apply to document & history
+        self.document.update_image(result, page)
+        self.crop_available.emit(True)
+        self.update()
+        self.status_message.emit(f"Rotated selection {angle_degrees}°")
+
+        def undo_rot():
+            self.document.update_image(old_img, page)
+            self.crop_box = copy.deepcopy(old_crop_box)
+            self.crop_available.emit(True)
+            self.update()
+
+        def redo_rot():
+            self.document.update_image(result, page)
+            self.crop_box = copy.deepcopy(new_crop_box)
+            self.crop_available.emit(True)
+            self.update()
+
+        self.history.push(ActionCommand(f"Rotate Selection {angle_degrees}°", undo_rot, redo_rot))
+
+    def _rotate_annotation(self, item: AnnotationItem, angle: int = 90):
+        """Rotates a selected annotation item by angle degrees around its center."""
+        old_rect = QRectF(item.rect)
+        old_points = [QPointF(p) for p in item.points]
+
+        b = item.get_bounds()
+        cx = b.center().x()
+        cy = b.center().y()
+
+        if item.points:
+            rad = math.radians(angle)
+            cos_a = math.cos(rad)
+            sin_a = math.sin(rad)
+            item.points = [
+                QPointF(cx + (p.x() - cx) * cos_a - (p.y() - cy) * sin_a,
+                        cy + (p.x() - cx) * sin_a + (p.y() - cy) * cos_a)
+                for p in item.points
+            ]
+
+        if not item.rect.isEmpty():
+            w = item.rect.width()
+            h = item.rect.height()
+            if abs(angle) % 180 == 90:
+                item.rect = QRectF(cx - h / 2.0, cy - w / 2.0, h, w)
+            else:
+                item.rect = QRectF(cx - w / 2.0, cy - h / 2.0, w, h)
+
+        new_rect = QRectF(item.rect)
+        new_points = [QPointF(p) for p in item.points]
+
+        def undo_annot():
+            item.rect = QRectF(old_rect)
+            item.points = [QPointF(p) for p in old_points]
+            self.update()
+
+        def redo_annot():
+            item.rect = QRectF(new_rect)
+            item.points = [QPointF(p) for p in new_points]
+            self.update()
+
+        self.history.push(ActionCommand(f"Rotate Annotation {angle}°", undo_annot, redo_annot))
+        self.update()
+        self.status_message.emit(f"Rotated annotation {angle}°")
+
+    def contextMenuEvent(self, event):
+        if not self.markup_enabled:
+            super().contextMenuEvent(event)
+            return
+        doc_pt = self.view_to_doc_coords(event.pos())
+        if self.crop_box and self._is_point_in_selection(doc_pt):
+            menu = QMenu(self)
+            act_rot_cw = menu.addAction("Rotate Selection 90° Clockwise")
+            act_rot_cw.triggered.connect(lambda: self.rotate_selection(90))
+            act_rot_ccw = menu.addAction("Rotate Selection 90° Counter-Clockwise")
+            act_rot_ccw.triggered.connect(lambda: self.rotate_selection(-90))
+            menu.addSeparator()
+            act_crop = menu.addAction("Crop to Selection (Ctrl+K)")
+            act_crop.triggered.connect(self.apply_crop)
+            act_del = menu.addAction("Cut / Clear Selection (Del)")
+            act_del.triggered.connect(self.delete_selection)
+            menu.addSeparator()
+            act_deselect = menu.addAction("Deselect")
+            act_deselect.triggered.connect(self.unselect_tools)
+            menu.exec(event.globalPos())
+            return
+        elif self._selected_annotation:
+            menu = QMenu(self)
+            act_rot = menu.addAction("Rotate Annotation 90°")
+            act_rot.triggered.connect(lambda: self._rotate_annotation(self._selected_annotation, 90))
+            menu.addSeparator()
+            act_del = menu.addAction("Delete Annotation (Del)")
+            act_del.triggered.connect(self._delete_selected_annotation)
+            menu.exec(event.globalPos())
+            return
+        super().contextMenuEvent(event)
+
+    def _delete_selected_annotation(self):
+        if self._selected_annotation and self._selected_annotation in self._get_current_annotations():
+            item = self._selected_annotation
+            page = self.current_page
+            idx = self._get_current_annotations().index(item)
+            def undo_del():
+                if self.current_page != page:
+                    self.set_page(page)
+                if page not in self.annotations:
+                    self.annotations[page] = []
+                self.annotations[page].insert(idx, item)
+                self._selected_annotation = item
+                item.is_selected = True
+                self.update()
+            def redo_del():
+                if self.current_page != page:
+                    self.set_page(page)
+                if item in self.annotations.get(page, []):
+                    self.annotations[page].remove(item)
+                if self._selected_annotation is item:
+                    self._selected_annotation = None
+                self.update()
+            self.history.push(ActionCommand("Delete Annotation", undo_del, redo_del))
+            self._get_current_annotations().remove(item)
+            self._selected_annotation = None
+            self.update()
+
+    def _is_point_in_selection(self, doc_pt: QPointF) -> bool:
+        if not self.crop_box:
+            return False
+        if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+            return self.crop_box.rect.normalized().contains(doc_pt)
+        elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+            poly = QPolygonF(self.crop_box.points)
+            return poly.containsPoint(doc_pt, Qt.FillRule.OddEvenFill)
+        return False
 
     def _copy_crop_selection(self):
         """Copies the selected rectangular, oval, or lasso area to the system clipboard."""

@@ -1,0 +1,26 @@
+{
+  "id": "use-the-sidebar",
+  "title": "Use the sidebar",
+  "summary": "Browse document pages with thumbnails or jump through chapters using the Table of Contents.",
+  "sections": [
+    {
+      "heading": "Sidebar Views",
+      "text": "Click the sidebar header menu to choose Thumbnails, Contact Sheet, or Table of Contents."
+    },
+    {
+      "heading": "Thumbnail Resizing",
+      "text": "Drag the slider at the bottom of the sidebar to increase or decrease thumbnail preview size."
+    }
+  ],
+  "steps": [
+    "Click the Sidebar button on the top toolbar or press Ctrl + B to open the sidebar.",
+    "Select Thumbnails to view a vertical strip of all pages.",
+    "Select Table of Contents to navigate PDF chapters and outline bookmarks."
+  ],
+  "note": "Right-click any thumbnail card to access quick page rotation, duplicate, insert, and delete commands.",
+  "related": [
+    "view-and-navigate",
+    "organize-pdf-pages",
+    "window-overview"
+  ]
+}

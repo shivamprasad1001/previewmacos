@@ -1,0 +1,1160 @@
+{
+  "version": "1.5.0",
+  "updated_at": "2026-10-20",
+  "categories": [
+    "Tools",
+    "Features",
+    "Settings",
+    "Terms"
+  ],
+  "dictionary": [
+    {
+      "id": "adjust-color",
+      "name": "Adjust Color",
+      "category": "Tools",
+      "meaning": "Fine-tunes image brightness, contrast, exposure, temperature, and tint sliders.",
+      "where": "Tools > Adjust Color... or Markup Toolbar > Adjust Color",
+      "steps": [
+        "Open an image or document page.",
+        "Click Tools > Adjust Color... or press Ctrl+Alt+C.",
+        "Drag the color sliders and click Done."
+      ],
+      "when": "Use when photos look too dark, washed out, or need tint correction.",
+      "related": [
+        "adjust-size",
+        "crop",
+        "markup-toolbar"
+      ],
+      "shortcut": "Ctrl+Alt+C",
+      "action_id": "adjust_color"
+    },
+    {
+      "id": "adjust-size",
+      "name": "Adjust Size",
+      "category": "Tools",
+      "meaning": "Resamples image dimensions, width, height, and dots-per-inch resolution.",
+      "where": "Tools > Adjust Size... or Markup Toolbar > Adjust Size",
+      "steps": [
+        "Open an image file.",
+        "Click Tools > Adjust Size... or press Ctrl+Alt+S.",
+        "Enter new pixel dimensions and click OK."
+      ],
+      "when": "Use when reducing file size or scaling photos for web publication.",
+      "related": [
+        "adjust-color",
+        "crop",
+        "export-dialog"
+      ],
+      "shortcut": "Ctrl+Alt+S",
+      "action_id": "adjust_size"
+    },
+    {
+      "id": "apply-redactions",
+      "name": "Apply Redactions",
+      "category": "Features",
+      "meaning": "Permanently burns black redaction boxes into document pages, destroying covered pixels.",
+      "where": "Edit > Apply Redactions or Canvas Redaction Context Menu",
+      "steps": [
+        "Draw black redaction boxes over sensitive text.",
+        "Click Edit > Apply Redactions.",
+        "Confirm the permanent blackout prompt."
+      ],
+      "when": "Use when sharing documents that contain confidential private data.",
+      "related": [
+        "redaction-tool",
+        "save",
+        "export-pdf"
+      ],
+      "shortcut": "",
+      "action_id": "apply_redactions"
+    },
+    {
+      "id": "check-for-updates",
+      "name": "Check for Updates",
+      "category": "Features",
+      "meaning": "Checks GitHub releases for new application versions and downloads updates.",
+      "where": "Apple Menu > Check for Updates... or Help > Check for Updates...",
+      "steps": [
+        "Click the Apple Menu or Help Menu.",
+        "Select Check for Updates...",
+        "Review the changelog and click Download & Install."
+      ],
+      "when": "Use to ensure you have the latest features and bug fixes.",
+      "related": [
+        "about-preview",
+        "preferences"
+      ],
+      "shortcut": "",
+      "action_id": "check_updates"
+    },
+    {
+      "id": "crop",
+      "name": "Crop Selection",
+      "category": "Tools",
+      "meaning": "Trims image or page boundaries to the active rectangular, oval, or lasso marquee.",
+      "where": "Tools > Crop or Markup Toolbar > Crop Selection",
+      "steps": [
+        "Click the Selection dropdown and draw a marquee.",
+        "Click Tools > Crop or press Ctrl+K.",
+        "Save changes or revert if needed."
+      ],
+      "when": "Use when removing unwanted margins or focusing on a specific subject.",
+      "related": [
+        "selection-marquee",
+        "rotate-selection",
+        "revert-original"
+      ],
+      "shortcut": "Ctrl+K",
+      "action_id": "crop_selection"
+    },
+    {
+      "id": "duplicate-document",
+      "name": "Duplicate / Save As New Copy",
+      "category": "Features",
+      "meaning": "Saves an exact clone of the current document under a fresh name.",
+      "where": "File > Duplicate / Save As New Copy...",
+      "steps": [
+        "Click File > Duplicate / Save As New Copy...",
+        "Choose a directory and type a new name.",
+        "Click Save."
+      ],
+      "when": "Use when creating test edits while safeguarding your primary file.",
+      "related": [
+        "save",
+        "export-dialog",
+        "revert-original"
+      ],
+      "shortcut": "Ctrl+Shift+S",
+      "action_id": "save_as"
+    },
+    {
+      "id": "export-dialog",
+      "name": "Export",
+      "category": "Features",
+      "meaning": "Converts open pages to PNG, JPEG, TIFF, WebP, BMP, or PDF formats.",
+      "where": "File > Export...",
+      "steps": [
+        "Click File > Export... or press Ctrl+E.",
+        "Select output format and compression quality.",
+        "Click Export to save."
+      ],
+      "when": "Use when converting image formats or publishing compressed web graphics.",
+      "related": [
+        "export-pdf",
+        "adjust-size",
+        "save"
+      ],
+      "shortcut": "Ctrl+E",
+      "action_id": "export_file"
+    },
+    {
+      "id": "export-pdf",
+      "name": "Export as PDF",
+      "category": "Features",
+      "meaning": "Flattens annotations and renders all active pages into a pristine PDF document.",
+      "where": "File > Export as PDF...",
+      "steps": [
+        "Click File > Export as PDF... or press Ctrl+Shift+E.",
+        "Select a destination folder and file name.",
+        "Click Save."
+      ],
+      "when": "Use when converting images to PDF or baking in highlights.",
+      "related": [
+        "export-dialog",
+        "merge-pdfs",
+        "print-document"
+      ],
+      "shortcut": "Ctrl+Shift+E",
+      "action_id": "export_pdf"
+    },
+    {
+      "id": "extract-text",
+      "name": "Extract All Text",
+      "category": "Features",
+      "meaning": "Pulls raw selectable text from all PDF pages and copies it to clipboard.",
+      "where": "Edit > Extract All Text...",
+      "steps": [
+        "Open any text-based PDF document.",
+        "Click Edit > Extract All Text...",
+        "Review the text viewer and click Copy All."
+      ],
+      "when": "Use when gathering notes, citations, or data from multi-page PDFs.",
+      "related": [
+        "search-bar",
+        "inspector-panel"
+      ],
+      "shortcut": "",
+      "action_id": "extract_text"
+    },
+    {
+      "id": "highlighter-tool",
+      "name": "Highlighter",
+      "category": "Tools",
+      "meaning": "Draws translucent fluorescent colored brush strokes over text and diagrams.",
+      "where": "Markup Toolbar > Highlighter",
+      "steps": [
+        "Click Markup on the top toolbar.",
+        "Click the Highlighter button.",
+        "Drag across text to apply highlight."
+      ],
+      "when": "Use when calling attention to key terms, sentences, or numbers.",
+      "related": [
+        "pen-tool",
+        "text-tool",
+        "stroke-color"
+      ],
+      "shortcut": "",
+      "action_id": "tool_highlighter"
+    },
+    {
+      "id": "inspector-panel",
+      "name": "Inspector Panel",
+      "category": "Features",
+      "meaning": "Displays comprehensive file metadata, dimensions, color profiles, DPI, and PDF security.",
+      "where": "Tools > Show Inspector or Top Toolbar > Info Button",
+      "steps": [
+        "Click Tools > Show Inspector or press Ctrl+I.",
+        "Review file size, pixel dimensions, and encoding.",
+        "Press Escape or close the window when finished."
+      ],
+      "when": "Use when checking document dimensions, encryption level, or EXIF metadata.",
+      "related": [
+        "adjust-size",
+        "set-pdf-password"
+      ],
+      "shortcut": "Ctrl+I",
+      "action_id": "show_inspector"
+    },
+    {
+      "id": "loupe-tool",
+      "name": "Loupe / Magnifier",
+      "category": "Tools",
+      "meaning": "Displays an interactive circular magnifying glass to inspect fine image details.",
+      "where": "Tools > Show Loupe / Magnifier or Press ` (Backtick)",
+      "steps": [
+        "Press the backtick key ` or click Tools > Show Loupe.",
+        "Move your mouse cursor across the canvas.",
+        "Press ` again to dismiss the magnifier."
+      ],
+      "when": "Use when inspecting fine typography, vector curves, or photo artifacts.",
+      "related": [
+        "zoom-in",
+        "actual-size"
+      ],
+      "shortcut": "`",
+      "action_id": "toggle_loupe"
+    },
+    {
+      "id": "markup-toolbar",
+      "name": "Markup Toolbar",
+      "category": "Tools",
+      "meaning": "Toggles Apple-style drawing, shapes, text, signatures, and crop action controls.",
+      "where": "Tools > Show Markup Toolbar or Top Toolbar > Markup Button",
+      "steps": [
+        "Click the Markup pill button on the toolbar.",
+        "Select any annotation tool from the sub-toolbar.",
+        "Click Markup again to hide and exit edit mode."
+      ],
+      "when": "Use when drawing notes, arrows, boxes, text, or signing forms.",
+      "related": [
+        "pen-tool",
+        "shapes-tool",
+        "signature-tool"
+      ],
+      "shortcut": "Ctrl+Shift+A",
+      "action_id": "toggle_markup"
+    },
+    {
+      "id": "merge-pdfs",
+      "name": "Merge PDFs",
+      "category": "Features",
+      "meaning": "Combines multiple PDF files into one continuous multi-page document.",
+      "where": "File > Merge PDFs...",
+      "steps": [
+        "Click File > Merge PDFs...",
+        "Select two or more PDF files in the chooser.",
+        "Pick an output destination and click Merge."
+      ],
+      "when": "Use when bundling invoices, reports, or chapters into a single file.",
+      "related": [
+        "split-pdf",
+        "insert-page-file",
+        "export-pdf"
+      ],
+      "shortcut": "",
+      "action_id": "merge_pdfs"
+    },
+    {
+      "id": "open-file",
+      "name": "Open File",
+      "category": "Features",
+      "meaning": "Loads PDF documents or image files into the viewer workspace.",
+      "where": "File > Open... or Top Toolbar > Open Button",
+      "steps": [
+        "Click the Open button or press Ctrl+O.",
+        "Select a PDF or image file from disk.",
+        "Click Open."
+      ],
+      "when": "Use when starting work on a document or photo.",
+      "related": [
+        "open-folder",
+        "open-recent"
+      ],
+      "shortcut": "Ctrl+O",
+      "action_id": "open_file"
+    },
+    {
+      "id": "open-folder",
+      "name": "Open Folder",
+      "category": "Features",
+      "meaning": "Loads all supported images from a selected folder into the sidebar.",
+      "where": "File > Open Folder... or Top Toolbar > Open Dropdown",
+      "steps": [
+        "Click the down arrow beside Open and pick Open Folder...",
+        "Choose a directory containing photos.",
+        "Click Choose Folder."
+      ],
+      "when": "Use when reviewing photo albums or multi-image sets in one session.",
+      "related": [
+        "open-file",
+        "sidebar-thumbnails",
+        "contact-sheet"
+      ],
+      "shortcut": "Ctrl+Shift+O",
+      "action_id": "open_folder"
+    },
+    {
+      "id": "pen-tool",
+      "name": "Pen / Sketch Tool",
+      "category": "Tools",
+      "meaning": "Draws freehand vector ink curves with customizable stroke width and color.",
+      "where": "Markup Toolbar > Sketch / Pen",
+      "steps": [
+        "Click Markup on the top toolbar.",
+        "Click the Pen button.",
+        "Click and drag on the page to draw."
+      ],
+      "when": "Use when circling items, drawing arrows, or sketching freehand notes.",
+      "related": [
+        "highlighter-tool",
+        "stroke-color",
+        "line-width"
+      ],
+      "shortcut": "",
+      "action_id": "tool_pen"
+    },
+    {
+      "id": "preferences",
+      "name": "Preferences",
+      "category": "Settings",
+      "meaning": "Displays user preferences, default zoom options, and general application settings.",
+      "where": "Apple Menu > Preferences...",
+      "steps": [
+        "Click the Apple Menu logo.",
+        "Select Preferences... or press Ctrl+,",
+        "Review your active workspace configuration."
+      ],
+      "when": "Use when configuring application behavior and default viewing options.",
+      "related": [
+        "toggle-theme",
+        "about-preview"
+      ],
+      "shortcut": "Ctrl+,",
+      "action_id": "preferences"
+    },
+    {
+      "id": "print-document",
+      "name": "Print Document",
+      "category": "Features",
+      "meaning": "Sends the active document or image to your system printer dialog.",
+      "where": "File > Print...",
+      "steps": [
+        "Click File > Print... or press Ctrl+P.",
+        "Select your target printer, paper size, and page range.",
+        "Click Print."
+      ],
+      "when": "Use when creating hard copies of documents, forms, or photos.",
+      "related": [
+        "export-pdf",
+        "print-preview"
+      ],
+      "shortcut": "Ctrl+P",
+      "action_id": "print_file"
+    },
+    {
+      "id": "redaction-tool",
+      "name": "Redaction Tool",
+      "category": "Tools",
+      "meaning": "Marks sensitive areas with black masking boxes before permanent redaction.",
+      "where": "Markup Toolbar > Redact / Blackout Info",
+      "steps": [
+        "Click Markup on the top toolbar.",
+        "Click the Redaction tool button.",
+        "Draw rectangles over sensitive numbers, names, or photos."
+      ],
+      "when": "Use when preparing documents for public disclosure or legal sharing.",
+      "related": [
+        "apply-redactions",
+        "shapes-tool",
+        "save"
+      ],
+      "shortcut": "",
+      "action_id": "tool_redact"
+    },
+    {
+      "id": "revert-original",
+      "name": "Revert to Original",
+      "category": "Features",
+      "meaning": "Discards all unsaved edits, rotations, crops, and annotations, restoring disk state.",
+      "where": "File > Revert to Original...",
+      "steps": [
+        "Click File > Revert to Original...",
+        "Confirm the revert confirmation prompt.",
+        "The file reloads fresh from disk."
+      ],
+      "when": "Use when you made mistaken edits and want to start over.",
+      "related": [
+        "save",
+        "undo"
+      ],
+      "shortcut": "",
+      "action_id": "revert_file"
+    },
+    {
+      "id": "rotate-left",
+      "name": "Rotate Left 90\u00b0",
+      "category": "Tools",
+      "meaning": "Rotates the entire active page counter-clockwise by 90 degrees.",
+      "where": "Tools > Rotate Left 90\u00b0 or Markup Toolbar > Rotate Left",
+      "steps": [
+        "Open a document or image.",
+        "Click Tools > Rotate Left 90\u00b0 or press Ctrl+L.",
+        "The page turns 90 degrees counter-clockwise."
+      ],
+      "when": "Use when scanned documents or mobile photos are oriented sideways.",
+      "related": [
+        "rotate-right",
+        "rotate-selection"
+      ],
+      "shortcut": "Ctrl+L",
+      "action_id": "rotate_left"
+    },
+    {
+      "id": "rotate-right",
+      "name": "Rotate Right 90\u00b0",
+      "category": "Tools",
+      "meaning": "Rotates the entire active page clockwise by 90 degrees.",
+      "where": "Tools > Rotate Right 90\u00b0 or Top Toolbar > Rotate Button",
+      "steps": [
+        "Open a document or image.",
+        "Click Tools > Rotate Right 90\u00b0 or press Ctrl+R.",
+        "The page turns 90 degrees clockwise."
+      ],
+      "when": "Use when fixing landscape photos scanned in portrait orientation.",
+      "related": [
+        "rotate-left",
+        "rotate-selection"
+      ],
+      "shortcut": "Ctrl+R",
+      "action_id": "rotate_right"
+    },
+    {
+      "id": "rotate-selection",
+      "name": "Rotate Selection 90\u00b0",
+      "category": "Tools",
+      "meaning": "Rotates only the actively selected marquee pixels or annotation by 90 degrees.",
+      "where": "Markup Toolbar > Rotate Selection 90\u00b0",
+      "steps": [
+        "Draw a Rectangular, Oval, or Lasso selection marquee.",
+        "Click Rotate Selection 90\u00b0 on the Markup Toolbar.",
+        "Selected content rotates inside the canvas."
+      ],
+      "when": "Use when reorienting an upside-down diagram, badge, or figure.",
+      "related": [
+        "crop",
+        "selection-marquee",
+        "rotate-right"
+      ],
+      "shortcut": "Ctrl+R (with marquee)",
+      "action_id": "rotate_selection"
+    },
+    {
+      "id": "save",
+      "name": "Save",
+      "category": "Features",
+      "meaning": "Writes all canvas annotations, crops, and edits directly to the open file.",
+      "where": "File > Save",
+      "steps": [
+        "Make annotations or edits.",
+        "Click File > Save or press Ctrl+S.",
+        "The dirty dot on the close button disappears."
+      ],
+      "when": "Use frequently while editing to ensure your progress is recorded.",
+      "related": [
+        "duplicate-document",
+        "revert-original"
+      ],
+      "shortcut": "Ctrl+S",
+      "action_id": "save_file"
+    },
+    {
+      "id": "search-bar",
+      "name": "Search",
+      "category": "Features",
+      "meaning": "Finds text occurrences throughout the document with live match counter and jumps.",
+      "where": "Top Toolbar > Search Input Field",
+      "steps": [
+        "Click the Search field or press Ctrl+F.",
+        "Type your query and press Enter.",
+        "Use the arrow buttons to jump through matches."
+      ],
+      "when": "Use when locating specific words, names, or clauses in long documents.",
+      "related": [
+        "extract-text",
+        "sidebar-thumbnails"
+      ],
+      "shortcut": "Ctrl+F",
+      "action_id": "focus_search"
+    },
+    {
+      "id": "selection-marquee",
+      "name": "Selection Tools",
+      "category": "Tools",
+      "meaning": "Offers Rectangular Marquee, Elliptical/Oval Marquee, and Freehand Lasso selections.",
+      "where": "Markup Toolbar > Selection Dropdown",
+      "steps": [
+        "Click the Selection dropdown on the Markup toolbar.",
+        "Choose Rectangular Selection, Oval Selection, or Lasso Selection.",
+        "Drag across canvas to create the marquee."
+      ],
+      "when": "Use before cropping, copying, or rotating a specific sub-region.",
+      "related": [
+        "crop",
+        "rotate-selection"
+      ],
+      "shortcut": "",
+      "action_id": "tool_select"
+    },
+    {
+      "id": "set-pdf-password",
+      "name": "Set PDF Password / Encryption",
+      "category": "Features",
+      "meaning": "Protects PDF files using AES-256 password encryption against unauthorized access.",
+      "where": "File > Set PDF Password / Encryption...",
+      "steps": [
+        "Click File > Set PDF Password / Encryption...",
+        "Enter and confirm your secret password.",
+        "Click OK to encrypt the document."
+      ],
+      "when": "Use when emailing tax documents, payroll statements, or contracts.",
+      "related": [
+        "inspector-panel",
+        "export-pdf"
+      ],
+      "shortcut": "",
+      "action_id": "set_password"
+    },
+    {
+      "id": "shapes-tool",
+      "name": "Shapes Dropdown",
+      "category": "Tools",
+      "meaning": "Inserts vector shapes including rectangles, ovals, lines, arrows, and speech bubbles.",
+      "where": "Markup Toolbar > Shapes Dropdown",
+      "steps": [
+        "Click Shapes on the Markup toolbar.",
+        "Select Rectangle, Rounded Rectangle, Oval, Line, or Arrow.",
+        "Click and drag on the canvas to place the shape."
+      ],
+      "when": "Use when framing screenshots or diagramming workflows.",
+      "related": [
+        "stroke-color",
+        "fill-color",
+        "line-width"
+      ],
+      "shortcut": "",
+      "action_id": "tool_shapes"
+    },
+    {
+      "id": "sidebar-thumbnails",
+      "name": "Sidebar Thumbnails",
+      "category": "Features",
+      "meaning": "Displays page cards with drag-and-drop reordering, deletion, and thumbnail scaling.",
+      "where": "View > Thumbnails Sidebar or Top Toolbar > Sidebar Button",
+      "steps": [
+        "Click the Sidebar icon on the top toolbar or press Ctrl+B.",
+        "Click any thumbnail card to navigate to that page.",
+        "Drag cards up or down to reorder pages."
+      ],
+      "when": "Use when organizing presentations, reports, or browsing large manuals.",
+      "related": [
+        "contact-sheet",
+        "table-of-contents"
+      ],
+      "shortcut": "Ctrl+B",
+      "action_id": "toggle_sidebar"
+    },
+    {
+      "id": "signature-tool",
+      "name": "Signature Tool",
+      "category": "Tools",
+      "meaning": "Captures hand-drawn signatures on a smooth virtual trackpad and stamps them onto pages.",
+      "where": "Markup Toolbar > Sign Document",
+      "steps": [
+        "Click the Signature button on the Markup toolbar.",
+        "Draw your signature in the dialog and click Save.",
+        "Click on the document page to place your signature stamp."
+      ],
+      "when": "Use when signing legal contracts, agreements, and tax forms.",
+      "related": [
+        "markup-toolbar",
+        "text-tool"
+      ],
+      "shortcut": "",
+      "action_id": "tool_signature"
+    },
+    {
+      "id": "slideshow-mode",
+      "name": "Slideshow Mode",
+      "category": "Features",
+      "meaning": "Presents document pages in a distraction-free fullscreen view with floating HUD.",
+      "where": "View > Slideshow Mode",
+      "steps": [
+        "Click View > Slideshow Mode or press Ctrl+Shift+F.",
+        "Use Left and Right arrow keys to advance slides.",
+        "Press Escape to exit fullscreen."
+      ],
+      "when": "Use when giving presentations or reviewing photo sets on a projector.",
+      "related": [
+        "two-up-view",
+        "zoom-fit"
+      ],
+      "shortcut": "Ctrl+Shift+F",
+      "action_id": "start_slideshow"
+    },
+    {
+      "id": "sticky-note-tool",
+      "name": "Sticky Note",
+      "category": "Tools",
+      "meaning": "Places a collapsible pastel yellow memo note on the page with user commentary.",
+      "where": "Markup Toolbar > Sticky Note",
+      "steps": [
+        "Click Markup on the toolbar.",
+        "Click the Sticky Note button.",
+        "Click on the page and enter your note text."
+      ],
+      "when": "Use when leaving editorial feedback or reminders without altering page text.",
+      "related": [
+        "text-tool",
+        "highlighter-tool"
+      ],
+      "shortcut": "",
+      "action_id": "tool_note"
+    },
+    {
+      "id": "text-tool",
+      "name": "Text Box",
+      "category": "Tools",
+      "meaning": "Adds formatted typography with selectable font family, size, bold, italic, and color.",
+      "where": "Markup Toolbar > Text Box",
+      "steps": [
+        "Click Markup on the toolbar.",
+        "Click the Text Box button.",
+        "Click on the page and type your message."
+      ],
+      "when": "Use when filling out forms or adding labels and captions to graphics.",
+      "related": [
+        "font-formatting",
+        "sticky-note-tool"
+      ],
+      "shortcut": "",
+      "action_id": "tool_text"
+    },
+    {
+      "id": "toggle-theme",
+      "name": "Toggle Theme",
+      "category": "Settings",
+      "meaning": "Switches the entire user interface between macOS Dark Mode and Light Mode.",
+      "where": "Top Toolbar > Sun/Moon Button or Apple Menu > Toggle Theme",
+      "steps": [
+        "Click the Sun/Moon icon on the top right toolbar.",
+        "Or press Ctrl+T.",
+        "UI colors, cards, and icons invert instantly."
+      ],
+      "when": "Use to reduce eye strain in low-light environments.",
+      "related": [
+        "preferences"
+      ],
+      "shortcut": "Ctrl+T",
+      "action_id": "toggle_theme"
+    },
+    {
+      "id": "two-up-view",
+      "name": "Two-Up Continuous View",
+      "category": "Features",
+      "meaning": "Displays facing page spreads side by side, mimicking a physical opened book.",
+      "where": "View > View Mode > Two-Up Continuous or Top Toolbar View Dropdown",
+      "steps": [
+        "Click the View Mode dropdown on the toolbar.",
+        "Select Two-Up Continuous.",
+        "Scroll vertically to view dual-page spreads."
+      ],
+      "when": "Use when reading magazines, brochures, or books with double-page layouts.",
+      "related": [
+        "slideshow-mode",
+        "zoom-fit"
+      ],
+      "shortcut": "",
+      "action_id": "view_two_up"
+    },
+    {
+      "id": "zoom-fit",
+      "name": "Zoom to Fit",
+      "category": "Features",
+      "meaning": "Scales the document page dynamically so the entire page fits inside the window.",
+      "where": "View > Zoom to Fit or Top Toolbar > Zoom Dropdown",
+      "steps": [
+        "Click View > Zoom to Fit or press Ctrl+9.",
+        "Page scales automatically to fill visible space.",
+        "Resizing the window adjusts zoom in real-time."
+      ],
+      "when": "Use when overviewing page layout without manual zoom adjustment.",
+      "related": [
+        "actual-size",
+        "zoom-in"
+      ],
+      "shortcut": "Ctrl+9",
+      "action_id": "zoom_fit"
+    }
+  ],
+  "image_guide": [
+    {
+      "id": "guide-sidebar",
+      "title": "Sidebar & Page Thumbnails",
+      "image_light": "guide-sidebar-thumbnails-light.png",
+      "image_dark": "guide-sidebar-thumbnails-dark.png",
+      "caption": "Sidebar with thumbnails, outline, and contact sheet modes.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 105,
+          "y": 67,
+          "desc": "Mode Dropdown: Switch between Thumbnails, Contact Sheet, and TOC."
+        },
+        {
+          "type": "box",
+          "x": 38,
+          "y": 90,
+          "w": 124,
+          "h": 90,
+          "desc": "Active Page Card: Shows blue accent selection ring and badge."
+        },
+        {
+          "type": "arrow",
+          "x1": 170,
+          "y1": 135,
+          "x2": 240,
+          "y2": 135,
+          "desc": "Canvas Preview: Reflects selected page immediately."
+        }
+      ],
+      "steps": [
+        "Click the Sidebar icon on the top toolbar or press Ctrl+B.",
+        "Select Thumbnails from the dropdown header.",
+        "Click any page card to jump directly to it."
+      ]
+    },
+    {
+      "id": "guide-toolbar",
+      "title": "Top Navigation & Toolbar",
+      "image_light": "guide-toolbar-overview-light.png",
+      "image_dark": "guide-toolbar-overview-dark.png",
+      "caption": "Top toolbar with segmented open, search, and markup controls.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 56,
+          "y": 64,
+          "desc": "Sidebar Toggle: Expands or collapses page drawer."
+        },
+        {
+          "type": "number",
+          "num": 2,
+          "x": 148,
+          "y": 64,
+          "desc": "Open Button: Click to open files or choose folder from dropdown."
+        },
+        {
+          "type": "box",
+          "x": 630,
+          "y": 48,
+          "w": 115,
+          "h": 32,
+          "desc": "Search Bar: Fast in-document text search with Ctrl+F."
+        },
+        {
+          "type": "number",
+          "num": 3,
+          "x": 792,
+          "y": 64,
+          "desc": "Markup Button: Activates the annotation tools sub-bar."
+        }
+      ],
+      "steps": [
+        "Click Open to load any PDF or image.",
+        "Type inside the Search bar to highlight text matches.",
+        "Click Markup to reveal drawing and annotation tools."
+      ]
+    },
+    {
+      "id": "guide-markup",
+      "title": "Markup & Annotation Tools",
+      "image_light": "guide-markup-tools-light.png",
+      "image_dark": "guide-markup-tools-dark.png",
+      "caption": "Markup bar with shapes, pens, text, notes, and crop.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 48,
+          "y": 62,
+          "desc": "Selection Dropdown: Rectangular, Oval, or Lasso marquee."
+        },
+        {
+          "type": "number",
+          "num": 2,
+          "x": 110,
+          "y": 62,
+          "desc": "Shapes Menu: Rectangles, lines, arrows, speech bubbles."
+        },
+        {
+          "type": "number",
+          "num": 3,
+          "x": 232,
+          "y": 62,
+          "desc": "Highlighter: Semi-transparent fluorescent text highlighter."
+        },
+        {
+          "type": "box",
+          "x": 136,
+          "y": 196,
+          "w": 288,
+          "h": 128,
+          "desc": "Canvas Shape: Fully interactive editable vector shape."
+        }
+      ],
+      "steps": [
+        "Click Markup in the toolbar to display drawing tools.",
+        "Select a tool such as Pen, Highlighter, or Shapes.",
+        "Draw on the canvas and adjust color or line thickness."
+      ]
+    },
+    {
+      "id": "guide-color",
+      "title": "Adjust Color Dialog",
+      "image_light": "guide-adjust-color-light.png",
+      "image_dark": "guide-adjust-color-dark.png",
+      "caption": "Color dialog with exposure, contrast, temperature, and tint sliders.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 420,
+          "y": 85,
+          "desc": "Dialog Header: Drag window to view underlying document."
+        },
+        {
+          "type": "box",
+          "x": 335,
+          "y": 125,
+          "w": 250,
+          "h": 280,
+          "desc": "Slider Tracks: Live real-time adjustment with auto-levels."
+        },
+        {
+          "type": "arrow",
+          "x1": 590,
+          "y1": 170,
+          "x2": 660,
+          "y2": 170,
+          "desc": "Immediate Preview: Canvas updates as you drag."
+        }
+      ],
+      "steps": [
+        "Press Ctrl+Alt+C or click Tools > Adjust Color...",
+        "Drag the Exposure and Contrast sliders.",
+        "Click Done or Reset to keep or discard changes."
+      ]
+    },
+    {
+      "id": "guide-size",
+      "title": "Adjust Size Dialog",
+      "image_light": "guide-adjust-size-light.png",
+      "image_dark": "guide-adjust-size-dark.png",
+      "caption": "Resample image dimensions and adjust resolution settings cleanly.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 440,
+          "y": 164,
+          "desc": "Width Input: Enter target width in pixels, percent, or inches."
+        },
+        {
+          "type": "number",
+          "num": 2,
+          "x": 440,
+          "y": 209,
+          "desc": "Height Input: Constrained proportionally by default."
+        },
+        {
+          "type": "number",
+          "num": 3,
+          "x": 440,
+          "y": 254,
+          "desc": "Resolution: Configures DPI print fidelity."
+        }
+      ],
+      "steps": [
+        "Click Tools > Adjust Size... or press Ctrl+Alt+S.",
+        "Enter your desired width or height.",
+        "Click OK to resample the active image."
+      ]
+    },
+    {
+      "id": "guide-export",
+      "title": "Export & File Conversion",
+      "image_light": "guide-export-options-light.png",
+      "image_dark": "guide-export-options-dark.png",
+      "caption": "Export files with format, compression quality, and color space.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 470,
+          "y": 159,
+          "desc": "Format Selector: Choose PNG, JPEG, TIFF, WebP, or PDF."
+        },
+        {
+          "type": "number",
+          "num": 2,
+          "x": 470,
+          "y": 204,
+          "desc": "Quality Slider: Balance file size versus visual clarity."
+        },
+        {
+          "type": "box",
+          "x": 340,
+          "y": 280,
+          "w": 260,
+          "h": 30,
+          "desc": "Color Profile: Embed sRGB or Display P3 ICC profile."
+        }
+      ],
+      "steps": [
+        "Click File > Export... or press Ctrl+E.",
+        "Choose the format and compression quality.",
+        "Click Export to save the new file."
+      ]
+    },
+    {
+      "id": "guide-signature",
+      "title": "Signature Manager",
+      "image_light": "guide-signature-manager-light.png",
+      "image_dark": "guide-signature-manager-dark.png",
+      "caption": "Capture electronic signatures and stamp them onto document forms.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 430,
+          "y": 240,
+          "desc": "Virtual Trackpad: Draw signature smoothly with mouse or stylus."
+        },
+        {
+          "type": "arrow",
+          "x1": 370,
+          "y1": 260,
+          "x2": 450,
+          "y2": 260,
+          "desc": "Baseline Guide: Aligns signature neatly."
+        },
+        {
+          "type": "number",
+          "num": 2,
+          "x": 580,
+          "y": 380,
+          "desc": "Save Button: Stores signature for repeated 1-click stamping."
+        }
+      ],
+      "steps": [
+        "Click the Signature tool on the Markup toolbar.",
+        "Sign your name on the drawing pad.",
+        "Click Save and click anywhere on the page to place it."
+      ]
+    },
+    {
+      "id": "guide-inspector",
+      "title": "Document Inspector",
+      "image_light": "guide-inspector-panel-light.png",
+      "image_dark": "guide-inspector-panel-dark.png",
+      "caption": "Inspector panel showing file dimensions, security, and metadata.",
+      "annotations": [
+        {
+          "type": "number",
+          "num": 1,
+          "x": 450,
+          "y": 150,
+          "desc": "File Size: Total bytes and disk consumption."
+        },
+        {
+          "type": "box",
+          "x": 260,
+          "y": 240,
+          "w": 340,
+          "h": 65,
+          "desc": "Security & Encryption: Shows AES-256 password status."
+        },
+        {
+          "type": "number",
+          "num": 2,
+          "x": 450,
+          "y": 340,
+          "desc": "Color Space: Bit depth and color profile."
+        }
+      ],
+      "steps": [
+        "Press Ctrl+I or click Tools > Show Inspector.",
+        "Review page count, dimensions, and security details.",
+        "Close or move the floating inspector panel."
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "q": "How do I open multiple images together?",
+      "a": "Click the arrow next to Open and select Open Folder of Images. All supported images load into the sidebar."
+    },
+    {
+      "q": "How do I rotate an upside-down page?",
+      "a": "Press Ctrl+R to rotate 90\u00b0 clockwise, or Ctrl+L to rotate counter-clockwise."
+    },
+    {
+      "q": "Can I crop oval or freehand shapes?",
+      "a": "Yes. Open the Selection dropdown on the Markup toolbar, pick Oval or Lasso, select the area, and press Ctrl+K."
+    },
+    {
+      "q": "Why does my file name show '\u2014 Edited' with a dot?",
+      "a": "The dot and edited badge indicate unsaved changes. Press Ctrl+S to save your work."
+    },
+    {
+      "q": "How do I sign a PDF contract?",
+      "a": "Click Markup, select Sign Document, draw your signature, and click where you want to place it."
+    },
+    {
+      "q": "How do I redact sensitive information?",
+      "a": "Click Markup > Redact. Draw black boxes over private data, then click Edit > Apply Redactions."
+    },
+    {
+      "q": "How do I merge multiple PDFs into one?",
+      "a": "Click File > Merge PDFs... Select the source PDF files and choose where to save the merged output."
+    },
+    {
+      "q": "How can I extract all text from a PDF?",
+      "a": "Click Edit > Extract All Text... Review the extracted text in the dialog and click Copy All."
+    },
+    {
+      "q": "How do I encrypt a PDF with a password?",
+      "a": "Click File > Set PDF Password / Encryption... Enter a secure password and save the file."
+    },
+    {
+      "q": "How do I view two pages side by side?",
+      "a": "Click the View Mode dropdown on the top toolbar and select Two-Up Continuous."
+    },
+    {
+      "q": "How do I reorder pages in a PDF?",
+      "a": "Open the Sidebar (Ctrl+B), select Thumbnails, and drag page cards up or down to new positions."
+    },
+    {
+      "q": "How do I switch between Dark and Light mode?",
+      "a": "Click the Sun/Moon icon on the top right toolbar or press Ctrl+T."
+    },
+    {
+      "q": "Can I revert my edits if I make a mistake?",
+      "a": "Yes. Click File > Revert to Original... to discard all unsaved edits and reload the original file."
+    },
+    {
+      "q": "How do I inspect image metadata and DPI?",
+      "a": "Press Ctrl+I or click Tools > Show Inspector to view dimensions, resolution, and color profiles."
+    },
+    {
+      "q": "How do I enter fullscreen slideshow mode?",
+      "a": "Press Ctrl+Shift+F or click View > Slideshow Mode. Press Escape when done."
+    }
+  ],
+  "troubleshooting": [
+    {
+      "error": "Document is Password Protected",
+      "cause": "The PDF file is encrypted with AES-128 or AES-256 security.",
+      "fix": "Enter the required document password in the password dialog prompt."
+    },
+    {
+      "error": "Unsupported Image Format",
+      "cause": "The file format or extension is corrupted or unsupported.",
+      "fix": "Ensure the file is a standard PDF, PNG, JPEG, TIFF, BMP, or WebP format."
+    },
+    {
+      "error": "Cannot Crop: No Selection Active",
+      "cause": "Crop was clicked before drawing a selection marquee.",
+      "fix": "Click the Selection tool, draw a marquee on the page, and then press Ctrl+K."
+    },
+    {
+      "error": "Cannot Save: File is Read-Only",
+      "cause": "File permissions prevent overwriting the existing file on disk.",
+      "fix": "Click File > Duplicate / Save As New Copy... to save your work to a writable directory."
+    },
+    {
+      "error": "Printer Not Found",
+      "cause": "No physical or virtual printer queue is registered in CUPS.",
+      "fix": "Verify your system printer settings or choose Export as PDF instead."
+    }
+  ],
+  "whats_new": [
+    {
+      "date": "2026-10-20",
+      "version": "1.4.0",
+      "title": "Comprehensive 5-Tab Help Center & PDF Documentation",
+      "desc": "Added full Help Dictionary, annotated Image Guide, printable A4 PDF Guide, FAQ, and What's New.",
+      "feature_id": "help-center"
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.3.8",
+      "title": "Oval and Lasso Marquee Cropping & Selection Rotation",
+      "desc": "Crop and rotate elliptical and freehand lasso selections directly inside the canvas.",
+      "feature_id": "crop"
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.3.5",
+      "title": "Unsaved Edits Confirmation Dialog & Dirty Dot Indicator",
+      "desc": "Displays red traffic light dot and confirms Save or Don't Save before closing modified files.",
+      "feature_id": "save"
+    },
+    {
+      "date": "2026-10-18",
+      "version": "1.3.0",
+      "title": "Adjust Color Dialog with Exposure, Sepia, and Auto-Levels",
+      "desc": "Real-time non-destructive image color grading with 9 dedicated slider adjustments.",
+      "feature_id": "adjust-color"
+    },
+    {
+      "date": "2026-10-15",
+      "version": "1.2.0",
+      "title": "Electronic Signature Manager with Smooth Bezier Inking",
+      "desc": "Draw and save electronic signatures for fast one-click contract stamping.",
+      "feature_id": "signature-tool"
+    }
+  ]
+}

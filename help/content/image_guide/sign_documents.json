@@ -1,0 +1,71 @@
+{
+  "id": "sign-documents",
+  "task_id": "sign-documents",
+  "title": "Sign documents",
+  "source_image": "help/screenshots_clean/guide-signature-manager-light.png",
+  "output_image": "guide-sign-documents-1.png",
+  "caption": "Signature drawing canvas pad with baseline guide line.",
+  "alt_text": "Signature modal dialog with trackpad drawing pad and insert button",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 18,
+      "y": 44,
+      "w": 364,
+      "h": 160
+    },
+    {
+      "type": "arrow",
+      "x1": 410,
+      "y1": 120,
+      "x2": 384,
+      "y2": 120
+    },
+    {
+      "type": "number",
+      "x": 425,
+      "y": 120,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 18,
+      "y": 218,
+      "w": 70,
+      "h": 28
+    },
+    {
+      "type": "arrow",
+      "x1": 53,
+      "y1": 265,
+      "x2": 53,
+      "y2": 248
+    },
+    {
+      "type": "number",
+      "x": 53,
+      "y": 278,
+      "text": "2"
+    },
+    {
+      "type": "box",
+      "x": 268,
+      "y": 218,
+      "w": 114,
+      "h": 28
+    },
+    {
+      "type": "arrow",
+      "x1": 325,
+      "y1": 265,
+      "x2": 325,
+      "y2": 248
+    },
+    {
+      "type": "number",
+      "x": 325,
+      "y": 278,
+      "text": "3"
+    }
+  ]
+}

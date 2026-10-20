@@ -1,0 +1,71 @@
+{
+  "id": "adjust-color",
+  "task_id": "adjust-color",
+  "title": "Adjust color",
+  "source_image": "help/screenshots_clean/guide-adjust-color-light.png",
+  "output_image": "guide-adjust-color-1.png",
+  "caption": "Real-time RGB histogram and image color adjustment sliders.",
+  "alt_text": "Adjust color dialog with real-time histogram and exposure sliders",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 16,
+      "y": 16,
+      "w": 308,
+      "h": 84
+    },
+    {
+      "type": "arrow",
+      "x1": 345,
+      "y1": 58,
+      "x2": 326,
+      "y2": 58
+    },
+    {
+      "type": "number",
+      "x": 360,
+      "y": 58,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 16,
+      "y": 110,
+      "w": 140,
+      "h": 28
+    },
+    {
+      "type": "arrow",
+      "x1": 86,
+      "y1": 160,
+      "x2": 86,
+      "y2": 140
+    },
+    {
+      "type": "number",
+      "x": 86,
+      "y": 172,
+      "text": "2"
+    },
+    {
+      "type": "box",
+      "x": 16,
+      "y": 190,
+      "w": 308,
+      "h": 220
+    },
+    {
+      "type": "arrow",
+      "x1": 345,
+      "y1": 300,
+      "x2": 326,
+      "y2": 300
+    },
+    {
+      "type": "number",
+      "x": 360,
+      "y": 300,
+      "text": "3"
+    }
+  ]
+}

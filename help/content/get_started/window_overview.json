@@ -1,0 +1,34 @@
+{
+  "id": "window-overview",
+  "title": "Window overview",
+  "summary": "Understand the main areas of the Preview window: Menubar, Sidebar, Canvas, and Markup Toolbar.",
+  "sections": [
+    {
+      "heading": "Menubar and Top Toolbar",
+      "text": "The top bar contains traffic light controls, navigation buttons, zoom controls, rotate, markup toggle, search, and inspector."
+    },
+    {
+      "heading": "Sidebar",
+      "text": "The left sidebar displays Thumbnails, Contact Sheet view, or the Table of Contents outline."
+    },
+    {
+      "heading": "Canvas",
+      "text": "The central canvas displays document pages or images with smooth panning and zooming."
+    },
+    {
+      "heading": "Markup Toolbar",
+      "text": "The secondary toolbar below the main bar provides sketch, shapes, text, note, redact, and formatting tools."
+    }
+  ],
+  "steps": [
+    "Press Ctrl + B to show or hide the sidebar.",
+    "Click the Markup button on the top toolbar to reveal the Markup Toolbar.",
+    "Use the zoom controls or mouse wheel to adjust canvas magnification."
+  ],
+  "note": "The secondary Markup Toolbar remains hidden until you click the Markup pill button.",
+  "related": [
+    "what-is-preview",
+    "use-the-sidebar",
+    "annotate-and-mark-up"
+  ]
+}

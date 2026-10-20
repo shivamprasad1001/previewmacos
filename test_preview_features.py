@@ -977,9 +977,325 @@ class TestPreviewParity(unittest.TestCase):
         cleared_img = canvas.document._pil_image
         self.assertEqual(cleared_img.getpixel((15, 15))[3], 0, "Pixels inside deleted oval should be cleared/transparent")
 
+        win.set_modified(False)
         win.close()
+
+    def test_41_history_dirty_tracking(self):
+        """Verifies HistoryManager correctly tracks modified state through undo/redo/save cycles."""
+        changes = []
+        hist = HistoryManager(on_changed=lambda m: changes.append(m))
+        self.assertFalse(hist.is_modified)
+
+        # 1. Push a command -> becomes modified
+        hist.push(ActionCommand("Edit", lambda: None, lambda: None))
+        self.assertTrue(hist.is_modified)
+        self.assertEqual(changes[-1], True)
+
+        # 2. Undo -> returns to clean state
+        hist.undo()
+        self.assertFalse(hist.is_modified)
+        self.assertEqual(changes[-1], False)
+
+        # 3. Redo -> modified again
+        hist.redo()
+        self.assertTrue(hist.is_modified)
+
+        # 4. Mark saved -> current position is now clean
+        hist.mark_saved()
+        self.assertFalse(hist.is_modified)
+
+        # 5. Another change -> modified
+        hist.push(ActionCommand("Edit 2", lambda: None, lambda: None))
+        self.assertTrue(hist.is_modified)
+
+        # 6. Undo back to save checkpoint -> clean again
+        hist.undo()
+        self.assertFalse(hist.is_modified)
+
+        # 7. Clear -> clean
+        hist.clear()
+        self.assertFalse(hist.is_modified)
+
+    def test_42_save_confirmation_dialog_and_traffic_light(self):
+        """Verifies TrafficLightButton dirty dot and MacSaveConfirmationDialog choices."""
+        from preview.ui.save_dialog import MacSaveConfirmationDialog
+        from preview.ui.main_window import TrafficLightButton
+
+        # 1. Traffic light button modified dot
+        btn = TrafficLightButton("#ff5f56", "#e0443e", "✕", "#4d0000")
+        self.assertFalse(btn._modified)
+        btn.set_modified(True)
+        self.assertTrue(btn._modified)
+        btn.set_modified(False)
+        self.assertFalse(btn._modified)
+
+        # 2. Dialog choices: Save, Don't Save, Cancel (Replace Original removed)
+        dlg = MacSaveConfirmationDialog("document.pdf", has_file_path=True)
+        self.assertIsNotNone(dlg.btn_dont_save)
+        self.assertIsNotNone(dlg.btn_cancel)
+        self.assertIsNotNone(dlg.btn_save)
+        self.assertEqual(dlg.btn_save.text(), "Save")
+        self.assertEqual(dlg.btn_dont_save.text(), "Don't Save")
+        self.assertEqual(dlg.btn_cancel.text(), "Cancel")
+
+        # Test button action return codes
+        dlg._on_save()
+        self.assertEqual(dlg.result_code, MacSaveConfirmationDialog.SAVE)
+
+        dlg._on_dont_save()
+        self.assertEqual(dlg.result_code, MacSaveConfirmationDialog.DONT_SAVE)
+
+        dlg._on_cancel()
+        self.assertEqual(dlg.result_code, MacSaveConfirmationDialog.CANCEL)
+
+    def test_43_unsaved_changes_prompt_and_save_options(self):
+        """Verifies full window dirty detection, window title '— Edited', replace, copy, and revert workflows."""
+        import tempfile
+        import shutil
+
+        # Create isolated temporary copy of test image
+        temp_dir = tempfile.mkdtemp()
+        orig_img = os.path.join(temp_dir, "work_photo.png")
+        shutil.copyfile(self.test_img_path, orig_img)
+
+        try:
+            win = MacMainWindow(initial_file=orig_img)
+            self.assertFalse(win.is_document_modified())
+            self.assertNotIn("— Edited", win.windowTitle())
+            self.assertFalse(win.traffic_cluster.btn_close._modified)
+
+            # 1. Modify document by adding an annotation
+            pen = AnnotationItem(AnnotationType.PEN)
+            pen.points = [QPointF(5, 5), QPointF(50, 50)]
+            win.canvas.annotations[0] = [pen]
+            win.canvas.history.push(ActionCommand("Draw Pen", lambda: None, lambda: None))
+
+            # Verify dirty state is detected and displayed
+            self.assertTrue(win.is_document_modified())
+            self.assertIn("— Edited", win.windowTitle())
+            self.assertTrue(win.traffic_cluster.btn_close._modified)
+            self.assertTrue(win.revert_act.isEnabled())
+
+            # 2. Test 'Save As New Copy'
+            copy_path = os.path.join(temp_dir, "work_photo_new_copy.png")
+            # Directly test save_as_new_copy logic:
+            win.document.save_with_annotations(copy_path, win.canvas.annotations)
+            self.assertTrue(os.path.exists(copy_path))
+            # Verify original file was preserved
+            self.assertTrue(os.path.exists(orig_img))
+
+            # 3. Test 'Revert to Original'
+            # Reset canvas with mock user confirmation
+            win.set_modified(False)
+            win.open_file(orig_img)
+            self.assertFalse(win.is_document_modified())
+            self.assertNotIn("— Edited", win.windowTitle())
+            self.assertFalse(win.traffic_cluster.btn_close._modified)
+
+            # 4. Modify again and test 'Replace Original'
+            win.set_modified(True)
+            self.assertTrue(win.is_document_modified())
+            self.assertIn("— Edited", win.windowTitle())
+
+            save_ok = win._save_file_direct()
+            self.assertTrue(save_ok)
+            self.assertFalse(win.is_document_modified())
+            self.assertNotIn("— Edited", win.windowTitle())
+            self.assertFalse(win.traffic_cluster.btn_close._modified)
+
+            # 5. Test closeEvent ignoring when cancelled
+            from PyQt6.QtGui import QCloseEvent
+            close_evt = QCloseEvent()
+            win.set_modified(True)
+            # Monkey-patch maybe_save_changes to simulate user clicking Cancel
+            win.maybe_save_changes = lambda: False
+            win.closeEvent(close_evt)
+            self.assertFalse(close_evt.isAccepted(), "closeEvent should be ignored when cancelled")
+
+            # Monkey-patch maybe_save_changes to simulate user clicking Don't Save
+            close_evt2 = QCloseEvent()
+            win.maybe_save_changes = lambda: True
+            win.closeEvent(close_evt2)
+            self.assertTrue(close_evt2.isAccepted(), "closeEvent should be accepted when Don't Save or Saved")
+
+            win.set_modified(False)
+            win.close()
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_44_markup_disabled_blocks_edits(self):
+        """Verifies that when markup is disabled (toolbar closed), no annotations/selections can be created or edited."""
+        from PyQt6.QtGui import QMouseEvent
+        from PyQt6.QtCore import QPointF
+        win = MacMainWindow(initial_file=self.test_img_path)
+        canvas = win.canvas
+
+        # By default markup bar is hidden -> canvas.markup_enabled is False
+        self.assertFalse(win.markup_bar.isVisible())
+        self.assertFalse(canvas.markup_enabled)
+
+        # 1. Attempt mouse click with active tool while markup_enabled is False
+        canvas.set_active_tool(AnnotationType.RECTANGLE)
+        # Simulate click
+        evt = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(50, 50), Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+        canvas.mousePressEvent(evt)
+        # No annotation should have been added
+        self.assertEqual(len(canvas._get_current_annotations()), 0)
+
+        # 2. Toggle markup toolbar open -> canvas.markup_enabled becomes True
+        win._toggle_markup_bar()
+        self.assertTrue(win.markup_bar.isVisible())
+        self.assertTrue(canvas.markup_enabled)
+
+        # 3. Now drawing an annotation works
+        canvas.set_active_tool(AnnotationType.RECTANGLE)
+        canvas.mousePressEvent(evt)
+        self.assertIsNotNone(canvas._active_annotation)
+
+        # 4. Toggle markup toolbar closed -> resets active tool and disables editing
+        win._toggle_markup_bar()
+        self.assertFalse(win.markup_bar.isVisible())
+        self.assertFalse(canvas.markup_enabled)
+        self.assertEqual(canvas.active_tool, AnnotationType.NONE)
+        self.assertIsNone(canvas.crop_box)
+
+        win.set_modified(False)
+        win.close()
+
+    def test_45_rotate_selection_all_types(self):
+        """Verifies rotating selections of all types: Rectangular, Oval, and Lasso, plus annotations."""
+        win = MacMainWindow(initial_file=self.test_img_path)
+        canvas = win.canvas
+        win._toggle_markup_bar() # enable markup
+
+        # Create an asymmetrical test image (80x80)
+        from PIL import Image
+        test_img = Image.new("RGBA", (100, 100), (255, 255, 255, 255))
+        # Draw a colored red patch at top-left quadrant (10, 10) to (30, 30)
+        for y in range(10, 30):
+            for x in range(10, 30):
+                test_img.putpixel((x, y), (255, 0, 0, 255))
+        canvas.document.update_image(test_img)
+
+        # 1. Test Rectangular Selection Rotation
+        canvas.crop_box = AnnotationItem(AnnotationType.CROP_BOX)
+        canvas.crop_box.rect = QRectF(10, 10, 40, 40)
+        canvas.crop_available.emit(True)
+
+        canvas.rotate_selection(90)
+        # Bounding box should stay 40x40 centered at same place
+        self.assertEqual(int(canvas.crop_box.rect.width()), 40)
+        self.assertEqual(int(canvas.crop_box.rect.height()), 40)
+        # Red patch originally at top-left (10-30, 10-30) should now be rotated 90° clockwise
+        # Verify history was pushed
+        self.assertTrue(canvas.history.can_undo)
+
+        # 2. Test Oval Selection Rotation
+        canvas.crop_box = AnnotationItem(AnnotationType.CROP_OVAL)
+        canvas.crop_box.rect = QRectF(20, 20, 40, 40)
+        canvas.crop_available.emit(True)
+        canvas.rotate_selection(90)
+        self.assertIsNotNone(canvas.crop_box)
+
+        # 3. Test Lasso Selection Rotation
+        canvas.crop_box = AnnotationItem(AnnotationType.CROP_LASSO)
+        canvas.crop_box.points = [QPointF(20, 20), QPointF(60, 20), QPointF(60, 60), QPointF(20, 60)]
+        canvas.crop_available.emit(True)
+        canvas.rotate_selection(90)
+        self.assertEqual(len(canvas.crop_box.points), 4)
+
+        # 4. Test Annotation Item Rotation
+        rect_annot = AnnotationItem(AnnotationType.RECTANGLE)
+        rect_annot.rect = QRectF(10, 20, 80, 40) # w=80, h=40
+        canvas._selected_annotation = rect_annot
+        canvas.rotate_selection(90)
+        # Width and height should swap to 40x80
+        self.assertEqual((int(rect_annot.rect.width()), int(rect_annot.rect.height())), (40, 80))
+
+        win.set_modified(False)
+        win.close()
+
+    def test_46_help_window_initialization_and_theme(self):
+        """Test 46: Verify HelpWindow initializes, applies light/dark themes, and sets title."""
+        from preview.ui.help_window import HelpWindow
+        from preview.theme import MacTheme
+
+        # Light theme
+        help_win_light = HelpWindow(theme=MacTheme.LIGHT)
+        self.assertEqual(help_win_light.windowTitle(), "Preview Help")
+        self.assertIn("Get Started", [help_win_light.nav_tree.topLevelItem(i).text(0) for i in range(help_win_light.nav_tree.topLevelItemCount())])
+        help_win_light.close()
+
+        # Dark theme
+        help_win_dark = HelpWindow(theme=MacTheme.DARK)
+        self.assertEqual(help_win_dark.current_theme, MacTheme.DARK)
+        help_win_dark.close()
+
+    def test_47_help_content_and_dictionary_coverage(self):
+        """Test 47: Verify help content files exist, and dictionary achieves 100% code coverage."""
+        import json
+        dict_path = os.path.abspath("help/content/dictionary.json")
+        self.assertTrue(os.path.exists(dict_path))
+        with open(dict_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        entries = data.get("entries", [])
+        self.assertGreaterEqual(len(entries), 100)
+
+        # Run verify_help_dictionary.py
+        import subprocess
+        res = subprocess.run(["python3", "scripts/verify_help_dictionary.py"], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0, f"Dictionary verification failed:\n{res.stdout}\n{res.stderr}")
+        self.assertIn("100% documented", res.stdout)
+
+    def test_48_help_window_search_and_navigation(self):
+        """Test 48: Verify HelpWindow navigation to tasks, dictionary filtering, and shortcuts."""
+        from preview.ui.help_window import HelpWindow
+        help_win = HelpWindow()
+
+        # Navigate to a task
+        help_win.navigate_to("adjust-color")
+        self.assertEqual(help_win.current_page_id, "adjust-color")
+        self.assertIn("Adjust color", help_win.browser.toPlainText())
+
+        # Test dictionary search filter
+        help_win._on_search_changed("crop")
+        self.assertEqual(help_win.current_page_id, "dictionary")
+        self.assertIn("Crop", help_win.browser.toPlainText())
+
+        # Test shortcuts guide direct navigation
+        help_win.open_shortcuts()
+        self.assertEqual(help_win.current_page_id, "shortcuts")
+        self.assertIn("Keyboard Shortcuts", help_win.browser.toPlainText())
+
+        help_win.close()
+
+    def test_49_image_guide_and_annotated_screenshots(self):
+        """Test 49: Verify Image Guide specs and generated annotated screenshots exist."""
+        import glob
+        specs = glob.glob("help/content/image_guide/*.json")
+        self.assertEqual(len(specs), 13, f"Expected 13 task image specs, found {len(specs)}")
+
+        rendered_pngs = glob.glob("help/generated/guide-*.png")
+        self.assertEqual(len(rendered_pngs), 13, f"Expected 13 rendered task screenshots, found {len(rendered_pngs)}")
+
+    def test_50_pdf_guide_and_cheatsheet(self):
+        """Test 50: Verify PDF Guide and 1-page Cheat Sheet exist and have valid pages."""
+        import pymupdf
+
+        guide_pdf = "help/generated/preview_user_guide.pdf"
+        self.assertTrue(os.path.exists(guide_pdf))
+        doc_guide = pymupdf.open(guide_pdf)
+        self.assertGreaterEqual(doc_guide.page_count, 4)
+        doc_guide.close()
+
+        cheatsheet_pdf = "help/generated/preview_shortcuts_cheatsheet.pdf"
+        self.assertTrue(os.path.exists(cheatsheet_pdf))
+        doc_sheet = pymupdf.open(cheatsheet_pdf)
+        self.assertEqual(doc_sheet.page_count, 1)
+        doc_sheet.close()
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

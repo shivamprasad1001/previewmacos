@@ -1,0 +1,71 @@
+{
+  "id": "annotate-and-markup",
+  "task_id": "annotate-and-markup",
+  "title": "Annotate and mark up",
+  "source_image": "help/screenshots_clean/guide-markup-tools-light.png",
+  "output_image": "guide-annotate-and-markup-1.png",
+  "caption": "Markup Toolbar with sketch, shapes, text, and note tools.",
+  "alt_text": "Secondary Markup Toolbar with annotation drawing and shape controls",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 48,
+      "y": 4,
+      "w": 38,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 66,
+      "y1": 55,
+      "x2": 66,
+      "y2": 36
+    },
+    {
+      "type": "number",
+      "x": 66,
+      "y": 68,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 90,
+      "y": 4,
+      "w": 72,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 126,
+      "y1": 55,
+      "x2": 126,
+      "y2": 36
+    },
+    {
+      "type": "number",
+      "x": 126,
+      "y": 68,
+      "text": "2"
+    },
+    {
+      "type": "box",
+      "x": 166,
+      "y": 4,
+      "w": 104,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 218,
+      "y1": 55,
+      "x2": 218,
+      "y2": 36
+    },
+    {
+      "type": "number",
+      "x": 218,
+      "y": 68,
+      "text": "3"
+    }
+  ]
+}

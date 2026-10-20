@@ -1,0 +1,71 @@
+{
+  "id": "export-and-print",
+  "task_id": "export-and-print",
+  "title": "Export and print",
+  "source_image": "help/screenshots_clean/guide-export-options-light.png",
+  "output_image": "guide-export-and-print-1.png",
+  "caption": "Export sheet format selection and resolution settings.",
+  "alt_text": "Export dialog sheet with format choices and DPI resolution menu",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 24,
+      "y": 64,
+      "w": 412,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 460,
+      "y1": 79,
+      "x2": 438,
+      "y2": 79
+    },
+    {
+      "type": "number",
+      "x": 475,
+      "y": 79,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 24,
+      "y": 104,
+      "w": 412,
+      "h": 30
+    },
+    {
+      "type": "arrow",
+      "x1": 460,
+      "y1": 119,
+      "x2": 438,
+      "y2": 119
+    },
+    {
+      "type": "number",
+      "x": 475,
+      "y": 119,
+      "text": "2"
+    },
+    {
+      "type": "box",
+      "x": 360,
+      "y": 306,
+      "w": 76,
+      "h": 28
+    },
+    {
+      "type": "arrow",
+      "x1": 398,
+      "y1": 275,
+      "x2": 398,
+      "y2": 302
+    },
+    {
+      "type": "number",
+      "x": 398,
+      "y": 260,
+      "text": "3"
+    }
+  ]
+}

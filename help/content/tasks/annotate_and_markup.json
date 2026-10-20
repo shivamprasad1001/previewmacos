@@ -1,0 +1,27 @@
+{
+  "id": "annotate-and-markup",
+  "title": "Annotate and mark up",
+  "summary": "Draw freehand sketch lines, highlight text, create shapes, add text boxes, and insert sticky notes.",
+  "sections": [
+    {
+      "heading": "Markup Toolbar",
+      "text": "Click the Markup button on the top toolbar to display the secondary annotation bar."
+    },
+    {
+      "heading": "Color and Line Controls",
+      "text": "Use the stroke color, fill color, and line thickness menus to style your annotations."
+    }
+  ],
+  "steps": [
+    "Click the Markup button on the toolbar or press Ctrl + Shift + A.",
+    "Select the Pen or Highlighter tool and drag on the canvas to draw.",
+    "Click the Shapes dropdown to add rectangles, circles, lines, or arrows.",
+    "Click the Text tool to type annotation boxes, or click Note to add a yellow sticky note."
+  ],
+  "note": "Press the Esc key or click the Pointer button on the Markup Toolbar to return to select mode.",
+  "related": [
+    "select-crop-and-rotate",
+    "sign-documents",
+    "redact-content"
+  ]
+}

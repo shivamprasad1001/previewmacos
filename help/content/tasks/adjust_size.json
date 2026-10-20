@@ -1,0 +1,23 @@
+{
+  "id": "adjust-size",
+  "title": "Adjust size",
+  "summary": "Resize image dimensions and change print resolution with proportional aspect ratio lock.",
+  "sections": [
+    {
+      "heading": "Dimension Presets",
+      "text": "Pick common display dimensions such as 1920x1080 Full HD or enter custom pixel values."
+    }
+  ],
+  "steps": [
+    "Select Tools > Adjust Size... or click the Adjust Size button on the Markup Toolbar.",
+    "Keep Scale proportionally checked to maintain original image proportions.",
+    "Enter your target Width or Height in pixels or percent.",
+    "Set the print resolution in pixels per inch, then click OK."
+  ],
+  "note": "Check the resulting size label at the bottom of the window to preview file weight.",
+  "related": [
+    "adjust-color",
+    "select-crop-and-rotate",
+    "export-and-print"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "organize-pdf-pages",
+  "title": "Organize PDF pages",
+  "summary": "Reorder, delete, duplicate, and insert pages in multi-page PDF documents.",
+  "sections": [
+    {
+      "heading": "Thumbnails Drag and Drop",
+      "text": "Drag thumbnail cards up or down in the sidebar to reorganize page sequence immediately."
+    }
+  ],
+  "steps": [
+    "Select View > Toggle Sidebar or press Ctrl + B to open the left sidebar.",
+    "Drag a page thumbnail to a new location in the list to reorder it.",
+    "Right-click any thumbnail and select Duplicate Page to copy the active page.",
+    "Right-click a thumbnail and select Delete Page to remove that page from the document."
+  ],
+  "note": "Select Edit > Insert Blank Page or press Ctrl + Shift + N to insert a fresh white page.",
+  "related": [
+    "use-the-sidebar",
+    "merge-and-split-pdfs",
+    "save-safely"
+  ]
+}

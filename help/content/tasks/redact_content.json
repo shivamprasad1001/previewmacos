@@ -1,0 +1,27 @@
+{
+  "id": "redact-content",
+  "title": "Redact content",
+  "summary": "Permanently black out confidential text and sensitive imagery before sharing documents.",
+  "sections": [
+    {
+      "heading": "Redaction Marking",
+      "text": "Draw black redaction boxes over sensitive numbers, names, or addresses on any document page."
+    },
+    {
+      "heading": "Permanent Application",
+      "text": "Applying redactions strips the underlying text bytes and pixels completely from the PDF structure."
+    }
+  ],
+  "steps": [
+    "Click the Redaction tool on the Markup Toolbar.",
+    "Drag black boxes over the private text or images you wish to hide.",
+    "Select Edit > Apply All Redactions.",
+    "Click Yes on the confirmation alert to permanently erase the covered content."
+  ],
+  "note": "Permanent redaction cannot be undone after saving. Keep a backup copy of your original file.",
+  "related": [
+    "annotate-and-markup",
+    "password-and-encryption",
+    "save-safely"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "troubleshooting",
+  "title": "Troubleshooting",
+  "summary": "Fix common issues with PDF rendering, image editing, font displays, and update installation.",
+  "items": [
+    {
+      "problem": "Cannot edit document when Markup Toolbar is closed",
+      "cause": "Markup tools are disabled by design while the toolbar is hidden.",
+      "solution": [
+        "Click the Markup button on the top toolbar.",
+        "Or press Ctrl + Shift + A to open the Markup Toolbar.",
+        "Select your desired drawing or annotation tool."
+      ]
+    },
+    {
+      "problem": "Crop or Rotate Selection buttons are disabled",
+      "cause": "A selection marquee must be drawn on canvas before cropping or rotating areas.",
+      "solution": [
+        "Click the Selection dropdown on the Markup Toolbar.",
+        "Choose Rectangular Selection, Oval Selection, or Lasso Selection.",
+        "Drag across the canvas to mark a region.",
+        "The Crop and Rotate Selection buttons will activate."
+      ]
+    },
+    {
+      "problem": "Unsaved changes lost after closing",
+      "cause": "Selecting Don't Save discards session modifications immediately.",
+      "solution": [
+        "Always click Save or press Enter when the prompt appears.",
+        "Select File > Save or press Ctrl + S regularly while editing.",
+        "Use File > Duplicate / Save As New Copy... to preserve original copies."
+      ]
+    },
+    {
+      "problem": "Color adjustments do not apply to PDF text",
+      "cause": "Adjust Color modifies pixel data in raster images and photos.",
+      "solution": [
+        "Use Adjust Color on image files like PNG, JPEG, and TIFF.",
+        "For PDF documents, use the Highlighter tool or Text Box styling."
+      ]
+    },
+    {
+      "problem": "Encrypted PDF cannot be opened without password",
+      "cause": "AES-256 PDF encryption cannot be bypassed without the key.",
+      "solution": [
+        "Type the document password when prompted by Preview.",
+        "Always store backup passwords in a secure password manager."
+      ]
+    }
+  ],
+  "note": "If an issue persists, select Help > Check for Updates... to install the latest software patch.",
+  "related": [
+    "save-safely",
+    "annotate-and-markup",
+    "password-and-encryption"
+  ]
+}

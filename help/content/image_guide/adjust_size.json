@@ -1,0 +1,71 @@
+{
+  "id": "adjust-size",
+  "task_id": "adjust-size",
+  "title": "Adjust size",
+  "source_image": "help/screenshots_clean/guide-adjust-size-light.png",
+  "output_image": "guide-adjust-size-1.png",
+  "caption": "Adjust Size dialog with proportional scaling and resolution.",
+  "alt_text": "Adjust Size dialog showing dimension inputs and aspect ratio lock",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 18,
+      "y": 38,
+      "w": 354,
+      "h": 32
+    },
+    {
+      "type": "arrow",
+      "x1": 395,
+      "y1": 54,
+      "x2": 374,
+      "y2": 54
+    },
+    {
+      "type": "number",
+      "x": 410,
+      "y": 54,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 18,
+      "y": 80,
+      "w": 354,
+      "h": 110
+    },
+    {
+      "type": "arrow",
+      "x1": 395,
+      "y1": 135,
+      "x2": 374,
+      "y2": 135
+    },
+    {
+      "type": "number",
+      "x": 410,
+      "y": 135,
+      "text": "2"
+    },
+    {
+      "type": "box",
+      "x": 18,
+      "y": 200,
+      "w": 200,
+      "h": 24
+    },
+    {
+      "type": "arrow",
+      "x1": 240,
+      "y1": 212,
+      "x2": 220,
+      "y2": 212
+    },
+    {
+      "type": "number",
+      "x": 255,
+      "y": 212,
+      "text": "3"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "merge-and-split-pdfs",
+  "task_id": "merge-and-split-pdfs",
+  "title": "Merge and split PDFs",
+  "source_image": "help/screenshots_clean/guide-sidebar-thumbnails-light.png",
+  "output_image": "guide-merge-and-split-pdfs-1.png",
+  "caption": "Merge multiple documents or extract page ranges.",
+  "alt_text": "Thumbnail multi-page view for splitting and merging PDF files",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 10,
+      "y": 6,
+      "w": 148,
+      "h": 28
+    },
+    {
+      "type": "arrow",
+      "x1": 180,
+      "y1": 20,
+      "x2": 160,
+      "y2": 20
+    },
+    {
+      "type": "number",
+      "x": 195,
+      "y": 20,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 12,
+      "y": 48,
+      "w": 140,
+      "h": 340
+    },
+    {
+      "type": "arrow",
+      "x1": 185,
+      "y1": 210,
+      "x2": 155,
+      "y2": 210
+    },
+    {
+      "type": "number",
+      "x": 200,
+      "y": 210,
+      "text": "2"
+    }
+  ]
+}

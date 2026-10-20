@@ -1,0 +1,30 @@
+{
+  "id": "about-and-updates",
+  "title": "About and Updates",
+  "summary": "Information about Preview for Linux and Windows, release versioning, developer credits, and update checking.",
+  "sections": [
+    {
+      "heading": "Application Overview",
+      "text": "Preview for Linux and Windows provides an authentic macOS document viewing and markup experience powered by PyQt6, PyMuPDF, and Pillow."
+    },
+    {
+      "heading": "Developer and Attribution",
+      "text": "Developed by Shivam Prasad and powered by TriviLabs.in."
+    },
+    {
+      "heading": "Checking for Updates",
+      "text": "Preview checks for new releases on startup once every 24 hours. You can also run a manual update check at any time."
+    }
+  ],
+  "steps": [
+    "Select Help > Check for Updates... or Apple Menu > Check for Updates...",
+    "Review new release notes and improvements in the update window.",
+    "Click Download & Install to automatically download the package."
+  ],
+  "note": "Select Help > About Document Viewer to review build numbers and license details.",
+  "related": [
+    "what-is-preview",
+    "keyboard-shortcuts",
+    "troubleshooting"
+  ]
+}

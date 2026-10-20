@@ -1,0 +1,26 @@
+{
+  "id": "open-file-or-folder",
+  "title": "Open a file or folder",
+  "summary": "Open documents, single images, or entire folders as multi-page collections.",
+  "sections": [
+    {
+      "heading": "Opening Files",
+      "text": "You can open individual PDF documents or image files through the toolbar or File menu."
+    },
+    {
+      "heading": "Opening Folders",
+      "text": "Opening a folder loads all supported images in that directory as a multi-page document."
+    }
+  ],
+  "steps": [
+    "Click the Open button on the top toolbar, or select File > Open...",
+    "Choose a PDF file or an image, then click Open.",
+    "To view multiple images together, select File > Open Folder..."
+  ],
+  "note": "You can also reopen recent files by selecting File > Open Recent.",
+  "related": [
+    "what-is-preview",
+    "window-overview",
+    "organize-pdf-pages"
+  ]
+}

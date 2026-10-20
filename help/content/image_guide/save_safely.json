@@ -1,0 +1,51 @@
+{
+  "id": "save-safely",
+  "task_id": "save-safely",
+  "title": "Save safely",
+  "source_image": "help/screenshots_clean/guide-toolbar-overview-light.png",
+  "output_image": "guide-save-safely-1.png",
+  "caption": "File save commands and unsaved edits confirmation prompt.",
+  "alt_text": "Preview window demonstrating safe saving and revert features",
+  "annotations": [
+    {
+      "type": "box",
+      "x": 6,
+      "y": 6,
+      "w": 24,
+      "h": 24
+    },
+    {
+      "type": "arrow",
+      "x1": 50,
+      "y1": 50,
+      "x2": 25,
+      "y2": 25
+    },
+    {
+      "type": "number",
+      "x": 65,
+      "y": 55,
+      "text": "1"
+    },
+    {
+      "type": "box",
+      "x": 340,
+      "y": 8,
+      "w": 220,
+      "h": 32
+    },
+    {
+      "type": "arrow",
+      "x1": 450,
+      "y1": 65,
+      "x2": 450,
+      "y2": 42
+    },
+    {
+      "type": "number",
+      "x": 450,
+      "y": 78,
+      "text": "2"
+    }
+  ]
+}

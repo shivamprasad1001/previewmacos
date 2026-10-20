@@ -1,0 +1,23 @@
+{
+  "id": "sign-documents",
+  "title": "Sign documents",
+  "summary": "Draw and store your handwritten signature to sign digital contracts and PDF documents.",
+  "sections": [
+    {
+      "heading": "Signature Pad",
+      "text": "The signature window provides a smooth drawing pad with baseline guides for trackpads and mice."
+    }
+  ],
+  "steps": [
+    "Click the Markup button on the top toolbar to display markup tools.",
+    "Click the Signatures button on the Markup Toolbar.",
+    "Draw your handwritten signature on the canvas pad using your mouse or trackpad.",
+    "Click Insert Signature to place the transparent vector signature onto the document page."
+  ],
+  "note": "Drag the placed signature to reposition it, or drag its corner handles to resize.",
+  "related": [
+    "annotate-and-markup",
+    "redact-content",
+    "save-safely"
+  ]
+}

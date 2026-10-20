@@ -1,0 +1,27 @@
+{
+  "id": "select-crop-and-rotate",
+  "title": "Select, crop and rotate",
+  "summary": "Make rectangular, oval, or lasso selections to crop pictures or rotate selected areas.",
+  "sections": [
+    {
+      "heading": "Selection Modes",
+      "text": "Choose Rectangular Selection, Oval Selection, or Lasso Selection from the selection dropdown menu."
+    },
+    {
+      "heading": "Cropping and Rotation",
+      "text": "Crop selection cuts away the outer area. Rotate selection turns only the selected pixel box."
+    }
+  ],
+  "steps": [
+    "Click the Selection dropdown on the Markup Toolbar and choose a selection tool.",
+    "Drag over the document canvas to mark the desired boundary.",
+    "Click the Crop button or press Ctrl + K to crop the document to your selection.",
+    "Click the Rotate Selection button or press Ctrl + R to rotate the selection 90 degrees."
+  ],
+  "note": "To rotate the entire page instead of a selection, use Tools > Rotate Left or Tools > Rotate Right.",
+  "related": [
+    "annotate-and-markup",
+    "adjust-size",
+    "save-safely"
+  ]
+}

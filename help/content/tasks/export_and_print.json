@@ -1,0 +1,24 @@
+{
+  "id": "export-and-print",
+  "title": "Export and print",
+  "summary": "Export documents to PDF, PNG, JPEG, WebP, or TIFF, and send pages to system printers.",
+  "sections": [
+    {
+      "heading": "Export Sheet",
+      "text": "Configure output format, compression quality, resolution DPI, and page scope in the export window."
+    }
+  ],
+  "steps": [
+    "Select File > Export... or press Ctrl + E to open the Export dialog.",
+    "Select your desired Format: PDF, JPEG, PNG, WebP, or TIFF.",
+    "Choose your target resolution from 72 DPI screen up to 600 DPI ultra print.",
+    "Click Save to export your file.",
+    "To print directly, select File > Print... or press Ctrl + P."
+  ],
+  "note": "Select File > Print Preview... or press Ctrl + Shift + P to review page layouts before printing.",
+  "related": [
+    "save-safely",
+    "adjust-size",
+    "password-and-encryption"
+  ]
+}

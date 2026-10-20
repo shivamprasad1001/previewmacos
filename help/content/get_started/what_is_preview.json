@@ -1,0 +1,26 @@
+{
+  "id": "what-is-preview",
+  "title": "What is Preview",
+  "summary": "Preview is a fast document and image viewer for Linux and Windows with annotation and editing tools.",
+  "sections": [
+    {
+      "heading": "Overview",
+      "text": "Preview opens PDF documents and standard image formats without delay. You can view, mark up, crop, and convert files."
+    },
+    {
+      "heading": "Supported Formats",
+      "text": "Preview reads PDF, PNG, JPEG, WebP, TIFF, BMP, and GIF files. It also exports to PDF, PNG, JPEG, WebP, and TIFF."
+    }
+  ],
+  "steps": [
+    "Open any supported PDF or image file.",
+    "Use the top toolbar to navigate, zoom, or search.",
+    "Click the Markup button to add drawings, text, or signatures."
+  ],
+  "note": "Preview preserves your original file until you choose to save or export changes.",
+  "related": [
+    "open-file-or-folder",
+    "window-overview",
+    "markup-toolbar"
+  ]
+}
