@@ -1181,6 +1181,10 @@ class MacMainWindow(QMainWindow):
         if not self.document:
             return True
 
+        # In CI, testing, or headless environments, do not block execution with modal dialogs
+        if os.environ.get("CI") or os.environ.get("PREVIEW_TESTING") or getattr(self, "_skip_save_prompt", False):
+            return True
+
         has_path = bool(self.document.file_path and os.path.exists(self.document.file_path))
         doc_name = self.document.file_name or "Untitled"
         theme = getattr(self, "current_theme", MacTheme.DARK)

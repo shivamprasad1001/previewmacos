@@ -17,6 +17,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 
 # Initialize Qt App in offscreen mode
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ["PREVIEW_TESTING"] = "1"
 app = QApplication(sys.argv)
 
 import pymupdf
@@ -224,6 +225,7 @@ class TestPreviewParity(unittest.TestCase):
         # Redo addition
         canvas.redo()
         self.assertEqual(len(canvas._get_current_annotations()), initial_count + 1)
+        win.set_modified(False)
         win.close()
 
     def test_12_theme_colors(self):
@@ -1126,25 +1128,27 @@ class TestPreviewParity(unittest.TestCase):
     def test_44_markup_disabled_blocks_edits(self):
         """Verifies that when markup is disabled (toolbar closed), no annotations/selections can be created or edited."""
         from PyQt6.QtGui import QMouseEvent
-        from PyQt6.QtCore import QPointF
+        from PyQt6.QtCore import QPointF, QEvent
         win = MacMainWindow(initial_file=self.test_img_path)
+        win.show()
         canvas = win.canvas
 
         # By default markup bar is hidden -> canvas.markup_enabled is False
-        self.assertFalse(win.markup_bar.isVisible())
+        self.assertTrue(win.markup_bar.isHidden())
         self.assertFalse(canvas.markup_enabled)
 
         # 1. Attempt mouse click with active tool while markup_enabled is False
         canvas.set_active_tool(AnnotationType.RECTANGLE)
         # Simulate click
-        evt = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(50, 50), Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+        click_pt = canvas.doc_to_view_coords(QPointF(50, 50))
+        evt = QMouseEvent(QEvent.Type.MouseButtonPress, click_pt, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
         canvas.mousePressEvent(evt)
         # No annotation should have been added
         self.assertEqual(len(canvas._get_current_annotations()), 0)
 
         # 2. Toggle markup toolbar open -> canvas.markup_enabled becomes True
         win._toggle_markup_bar()
-        self.assertTrue(win.markup_bar.isVisible())
+        self.assertFalse(win.markup_bar.isHidden())
         self.assertTrue(canvas.markup_enabled)
 
         # 3. Now drawing an annotation works
@@ -1154,7 +1158,7 @@ class TestPreviewParity(unittest.TestCase):
 
         # 4. Toggle markup toolbar closed -> resets active tool and disables editing
         win._toggle_markup_bar()
-        self.assertFalse(win.markup_bar.isVisible())
+        self.assertTrue(win.markup_bar.isHidden())
         self.assertFalse(canvas.markup_enabled)
         self.assertEqual(canvas.active_tool, AnnotationType.NONE)
         self.assertIsNone(canvas.crop_box)
@@ -1205,6 +1209,7 @@ class TestPreviewParity(unittest.TestCase):
         self.assertEqual(len(canvas.crop_box.points), 4)
 
         # 4. Test Annotation Item Rotation
+        canvas.crop_box = None
         rect_annot = AnnotationItem(AnnotationType.RECTANGLE)
         rect_annot.rect = QRectF(10, 20, 80, 40) # w=80, h=40
         canvas._selected_annotation = rect_annot
