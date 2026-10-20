@@ -468,6 +468,8 @@ class MacMainWindow(QMainWindow):
         self.canvas = CanvasView(self)
         self.canvas.zoom_changed.connect(self._on_canvas_zoom_changed)
         self.canvas.status_message.connect(self._show_status)
+        self.canvas.page_next_requested.connect(self.next_page)
+        self.canvas.page_prev_requested.connect(self.prev_page)
 
         # 2. Secondary Markup Toolbar (collapsible 38px)
         self.markup_bar = MarkupToolbar(self)
@@ -560,13 +562,28 @@ class MacMainWindow(QMainWindow):
 
         toolbar_layout.addSpacing(6)
 
-        # 4. Open Button (icon-only, 28px high, 6px radius with Dropdown)
+        # 4. Open Segmented Control: [ 📁 Open | ▼ ] (Icon + Text with Dropdown Segment)
+        self.open_segmented = QWidget()
+        self.open_segmented.setObjectName("openSegmented")
+        self.open_segmented.setFixedHeight(28)
+        open_seg_layout = QHBoxLayout(self.open_segmented)
+        open_seg_layout.setContentsMargins(0, 0, 0, 0)
+        open_seg_layout.setSpacing(0)
+
         self.open_btn = QToolButton()
-        self.open_btn.setObjectName("openBtn")
-        self.open_btn.setFixedSize(28, 28)
+        self.open_btn.setObjectName("openMainBtn")
+        self.open_btn.setFixedHeight(28)
+        self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.open_btn.setText("Open")
         self.open_btn.setToolTip("Open Document or Images (Ctrl+O)")
         self.open_btn.clicked.connect(self._open_file_dialog)
-        
+        open_seg_layout.addWidget(self.open_btn)
+
+        self.open_arrow_btn = QToolButton()
+        self.open_arrow_btn.setObjectName("openArrowBtn")
+        self.open_arrow_btn.setFixedSize(18, 28)
+        self.open_arrow_btn.setToolTip("Open Options")
+
         open_menu = QMenu(self)
         open_files_action = QAction("Open File(s)...", self)
         open_files_action.setShortcut(QKeySequence("Ctrl+O"))
@@ -578,9 +595,11 @@ class MacMainWindow(QMainWindow):
         open_folder_action.triggered.connect(self._open_folder_dialog)
         open_menu.addAction(open_folder_action)
 
-        self.open_btn.setMenu(open_menu)
-        self.open_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        toolbar_layout.addWidget(self.open_btn)
+        self.open_arrow_btn.setMenu(open_menu)
+        self.open_arrow_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        open_seg_layout.addWidget(self.open_arrow_btn)
+
+        toolbar_layout.addWidget(self.open_segmented)
 
         # Spacer to allow centering of title
         toolbar_layout.addStretch(1)
@@ -699,6 +718,8 @@ class MacMainWindow(QMainWindow):
         self.prev_btn.setIcon(MacIconFactory.create_icon("arrow_left", col, 14))
         self.next_btn.setIcon(MacIconFactory.create_icon("arrow_right", col, 14))
         self.open_btn.setIcon(MacIconFactory.create_icon("open", col, 16))
+        if hasattr(self, "open_arrow_btn"):
+            self.open_arrow_btn.setIcon(MacIconFactory.create_icon("arrow_down", col, 10))
         self.proxy_icon_label.setPixmap(MacIconFactory.create_icon("doc_proxy", col, 16).pixmap(16, 16))
         self.zoom_out_btn.setIcon(MacIconFactory.create_icon("zoom_out", col, 15))
         self.zoom_in_btn.setIcon(MacIconFactory.create_icon("zoom_in", col, 15))
@@ -715,11 +736,15 @@ class MacMainWindow(QMainWindow):
 
     def _connect_markup_bar(self):
         self.markup_bar.tool_changed.connect(self.canvas.set_active_tool)
-        self.markup_bar.stroke_color_changed.connect(lambda c: setattr(self.canvas, 'stroke_color', c))
-        self.markup_bar.stroke_width_changed.connect(lambda w: setattr(self.canvas, 'stroke_width', w))
-        self.markup_bar.fill_color_changed.connect(lambda f: setattr(self.canvas, 'fill_color', f))
+        self.markup_bar.stroke_color_changed.connect(self.canvas.set_stroke_color)
+        self.markup_bar.stroke_width_changed.connect(self.canvas.set_stroke_width)
+        self.markup_bar.fill_color_changed.connect(self.canvas.set_fill_color)
         self.markup_bar.font_size_changed.connect(self.canvas.set_font_size)
         self.markup_bar.font_family_changed.connect(self.canvas.set_font_family)
+        self.markup_bar.font_bold_changed.connect(self.canvas.set_font_bold)
+        self.markup_bar.font_italic_changed.connect(self.canvas.set_font_italic)
+        self.markup_bar.font_underline_changed.connect(self.canvas.set_font_underline)
+        self.markup_bar.text_align_changed.connect(self.canvas.set_text_alignment)
         self.markup_bar.adjust_color_requested.connect(self._open_adjust_color)
         self.markup_bar.adjust_size_requested.connect(self._open_adjust_size)
         self.markup_bar.rotate_requested.connect(self._rotate_left)
@@ -931,6 +956,11 @@ class MacMainWindow(QMainWindow):
         zoom_to_fit.setShortcuts([QKeySequence("Ctrl+0"), QKeySequence("Ctrl+9")])
         zoom_to_fit.triggered.connect(self.canvas.zoom_to_fit)
         self.view_menu.addAction(zoom_to_fit)
+
+        zoom_to_width = QAction("Zoom to Width", self)
+        zoom_to_width.setShortcut(QKeySequence("Ctrl+8"))
+        zoom_to_width.triggered.connect(self.canvas.zoom_to_width)
+        self.view_menu.addAction(zoom_to_width)
 
         zoom_in_act = QAction("Zoom In", self)
         zoom_in_act.setShortcuts([QKeySequence("Ctrl+="), QKeySequence("Ctrl++"), QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Plus)])
@@ -1805,23 +1835,61 @@ class MacMainWindow(QMainWindow):
     def _open_adjust_color(self):
         if not self.document:
             return
-        page = self.canvas.current_page
-        if self.document._pil_image:
-            img = self.document._pil_image
-        else:
-            pix = self.document.render_page(page, zoom=1.5)
-            import io
-            buf = io.BytesIO()
-            pix.save(buf, "PNG")
-            from PIL import Image
-            img = Image.open(buf)
+        if self.document.is_pdf or not self.document._pil_image:
+            QMessageBox.information(
+                self,
+                "Adjust Color",
+                "Color adjustment is available only for image documents."
+            )
+            return
 
-        old_img = img.copy()
-        dialog = AdjustColorDialog(img, self)
-        dialog.adjustments_applied.connect(lambda adjusted: self._on_color_adjustments_applied(adjusted, old_img, page))
-        dialog.exec()
+        page = self.canvas.current_page
+        img = self.document._pil_image
+        self._color_page = page
+        self._color_initial_image = img.copy()
+        self._color_last_committed = img.copy()
+
+        if not self.color_dialog:
+            self.color_dialog = AdjustColorDialog(img, self)
+            self.color_dialog.adjustments_applied.connect(self._on_color_live_preview)
+            self.color_dialog.adjustments_committed.connect(self._on_color_adjustments_committed)
+        else:
+            self.color_dialog.set_image(img)
+
+        self.color_dialog.show()
+        self.color_dialog.raise_()
+        self.color_dialog.activateWindow()
+
+    def _on_color_live_preview(self, new_img):
+        if self.document and not self.document.is_pdf and hasattr(self, "_color_page"):
+            self.document.update_image(new_img, self._color_page)
+            self.canvas.update()
+
+    def _on_color_adjustments_committed(self, new_img):
+        if not self.document or self.document.is_pdf or not hasattr(self, "_color_page"):
+            return
+        page = self._color_page
+        before_img = getattr(self, "_color_last_committed", self._color_initial_image).copy()
+        after_img = new_img.copy()
+        self._color_last_committed = after_img.copy()
+
+        self.document.update_image(after_img, page)
+        self.canvas.update()
+
+        def undo_color():
+            if self.document and not self.document.is_pdf:
+                self.document.update_image(before_img, page)
+                self.canvas.update()
+
+        def redo_color():
+            if self.document and not self.document.is_pdf:
+                self.document.update_image(after_img, page)
+                self.canvas.update()
+
+        self.canvas.history.push(ActionCommand("Adjust Color", undo_color, redo_color))
 
     def _on_color_adjustments_applied(self, new_img, old_img, page):
+        """Maintained for backward compatibility with direct callers/tests."""
         if self.document:
             self.document.update_image(new_img, page)
             self.canvas.update()
@@ -1834,8 +1902,8 @@ class MacMainWindow(QMainWindow):
             self.canvas.history.push(ActionCommand("Adjust Color", undo_color, redo_color))
 
     def _open_adjust_size(self):
-        if not self.document or not self.document._pil_image:
-            QMessageBox.information(self, "Adjust Size", "Size adjustment is available for image documents.")
+        if not self.document or not self.document._pil_image or self.document.is_pdf:
+            QMessageBox.information(self, "Adjust Size", "Size adjustment is available only for image documents.")
             return
 
         page = self.canvas.current_page

@@ -37,7 +37,7 @@ Section "Preview (required)" SecCore
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "UninstallString" '"$INSTDIR\uninstall.exe"'
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "DisplayIcon" '"$INSTDIR\Preview.exe"'
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "Publisher" "TriviLabs"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "DisplayVersion" "1.3.1"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "DisplayVersion" "1.4.0"
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "NoModify" 1
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Preview" "NoRepair" 1
 

@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QSlider, QPushButton, QCheckBox, QFrame, QWidget
 )
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QPaintEvent
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from preview.core.color_adjust import ColorAdjustEngine
 
@@ -65,29 +65,35 @@ class HistogramWidget(QWidget):
 class AdjustColorDialog(QDialog):
     """Apple macOS Adjust Color floating utility panel."""
 
-    adjustments_applied = pyqtSignal(object)  # Emits adjusted PIL Image
+    adjustments_applied = pyqtSignal(object)       # Emits adjusted PIL Image (live preview)
+    adjustments_committed = pyqtSignal(object)     # Emits adjusted PIL Image (when finished/released)
 
     def __init__(self, base_image: Image.Image, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Adjust Color")
-        self.setFixedSize(320, 480)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Tool)
+        self.setMinimumSize(320, 460)
+        self.resize(340, 520)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint)
 
         self.original_image: Image.Image = base_image.copy()
-        
-        # Fast proxy image for 60fps real-time dragging if original is large
-        max_dim = max(self.original_image.width, self.original_image.height)
-        if max_dim > 1000:
-            scale = 1000.0 / max_dim
-            pw = int(self.original_image.width * scale)
-            ph = int(self.original_image.height * scale)
-            self.proxy_image = self.original_image.resize((pw, ph), Image.Resampling.BILINEAR)
-        else:
-            self.proxy_image = self.original_image.copy()
+        self.current_preview: Image.Image = self.original_image.copy()
 
-        self.current_preview: Image.Image = self.proxy_image.copy()
+        # Real-time debounce timer (20ms) so rapid slider dragging is fluid and glitch-free
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.setInterval(20)
+        self._debounce_timer.timeout.connect(self._do_apply_changes)
 
         self._setup_ui()
+        self.histogram.update_histogram(self.original_image)
+
+    def set_image(self, base_image: Image.Image):
+        """Update source image when a new document or image is opened."""
+        if hasattr(self, "_debounce_timer") and self._debounce_timer.isActive():
+            self._debounce_timer.stop()
+        self.original_image = base_image.copy()
+        self.current_preview = self.original_image.copy()
+        self._reset_all(silent=True)
         self.histogram.update_histogram(self.original_image)
 
     def _setup_ui(self):
@@ -182,45 +188,49 @@ class AdjustColorDialog(QDialog):
         )
 
     def _apply_changes(self):
-        exp, con, sat, temp, tint, sharp, sepia = self._get_params()
+        if hasattr(self, "_debounce_timer"):
+            self._debounce_timer.start()
+        else:
+            self._do_apply_changes()
 
-        # Apply to fast proxy image during slider dragging
-        enhanced_proxy = ColorAdjustEngine.adjust(
-            self.proxy_image,
-            exposure=exp, contrast=con, saturation=sat,
-            temperature=temp, tint=tint, sharpness=sharp, sepia=sepia
-        )
-        self.histogram.update_histogram(enhanced_proxy)
-        self.adjustments_applied.emit(enhanced_proxy)
-
-    def _on_slider_released(self):
-        # On slider release, update full resolution image
+    def _do_apply_changes(self):
         exp, con, sat, temp, tint, sharp, sepia = self._get_params()
-        enhanced_full = ColorAdjustEngine.adjust(
+        enhanced = ColorAdjustEngine.adjust(
             self.original_image,
             exposure=exp, contrast=con, saturation=sat,
             temperature=temp, tint=tint, sharpness=sharp, sepia=sepia
         )
-        self.adjustments_applied.emit(enhanced_full)
-
-    def _on_done(self):
-        exp, con, sat, temp, tint, sharp, sepia = self._get_params()
-        enhanced_full = ColorAdjustEngine.adjust(
-            self.original_image,
-            exposure=exp, contrast=con, saturation=sat,
-            temperature=temp, tint=tint, sharpness=sharp, sepia=sepia
-        )
-        self.adjustments_applied.emit(enhanced_full)
-        self.accept()
-
-    def _on_auto_levels(self):
-        self._reset_all(silent=True)
-        enhanced = ColorAdjustEngine.auto_levels(self.original_image)
-        self.original_image = enhanced.copy()
+        self.current_preview = enhanced
         self.histogram.update_histogram(enhanced)
         self.adjustments_applied.emit(enhanced)
 
+    def _on_slider_released(self):
+        if hasattr(self, "_debounce_timer") and self._debounce_timer.isActive():
+            self._debounce_timer.stop()
+        self._do_apply_changes()
+        self.adjustments_committed.emit(self.current_preview)
+
+    def _on_done(self):
+        if hasattr(self, "_debounce_timer") and self._debounce_timer.isActive():
+            self._debounce_timer.stop()
+        self._do_apply_changes()
+        self.adjustments_committed.emit(self.current_preview)
+        self.accept()
+
+    def _on_auto_levels(self):
+        if hasattr(self, "_debounce_timer") and self._debounce_timer.isActive():
+            self._debounce_timer.stop()
+        self._reset_all(silent=True)
+        enhanced = ColorAdjustEngine.auto_levels(self.original_image)
+        self.original_image = enhanced.copy()
+        self.current_preview = enhanced.copy()
+        self.histogram.update_histogram(enhanced)
+        self.adjustments_applied.emit(enhanced)
+        self.adjustments_committed.emit(enhanced)
+
     def _reset_all(self, silent: bool = False):
+        if hasattr(self, "_debounce_timer") and self._debounce_timer.isActive():
+            self._debounce_timer.stop()
         self.exposure_slider.blockSignals(True)
         self.contrast_slider.blockSignals(True)
         self.saturation_slider.blockSignals(True)
@@ -249,7 +259,24 @@ class AdjustColorDialog(QDialog):
             self.current_preview = self.original_image.copy()
             self.histogram.update_histogram(self.original_image)
             self.adjustments_applied.emit(self.original_image)
+            self.adjustments_committed.emit(self.original_image)
 
     def _on_revert(self):
+        if hasattr(self, "_debounce_timer") and self._debounce_timer.isActive():
+            self._debounce_timer.stop()
         self._reset_all()
         self.reject()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, "_drag_pos"):
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)

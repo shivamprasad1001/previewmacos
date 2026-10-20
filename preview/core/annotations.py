@@ -23,6 +23,8 @@ class AnnotationType(Enum):
     NOTE = auto()
     SIGNATURE = auto()
     CROP_BOX = auto()
+    CROP_OVAL = auto()
+    CROP_LASSO = auto()
     REDACT = auto()
 
 class Handle(Enum):
@@ -53,6 +55,10 @@ class AnnotationItem:
         self.font_family: str = "-apple-system"
         self.signature_pixmap: Optional[QPixmap] = None
         self.is_selected: bool = False
+        self.is_bold: bool = False
+        self.is_italic: bool = False
+        self.is_underline: bool = False
+        self.alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft
 
     def draw(self, painter: QPainter, zoom: float = 1.0):
         """Draws the annotation item using current zoom transformation."""
@@ -152,10 +158,17 @@ class AnnotationItem:
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.drawRoundedRect(scaled_rect, 4, 4)
             
-            font = QFont(self.font_family, int(self.font_size * zoom), QFont.Weight.Medium)
+            font = QFont(self.font_family, int(self.font_size * zoom))
+            if getattr(self, "is_bold", False):
+                font.setBold(True)
+            if getattr(self, "is_italic", False):
+                font.setItalic(True)
+            if getattr(self, "is_underline", False):
+                font.setUnderline(True)
             painter.setFont(font)
             painter.setPen(QPen(self.stroke_color))
-            painter.drawText(scaled_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, self.text)
+            align = getattr(self, "alignment", Qt.AlignmentFlag.AlignLeft) | Qt.AlignmentFlag.AlignTop
+            painter.drawText(scaled_rect, align, self.text)
 
         elif self.item_type == AnnotationType.NOTE:
             scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
@@ -188,18 +201,38 @@ class AnnotationItem:
         elif self.item_type == AnnotationType.CROP_BOX:
             scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
                                  self.rect.width() * zoom, self.rect.height() * zoom)
-            # Dim outside region
-            # (Outside region dimming is handled in canvas view)
-            pen = QPen(QColor("#007aff"), 2.0)
+            pen = QPen(QColor("#007aff"), 1.8)
             pen.setStyle(Qt.PenStyle.DashLine)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(scaled_rect)
-            # Draw handles
             self._draw_resize_handles(painter, scaled_rect)
 
+        elif self.item_type == AnnotationType.CROP_OVAL:
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+                                 self.rect.width() * zoom, self.rect.height() * zoom)
+            pen = QPen(QColor("#007aff"), 1.8)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(scaled_rect)
+            self._draw_resize_handles(painter, scaled_rect)
+
+        elif self.item_type == AnnotationType.CROP_LASSO:
+            if len(self.points) > 1:
+                path = QPainterPath()
+                path.moveTo(self.points[0] * zoom)
+                for pt in self.points[1:]:
+                    path.lineTo(pt * zoom)
+                path.closeSubpath()
+                pen = QPen(QColor("#007aff"), 1.8)
+                pen.setStyle(Qt.PenStyle.DashLine)
+                painter.setPen(pen)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawPath(path)
+
         # Draw selection border and handles if selected
-        if self.is_selected and self.item_type != AnnotationType.CROP_BOX:
+        if self.is_selected and self.item_type not in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, AnnotationType.CROP_LASSO):
             doc_b = self.get_bounds()
             bounds = QRectF(doc_b.x() * zoom, doc_b.y() * zoom,
                             doc_b.width() * zoom, doc_b.height() * zoom)
@@ -299,10 +332,10 @@ class AnnotationItem:
         if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
                               AnnotationType.ELLIPSE, AnnotationType.TEXT, 
                               AnnotationType.NOTE, AnnotationType.SIGNATURE, 
-                              AnnotationType.CROP_BOX, AnnotationType.REDACT):
+                              AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, AnnotationType.REDACT):
             self.rect = new_rect
 
-        elif self.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER) and orig_points and orig_bounds.isValid():
+        elif self.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER, AnnotationType.CROP_LASSO) and orig_points and orig_bounds.isValid():
             ow = max(1.0, orig_bounds.width())
             oh = max(1.0, orig_bounds.height())
             new_pts = []
@@ -318,7 +351,7 @@ class AnnotationItem:
         if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
                               AnnotationType.ELLIPSE, AnnotationType.TEXT, 
                               AnnotationType.NOTE, AnnotationType.SIGNATURE, 
-                              AnnotationType.CROP_BOX, AnnotationType.REDACT):
+                              AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, AnnotationType.REDACT):
             return self.rect.normalized()
         elif self.points:
             min_x = min(p.x() for p in self.points)

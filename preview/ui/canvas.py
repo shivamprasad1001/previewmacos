@@ -4,12 +4,13 @@ markup drawing, handle manipulation, search highlight, and cropping.
 """
 
 from typing import List, Optional, Tuple, Dict
-from PIL import Image
+from PIL import Image, ImageDraw, ImageChops
+from PIL.ImageQt import ImageQt
 
-from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu, QDialog
+from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu, QDialog, QApplication
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPixmap, QCursor, QMouseEvent, 
-    QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent, QPainterPath
+    QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent, QPainterPath, QPolygonF
 )
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal, QTimer, QEvent, QVariantAnimation, QEasingCurve
 
@@ -25,6 +26,8 @@ class CanvasView(QWidget):
     status_message = pyqtSignal(str)
     crop_available = pyqtSignal(bool)
     tool_deselected = pyqtSignal()
+    page_next_requested = pyqtSignal()
+    page_prev_requested = pyqtSignal()
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -38,6 +41,12 @@ class CanvasView(QWidget):
         self.current_page: int = 0
         self.zoom: float = 1.0
 
+        # Wheel page flip accumulator for multi-page PDFs
+        self._page_wheel_accumulator: float = 0.0
+        self._wheel_reset_timer: QTimer = QTimer(self)
+        self._wheel_reset_timer.setSingleShot(True)
+        self._wheel_reset_timer.timeout.connect(self._reset_page_wheel_accumulator)
+
         # Annotations per page: page_idx -> List[AnnotationItem]
         self.annotations: Dict[int, List[AnnotationItem]] = {}
         
@@ -48,6 +57,7 @@ class CanvasView(QWidget):
         self.fill_color: QColor = QColor(Qt.GlobalColor.transparent)
         self.font_size: int = 16
         self.font_family: str = "-apple-system"
+        self.text_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft
         self.active_signature_pixmap: Optional[QPixmap] = None
 
         # Interaction state
@@ -278,6 +288,36 @@ class CanvasView(QWidget):
             )
             self.update()
 
+    def _reset_page_wheel_accumulator(self):
+        self._page_wheel_accumulator = 0.0
+
+    def zoom_to_width(self):
+        """Fits document page width to canvas width for comfortable vertical reading."""
+        self._auto_fit = False
+        if not self.document:
+            return
+        w_doc, h_doc = self.document.get_page_size(self.current_page)
+        has_two_up = (self.view_mode == "Two-Up" and self.current_page + 1 < self.document.page_count)
+        if has_two_up:
+            w2, h2 = self.document.get_page_size(self.current_page + 1)
+            total_w = w_doc + w2 + 12.0
+            total_h = max(h_doc, h2)
+        else:
+            total_w = w_doc
+            total_h = h_doc
+        padding = 24.0
+        vw = max(50.0, float(self.width()) - 2.0 * padding)
+        if total_w > 0:
+            scale = vw / total_w
+            self.set_zoom(scale)
+            actual_pw = (w_doc + w2) * self.zoom + 12.0 if has_two_up else w_doc * self.zoom
+            actual_ph = max(h_doc, h2) * self.zoom if has_two_up else h_doc * self.zoom
+            self._pan_offset = QPointF(
+                (float(self.width()) - actual_pw) / 2.0,
+                padding
+            )
+            self.update()
+
     def toggle_loupe(self, enable: Optional[bool] = None):
         """Toggles macOS Loupe / Magnifier lens inspection tool."""
         if enable is None:
@@ -301,7 +341,7 @@ class CanvasView(QWidget):
         self.active_tool = tool
         if tool != AnnotationType.NONE and self.loupe_enabled:
             self.loupe_enabled = False
-        if tool != AnnotationType.CROP_BOX and self.crop_box:
+        if tool not in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, AnnotationType.CROP_LASSO) and self.crop_box:
             self.crop_box = None
             self.crop_available.emit(False)
         self._update_cursor()
@@ -317,6 +357,7 @@ class CanvasView(QWidget):
         elif self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
                                   AnnotationType.ELLIPSE, AnnotationType.LINE, 
                                   AnnotationType.ARROW, AnnotationType.CROP_BOX,
+                                  AnnotationType.CROP_OVAL, AnnotationType.CROP_LASSO,
                                   AnnotationType.REDACT):
             self.setCursor(Qt.CursorShape.CrossCursor)
         elif self.active_tool == AnnotationType.TEXT:
@@ -336,6 +377,48 @@ class CanvasView(QWidget):
         self.font_family = family
         if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
             self._selected_annotation.font_family = family
+            self.update()
+
+    def set_font_bold(self, bold: bool):
+        self.font_bold = bold
+        if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
+            self._selected_annotation.is_bold = bold
+            self.update()
+
+    def set_font_italic(self, italic: bool):
+        self.font_italic = italic
+        if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
+            self._selected_annotation.is_italic = italic
+            self.update()
+
+    def set_font_underline(self, underline: bool):
+        self.font_underline = underline
+        if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
+            self._selected_annotation.is_underline = underline
+            self.update()
+
+    def set_text_alignment(self, align: Qt.AlignmentFlag):
+        self.text_alignment = align
+        if self._selected_annotation and self._selected_annotation.item_type == AnnotationType.TEXT:
+            self._selected_annotation.alignment = align
+            self.update()
+
+    def set_stroke_color(self, color: QColor):
+        self.stroke_color = color
+        if self._selected_annotation:
+            self._selected_annotation.stroke_color = QColor(color)
+            self.update()
+
+    def set_fill_color(self, color: QColor):
+        self.fill_color = color
+        if self._selected_annotation:
+            self._selected_annotation.fill_color = QColor(color)
+            self.update()
+
+    def set_stroke_width(self, width: float):
+        self.stroke_width = width
+        if self._selected_annotation:
+            self._selected_annotation.stroke_width = width
             self.update()
 
     def clamp_to_doc_bounds(self, pt: QPointF) -> QPointF:
@@ -444,10 +527,16 @@ class CanvasView(QWidget):
                     return
                 doc_pt = self.clamp_to_doc_bounds(doc_pt)
 
-            # 1. Handle Crop Tool
-            if self.active_tool == AnnotationType.CROP_BOX:
-                self.crop_box = AnnotationItem(AnnotationType.CROP_BOX)
+            # 1. Handle Crop Tools (Rectangle, Oval, Lasso)
+            if self.active_tool in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+                self.crop_box = AnnotationItem(self.active_tool)
                 self.crop_box.rect = QRectF(doc_pt, doc_pt)
+                self.crop_available.emit(True)
+                self.update()
+                return
+            elif self.active_tool == AnnotationType.CROP_LASSO:
+                self.crop_box = AnnotationItem(AnnotationType.CROP_LASSO)
+                self.crop_box.points = [doc_pt]
                 self.crop_available.emit(True)
                 self.update()
                 return
@@ -487,6 +576,10 @@ class CanvasView(QWidget):
                     item.stroke_color = QColor(self.stroke_color)
                     item.font_size = self.font_size
                     item.font_family = self.font_family
+                    item.is_bold = getattr(self, "font_bold", False)
+                    item.is_italic = getattr(self, "font_italic", False)
+                    item.is_underline = getattr(self, "font_underline", False)
+                    item.alignment = getattr(self, "text_alignment", Qt.AlignmentFlag.AlignLeft)
                     item.rect = QRectF(doc_pt.x(), doc_pt.y(), 180, 36)
                     self._get_current_annotations().append(item)
                     page = self.current_page
@@ -665,11 +758,14 @@ class CanvasView(QWidget):
             self.update()
             return
 
-        # 2. Update Crop Box (clamped to page bounds)
+        # 2. Update Crop Selection (clamped to page bounds)
         if self.crop_box and (event.buttons() & Qt.MouseButton.LeftButton):
             doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
-            p1 = self.crop_box.rect.topLeft()
-            self.crop_box.rect = QRectF(p1, doc_pt_clamped).normalized()
+            if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+                p1 = self.crop_box.rect.topLeft()
+                self.crop_box.rect = QRectF(p1, doc_pt_clamped).normalized()
+            elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+                self.crop_box.points.append(doc_pt_clamped)
             self.update()
             return
 
@@ -805,6 +901,11 @@ class CanvasView(QWidget):
                     self.update()
                 self.history.push(ActionCommand("Move Annotation", undo_move, redo_move))
 
+        if self.crop_box:
+            if self.crop_box.item_type == AnnotationType.CROP_LASSO and len(self.crop_box.points) > 2:
+                self.crop_box.points.append(self.crop_box.points[0])
+            self.crop_available.emit(True)
+
         self.update()
 
     def undo(self):
@@ -851,6 +952,52 @@ class CanvasView(QWidget):
         else:
             dy = event.angleDelta().y() / 2.0
             dx = event.angleDelta().x() / 2.0
+            raw_dy = event.angleDelta().y()
+
+            # For multi-page PDFs, handle smooth page navigation on mouse wheel
+            if self.document and self.document.is_pdf and self.document.page_count > 1:
+                min_x, max_x, min_y, max_y = self._get_resting_bounds()
+                cur_y = self._pan_offset.y()
+                self._wheel_reset_timer.start(350)
+
+                # Case 1: Page fits vertically inside viewport (min_y == max_y)
+                if abs(max_y - min_y) < 1.0:
+                    self._page_wheel_accumulator += raw_dy
+                    if self._page_wheel_accumulator <= -80:
+                        self._page_wheel_accumulator = 0.0
+                        self.page_next_requested.emit()
+                    elif self._page_wheel_accumulator >= 80:
+                        self._page_wheel_accumulator = 0.0
+                        self.page_prev_requested.emit()
+                    event.accept()
+                    return
+
+                # Case 2: Page is taller than viewport (min_y < max_y)
+                # At the bottom scrolling down -> turn to next page
+                if cur_y <= min_y + 4 and raw_dy < 0:
+                    self._page_wheel_accumulator += raw_dy
+                    if self._page_wheel_accumulator <= -100:
+                        self._page_wheel_accumulator = 0.0
+                        self.page_next_requested.emit()
+                        # Position next page at top
+                        _, _, _, new_max_y = self._get_resting_bounds()
+                        self._pan_offset.setY(new_max_y)
+                    event.accept()
+                    return
+                # At the top scrolling up -> turn to previous page
+                elif cur_y >= max_y - 4 and raw_dy > 0:
+                    self._page_wheel_accumulator += raw_dy
+                    if self._page_wheel_accumulator >= 100:
+                        self._page_wheel_accumulator = 0.0
+                        self.page_prev_requested.emit()
+                        # Position previous page at bottom
+                        new_min_y, _, _, _ = self._get_resting_bounds()
+                        self._pan_offset.setY(new_min_y)
+                    event.accept()
+                    return
+                else:
+                    self._page_wheel_accumulator = 0.0
+
             self._apply_pan_delta(QPointF(dx, dy))
             self._spring_timer.start(100)
             event.accept()
@@ -863,10 +1010,21 @@ class CanvasView(QWidget):
             return
 
         if (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            if event.key() == Qt.Key.Key_C and self._selected_text:
-                self._copy_selected_text()
-                event.accept()
-                return
+            if event.key() == Qt.Key.Key_C:
+                if self.crop_box:
+                    self._copy_crop_selection()
+                    event.accept()
+                    return
+                elif self._selected_text:
+                    self._copy_selected_text()
+                    event.accept()
+                    return
+            elif event.key() == Qt.Key.Key_X:
+                if self.crop_box:
+                    self._copy_crop_selection()
+                    self.delete_selection()
+                    event.accept()
+                    return
             elif event.key() == Qt.Key.Key_A and self.document and self.document.is_pdf:
                 words = self.document.get_page_words(self.current_page)
                 self._text_sel_rects = [w[0] for w in words]
@@ -890,7 +1048,11 @@ class CanvasView(QWidget):
             self._space_held = True
             self._update_cursor()
         elif event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-            if self._selected_annotation and self._selected_annotation in self._get_current_annotations():
+            if self.crop_box:
+                self.delete_selection()
+                event.accept()
+                return
+            elif self._selected_annotation and self._selected_annotation in self._get_current_annotations():
                 item = self._selected_annotation
                 page = self.current_page
                 idx = self._get_current_annotations().index(item)
@@ -925,25 +1087,67 @@ class CanvasView(QWidget):
 
     # --- Actions ---
     def apply_crop(self):
-        """Applies active crop selection to the current document image."""
+        """Applies active crop selection (Rectangle, Oval, Lasso) to the current document image."""
         if not self.crop_box or not self.document:
-            return
-
-        r = self.crop_box.rect.normalized()
-        if r.width() < 10 or r.height() < 10:
             return
 
         # If document is an image, crop PIL image
         if not self.document.is_pdf and self.document._pil_image:
             old_img = self.document._pil_image.copy()
-            crop_rect = (int(r.left()), int(r.top()), int(r.right()), int(r.bottom()))
-            cropped = old_img.crop(crop_rect)
             page = self.current_page
+            
+            if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+                r = self.crop_box.rect.normalized()
+                if r.width() < 5 or r.height() < 5:
+                    return
+                crop_rect = (int(r.left()), int(r.top()), int(r.right()), int(r.bottom()))
+                cropped = old_img.crop(crop_rect)
+                
+                if self.crop_box.item_type == AnnotationType.CROP_OVAL:
+                    w, h = cropped.size
+                    mask = Image.new("L", (w, h), 0)
+                    draw = ImageDraw.Draw(mask)
+                    draw.ellipse((0, 0, w - 1, h - 1), fill=255)
+                    
+                    cropped_rgba = cropped.convert("RGBA")
+                    if "A" in cropped.getbands():
+                        orig_alpha = cropped.split()[-1]
+                        mask = ImageChops.multiply(orig_alpha, mask)
+                    cropped_rgba.putalpha(mask)
+                    cropped = cropped_rgba
+            
+            elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+                pts = self.crop_box.points
+                if len(pts) < 3:
+                    return
+                min_x = max(0, int(min(p.x() for p in pts)))
+                max_x = min(old_img.width, int(max(p.x() for p in pts)))
+                min_y = max(0, int(min(p.y() for p in pts)))
+                max_y = min(old_img.height, int(max(p.y() for p in pts)))
+                if (max_x - min_x) < 5 or (max_y - min_y) < 5:
+                    return
+                
+                cropped = old_img.crop((min_x, min_y, max_x, max_y))
+                w, h = cropped.size
+                mask = Image.new("L", (w, h), 0)
+                draw = ImageDraw.Draw(mask)
+                poly_pts = [(int(p.x() - min_x), int(p.y() - min_y)) for p in pts]
+                draw.polygon(poly_pts, fill=255)
+                
+                cropped_rgba = cropped.convert("RGBA")
+                if "A" in cropped.getbands():
+                    orig_alpha = cropped.split()[-1]
+                    mask = ImageChops.multiply(orig_alpha, mask)
+                cropped_rgba.putalpha(mask)
+                cropped = cropped_rgba
+            else:
+                return
+
             self.document.update_image(cropped, page)
             self.crop_box = None
             self.crop_available.emit(False)
             self.zoom_to_fit()
-            self.status_message.emit("Image cropped successfully.")
+            self.status_message.emit("Selection cropped successfully.")
 
             def undo_crop():
                 self.document.update_image(old_img, page)
@@ -951,7 +1155,97 @@ class CanvasView(QWidget):
             def redo_crop():
                 self.document.update_image(cropped, page)
                 self.zoom_to_fit()
-            self.history.push(ActionCommand("Crop Image", undo_crop, redo_crop))
+            self.history.push(ActionCommand("Crop Selection", undo_crop, redo_crop))
+
+    def delete_selection(self):
+        """Cuts / clears pixels inside the active selection (Rectangle, Oval, Lasso)."""
+        if not self.crop_box or not self.document or self.document.is_pdf:
+            return
+        if not self.document._pil_image:
+            return
+        old_img = self.document._pil_image.copy()
+        img = old_img.convert("RGBA")
+        draw = ImageDraw.Draw(img)
+        clear_col = (0, 0, 0, 0)
+        
+        if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+            r = self.crop_box.rect.normalized()
+            if self.crop_box.item_type == AnnotationType.CROP_BOX:
+                draw.rectangle((int(r.left()), int(r.top()), int(r.right()), int(r.bottom())), fill=clear_col)
+            else:
+                draw.ellipse((int(r.left()), int(r.top()), int(r.right()), int(r.bottom())), fill=clear_col)
+        elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+            pts = [(int(p.x()), int(p.y())) for p in self.crop_box.points]
+            if len(pts) >= 3:
+                draw.polygon(pts, fill=clear_col)
+                
+        page = self.current_page
+        self.document.update_image(img, page)
+        self.crop_box = None
+        self.crop_available.emit(False)
+        self.update()
+        self.status_message.emit("Selection cleared.")
+
+        def undo_del():
+            self.document.update_image(old_img, page)
+            self.update()
+        def redo_del():
+            self.document.update_image(img, page)
+            self.update()
+        self.history.push(ActionCommand("Delete Selection", undo_del, redo_del))
+
+    def _copy_crop_selection(self):
+        """Copies the selected rectangular, oval, or lasso area to the system clipboard."""
+        if not self.crop_box or not self.document or self.document.is_pdf:
+            return
+        if not self.document._pil_image:
+            return
+        old_img = self.document._pil_image
+        if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+            r = self.crop_box.rect.normalized()
+            if r.width() < 1 or r.height() < 1:
+                return
+            crop_rect = (int(r.left()), int(r.top()), int(r.right()), int(r.bottom()))
+            cropped = old_img.crop(crop_rect)
+            if self.crop_box.item_type == AnnotationType.CROP_OVAL:
+                w, h = cropped.size
+                mask = Image.new("L", (w, h), 0)
+                draw = ImageDraw.Draw(mask)
+                draw.ellipse((0, 0, w - 1, h - 1), fill=255)
+                cropped_rgba = cropped.convert("RGBA")
+                if "A" in cropped.getbands():
+                    orig_alpha = cropped.split()[-1]
+                    mask = ImageChops.multiply(orig_alpha, mask)
+                cropped_rgba.putalpha(mask)
+                cropped = cropped_rgba
+        elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
+            pts = self.crop_box.points
+            if len(pts) < 3:
+                return
+            min_x = max(0, int(min(p.x() for p in pts)))
+            max_x = min(old_img.width, int(max(p.x() for p in pts)))
+            min_y = max(0, int(min(p.y() for p in pts)))
+            max_y = min(old_img.height, int(max(p.y() for p in pts)))
+            if (max_x - min_x) < 1 or (max_y - min_y) < 1:
+                return
+            cropped = old_img.crop((min_x, min_y, max_x, max_y))
+            w, h = cropped.size
+            mask = Image.new("L", (w, h), 0)
+            draw = ImageDraw.Draw(mask)
+            poly_pts = [(int(p.x() - min_x), int(p.y() - min_y)) for p in pts]
+            draw.polygon(poly_pts, fill=255)
+            cropped_rgba = cropped.convert("RGBA")
+            if "A" in cropped.getbands():
+                orig_alpha = cropped.split()[-1]
+                mask = ImageChops.multiply(orig_alpha, mask)
+            cropped_rgba.putalpha(mask)
+            cropped = cropped_rgba
+        else:
+            return
+
+        qimg = ImageQt(cropped)
+        QApplication.clipboard().setImage(qimg)
+        self.status_message.emit("Selection copied to clipboard.")
 
     def _get_current_annotations(self) -> List[AnnotationItem]:
         if self.current_page not in self.annotations:
@@ -989,8 +1283,8 @@ class CanvasView(QWidget):
         painter.setBrush(QBrush(QColor(0, 0, 0, 40)))
         painter.drawRoundedRect(shadow_inner, 2, 2)
 
-        # Draw page pixmap
-        painter.drawPixmap(int(page_rect.left()), int(page_rect.top()), page_pix)
+        # Draw page pixmap anchored to page_rect
+        painter.drawPixmap(page_rect.toRect(), page_pix)
 
         # Subtle crisp page outline
         painter.setPen(QPen(QColor(0, 0, 0, 30), 1))
@@ -1019,8 +1313,24 @@ class CanvasView(QWidget):
         for item in self._get_current_annotations():
             item.draw(painter, zoom=self.zoom)
         
-        # 4. Draw Crop Box
+        # 4. Draw Crop Selection & Dim Outside Region
         if self.crop_box:
+            dim_path = QPainterPath()
+            dim_path.addRect(QRectF(0, 0, w_doc * self.zoom, h_doc * self.zoom))
+            sel_path = QPainterPath()
+            if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
+                r = self.crop_box.rect.normalized()
+                scaled_r = QRectF(r.left() * self.zoom, r.top() * self.zoom, r.width() * self.zoom, r.height() * self.zoom)
+                if self.crop_box.item_type == AnnotationType.CROP_BOX:
+                    sel_path.addRect(scaled_r)
+                else:
+                    sel_path.addEllipse(scaled_r)
+            elif self.crop_box.item_type == AnnotationType.CROP_LASSO and len(self.crop_box.points) > 2:
+                poly = QPolygonF([p * self.zoom for p in self.crop_box.points])
+                sel_path.addPolygon(poly)
+            
+            dim_outside = dim_path.subtracted(sel_path)
+            painter.fillPath(dim_outside, QBrush(QColor(0, 0, 0, 50)))
             self.crop_box.draw(painter, zoom=self.zoom)
         painter.restore()
 
@@ -1046,7 +1356,7 @@ class CanvasView(QWidget):
                 painter.setBrush(QBrush(QColor(0, 0, 0, 28)))
                 painter.drawRoundedRect(p2_shadow, 4, 4)
 
-                painter.drawPixmap(int(p2_rect.left()), int(p2_rect.top()), p2_pix)
+                painter.drawPixmap(p2_rect.toRect(), p2_pix)
 
                 painter.setPen(QPen(QColor(0, 0, 0, 30), 1))
                 painter.setBrush(Qt.BrushStyle.NoBrush)

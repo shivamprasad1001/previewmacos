@@ -3,14 +3,14 @@ High-definition vector icon renderer for macOS Preview tools.
 Generates razor-sharp, resolution-independent SF Symbols styled icons.
 """
 
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPainterPath, QColor, QPen, QBrush, QFont
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QPainterPath, QColor, QPen, QBrush, QFont, QPolygonF
 from PyQt6.QtCore import Qt, QRectF, QPointF
 
 class MacIconFactory:
     """Creates crisp macOS SF Symbols style icons using QPainter vector paths."""
 
     @staticmethod
-    def create_icon(name: str, color_hex: str = "#f5f5f7", size: int = 24) -> QIcon:
+    def create_icon(name: str, color_hex: str = "#f5f5f7", size: int = 24, with_dropdown: bool = False) -> QIcon:
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.GlobalColor.transparent)
         
@@ -34,6 +34,61 @@ class MacIconFactory:
                 method(painter, rect, color, pen)
             else:
                 MacIconFactory._draw_default(painter, rect, color, pen)
+
+            if with_dropdown:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(color))
+                tri = QPolygonF([
+                    QPointF(s - 5.5, s - 4.5),
+                    QPointF(s - 1.5, s - 4.5),
+                    QPointF(s - 3.5, s - 1.5)
+                ])
+                painter.drawPolygon(tri)
+        finally:
+            painter.end()
+
+        return QIcon(pixmap)
+
+    @staticmethod
+    def create_dropdown_tool_icon(name: str, color_hex: str = "#f5f5f7", width: int = 28, height: int = 16) -> QIcon:
+        """Creates a segmented tool icon with main symbol on the left and dropdown triangle on the right."""
+        pixmap = QPixmap(width, height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        color = QColor(color_hex)
+        pen = QPen(color)
+        pen.setWidthF(1.6)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+
+        # Draw left tool icon
+        icon_rect = QRectF(1.0, 1.0, 14.0, 14.0)
+        try:
+            method = getattr(MacIconFactory, f"_draw_{name}", None)
+            if method:
+                method(painter, icon_rect, color, pen)
+            else:
+                MacIconFactory._draw_default(painter, icon_rect, color, pen)
+
+            # Subtle vertical separator line between tool icon and dropdown arrow
+            sep_col = QColor(color.red(), color.green(), color.blue(), 70)
+            painter.setPen(QPen(sep_col, 1.0))
+            painter.drawLine(QPointF(17.5, 2.5), QPointF(17.5, float(height) - 2.5))
+
+            # Dropdown arrow triangle on the right
+            cx = float(width) - 4.5
+            cy = float(height) / 2.0
+            tri = QPolygonF([
+                QPointF(cx - 2.8, cy - 1.8),
+                QPointF(cx + 2.8, cy - 1.8),
+                QPointF(cx, cy + 2.0)
+            ])
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(color))
+            painter.drawPolygon(tri)
         finally:
             painter.end()
 
@@ -145,20 +200,38 @@ class MacIconFactory:
 
     @staticmethod
     def _draw_markup(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # macOS classic Markup icon: Apple Pencil / Stylus tip inside circle
+        # macOS SF Symbol 'pencil.tip.crop.circle': Authentic Apple Pencil tip inside circle
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        p_circ = QPen(color, 1.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        p_circ = QPen(color, 1.2, Qt.PenStyle.SolidLine)
         painter.setPen(p_circ)
         painter.drawEllipse(r)
-        
-        # Angled stylus inside circle
-        tip = QPointF(r.left() + r.width() * 0.32, r.bottom() - r.height() * 0.32)
-        top = QPointF(r.right() - r.width() * 0.30, r.top() + r.height() * 0.30)
-        
-        painter.setPen(QPen(color, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(tip, top)
-        painter.setPen(QPen(color, 1.2))
-        painter.drawPoint(QPointF(tip.x() - 1.5, tip.y() + 1.5))
+
+        cx, cy = r.center().x(), r.center().y()
+        painter.save()
+        painter.translate(cx, cy)
+        painter.rotate(-45)
+
+        pencil = QPainterPath()
+        pencil.moveTo(-1.8, -4.0)
+        pencil.lineTo(1.8, -4.0)
+        pencil.lineTo(1.8, 1.0)
+        pencil.lineTo(0.0, 4.2)
+        pencil.lineTo(-1.8, 1.0)
+        pencil.closeSubpath()
+
+        painter.setPen(QPen(color, 1.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        painter.drawPath(pencil)
+        painter.drawLine(QPointF(-1.8, 1.0), QPointF(1.8, 1.0))
+
+        # Nib fill
+        nib = QPainterPath()
+        nib.moveTo(-0.9, 2.7)
+        nib.lineTo(0.0, 4.2)
+        nib.lineTo(0.9, 2.7)
+        nib.closeSubpath()
+        painter.fillPath(nib, QBrush(color))
+
+        painter.restore()
 
     @staticmethod
     def _draw_select(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
@@ -176,6 +249,41 @@ class MacIconFactory:
         hs = 2.5
         for pt in [inner.topLeft(), inner.topRight(), inner.bottomLeft(), inner.bottomRight()]:
             painter.drawRect(QRectF(pt.x() - hs/2, pt.y() - hs/2, hs, hs))
+
+    @staticmethod
+    def _draw_select_oval(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Dashed elliptical selection outline with corner handles
+        dash_pen = QPen(color, 1.2, Qt.PenStyle.CustomDashLine, Qt.PenCapStyle.FlatCap)
+        dash_pen.setDashPattern([2.5, 2.0])
+        painter.setPen(dash_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        inner = r.adjusted(1.5, 1.5, -1.5, -1.5)
+        painter.drawEllipse(inner)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(color))
+        hs = 2.5
+        for pt in [QPointF(inner.center().x(), inner.top()),
+                   QPointF(inner.center().x(), inner.bottom()),
+                   QPointF(inner.left(), inner.center().y()),
+                   QPointF(inner.right(), inner.center().y())]:
+            painter.drawRect(QRectF(pt.x() - hs/2, pt.y() - hs/2, hs, hs))
+
+    @staticmethod
+    def _draw_select_lasso(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Dashed freehand lasso loop selection outline
+        dash_pen = QPen(color, 1.2, Qt.PenStyle.CustomDashLine, Qt.PenCapStyle.FlatCap)
+        dash_pen.setDashPattern([2.5, 2.0])
+        painter.setPen(dash_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        path = QPainterPath()
+        path.moveTo(r.left() + r.width() * 0.35, r.bottom() - 1)
+        path.cubicTo(r.left(), r.top() + r.height() * 0.5,
+                     r.left() + r.width() * 0.35, r.top() + 1,
+                     r.right() - 1, r.top() + r.height() * 0.3)
+        path.cubicTo(r.right() + 1, r.bottom() - 2,
+                     r.center().x(), r.bottom(),
+                     r.left() + r.width() * 0.35, r.bottom() - 1)
+        painter.drawPath(path)
 
     @staticmethod
     def _draw_pen(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
@@ -371,26 +479,33 @@ class MacIconFactory:
 
     @staticmethod
     def _draw_open(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
-        # Folder open icon
+        # Clean macOS SF Symbol folder icon
         path = QPainterPath()
-        tab_w = r.width() * 0.4
-        tab_h = r.height() * 0.25
-        path.moveTo(r.left(), r.top() + tab_h)
-        path.lineTo(r.left() + tab_w, r.top() + tab_h)
-        path.lineTo(r.left() + tab_w + 3, r.top())
-        path.lineTo(r.right() - 2, r.top())
-        path.lineTo(r.right() - 2, r.bottom() - 2)
-        path.lineTo(r.left(), r.bottom() - 2)
+        w = r.width()
+        h = r.height() * 0.88
+        x = r.left()
+        y = r.top() + (r.height() - h) / 2
+
+        tab_w = w * 0.42
+        tab_h = h * 0.22
+
+        path.moveTo(x + 1.5, y + tab_h)
+        path.lineTo(x + tab_w, y + tab_h)
+        path.lineTo(x + tab_w + 1.8, y)
+        path.lineTo(x + w - 1.5, y)
+        path.quadTo(x + w, y, x + w, y + 1.5)
+        path.lineTo(x + w, y + h - 1.5)
+        path.quadTo(x + w, y + h, x + w - 1.5, y + h)
+        path.lineTo(x + 1.5, y + h)
+        path.quadTo(x, y + h, x, y + h - 1.5)
+        path.lineTo(x, y + tab_h + 1.5)
+        path.quadTo(x, y + tab_h, x + 1.5, y + tab_h)
         path.closeSubpath()
+
+        f_pen = QPen(color, 1.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(f_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawPath(path)
-        # Front flap angled
-        flap = QPainterPath()
-        flap.moveTo(r.left(), r.bottom() - 2)
-        flap.lineTo(r.left() + 3, r.top() + tab_h + 3)
-        flap.lineTo(r.right(), r.top() + tab_h + 3)
-        flap.lineTo(r.right() - 3, r.bottom() - 2)
-        flap.closeSubpath()
-        painter.drawPath(flap)
 
     @staticmethod
     def _draw_folder(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
@@ -447,6 +562,20 @@ class MacIconFactory:
         path.moveTo(cx - 3, cy - 6)
         path.lineTo(cx + 3, cy)
         path.lineTo(cx - 3, cy + 6)
+        painter.drawPath(path)
+
+    @staticmethod
+    def _draw_arrow_down(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Crisp solid dropdown arrow triangle (matching macOS / attached photo)
+        path = QPainterPath()
+        cx = r.center().x()
+        cy = r.center().y()
+        path.moveTo(cx - 3.5, cy - 2.0)
+        path.lineTo(cx + 3.5, cy - 2.0)
+        path.lineTo(cx, cy + 2.5)
+        path.closeSubpath()
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(color))
         painter.drawPath(path)
 
     @staticmethod

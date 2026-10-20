@@ -141,7 +141,7 @@ class MacTheme:
             min-height: 28px;
             max-height: 28px;
             min-width: 28px;
-            max-width: 28px;
+            max-width: 44px;
         }}
 
         #markupToolbar QToolButton:hover {{
@@ -188,6 +188,11 @@ class MacTheme:
             color: #ffffff;
         }}
 
+        QToolButton::menu-indicator {{
+            image: none;
+            width: 0px;
+        }}
+
         /* Joined Segmented Control Pairs */
         #prevBtn, #zoomOutBtn {{
             border-top-left-radius: 6px;
@@ -203,6 +208,44 @@ class MacTheme:
             border-top-right-radius: 6px;
             border-bottom-right-radius: 6px;
             border-left: none;
+        }}
+
+        #openMainBtn {{
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+            border-top-right-radius: 0px;
+            border-bottom-right-radius: 0px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 0px 8px 0px 6px;
+            font-size: 12px;
+            font-weight: 500;
+            background-color: transparent;
+            color: {cls.DARK_TEXT_PRIMARY};
+        }}
+        #openMainBtn:hover {{
+            background-color: rgba(255, 255, 255, 0.08);
+        }}
+        #openMainBtn:pressed {{
+            background-color: rgba(255, 255, 255, 0.14);
+        }}
+
+        #openArrowBtn {{
+            border-top-left-radius: 0px;
+            border-bottom-left-radius: 0px;
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-left: none;
+            padding: 0px;
+            background-color: transparent;
+            color: {cls.DARK_TEXT_PRIMARY};
+        }}
+        #openArrowBtn:hover {{
+            background-color: rgba(255, 255, 255, 0.08);
+        }}
+        #openArrowBtn:pressed {{
+            background-color: rgba(255, 255, 255, 0.14);
         }}
 
         /* Markup Pill Button (rounded 14px pill) */
@@ -408,21 +451,55 @@ class MacTheme:
             background-color: rgba(255, 255, 255, 0.12);
         }}
 
+        /* SpinBox & Font Controls */
+        QSpinBox {{
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            padding: 2px 4px 2px 6px;
+            color: {cls.DARK_TEXT_PRIMARY};
+            font-size: 12px;
+            min-height: 24px;
+        }}
+
+        QSpinBox:focus {{
+            border: 2px solid {cls.DARK_ACCENT};
+            background-color: rgba(255, 255, 255, 0.12);
+        }}
+
+        QSpinBox::up-button, QSpinBox::down-button {{
+            background: transparent;
+            border: none;
+            width: 14px;
+        }}
+
+        QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+            background-color: rgba(255, 255, 255, 0.10);
+            border-radius: 2px;
+        }}
+
         /* Dropdown & ComboBox */
-        QComboBox {{
+        QFontComboBox, QComboBox {{
             background-color: rgba(255, 255, 255, 0.08);
             border: 1px solid {cls.DARK_BORDER};
             border-radius: 6px;
-            padding: 3px 8px;
+            padding: 2px 8px;
             color: {cls.DARK_TEXT_PRIMARY};
+            font-size: 12px;
+            min-height: 24px;
         }}
 
-        QComboBox::drop-down {{
+        QFontComboBox:focus, QComboBox:focus {{
+            border: 2px solid {cls.DARK_ACCENT};
+            background-color: rgba(255, 255, 255, 0.12);
+        }}
+
+        QFontComboBox::drop-down, QComboBox::drop-down {{
             border: none;
             width: 18px;
         }}
 
-        QComboBox QAbstractItemView {{
+        QFontComboBox QAbstractItemView, QComboBox QAbstractItemView {{
             background-color: {cls.DARK_BG_CARD};
             border: 1px solid {cls.DARK_BORDER};
             border-radius: 6px;
@@ -647,7 +724,7 @@ class MacTheme:
             min-height: 28px;
             max-height: 28px;
             min-width: 28px;
-            max-width: 28px;
+            max-width: 44px;
         }}
 
         #markupToolbar QToolButton:hover {{
@@ -694,6 +771,11 @@ class MacTheme:
             color: #ffffff;
         }}
 
+        QToolButton::menu-indicator {{
+            image: none;
+            width: 0px;
+        }}
+
         /* Joined Segmented Control Pairs */
         #prevBtn, #zoomOutBtn {{
             border-top-left-radius: 6px;
@@ -709,6 +791,44 @@ class MacTheme:
             border-top-right-radius: 6px;
             border-bottom-right-radius: 6px;
             border-left: none;
+        }}
+
+        #openMainBtn {{
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+            border-top-right-radius: 0px;
+            border-bottom-right-radius: 0px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-right: 1px solid rgba(0, 0, 0, 0.10);
+            padding: 0px 8px 0px 6px;
+            font-size: 12px;
+            font-weight: 500;
+            background-color: transparent;
+            color: {cls.LIGHT_TEXT_PRIMARY};
+        }}
+        #openMainBtn:hover {{
+            background-color: rgba(0, 0, 0, 0.06);
+        }}
+        #openMainBtn:pressed {{
+            background-color: rgba(0, 0, 0, 0.12);
+        }}
+
+        #openArrowBtn {{
+            border-top-left-radius: 0px;
+            border-bottom-left-radius: 0px;
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-left: none;
+            padding: 0px;
+            background-color: transparent;
+            color: {cls.LIGHT_TEXT_PRIMARY};
+        }}
+        #openArrowBtn:hover {{
+            background-color: rgba(0, 0, 0, 0.06);
+        }}
+        #openArrowBtn:pressed {{
+            background-color: rgba(0, 0, 0, 0.12);
         }}
 
         /* Markup Pill Button (rounded 14px pill) */
@@ -914,21 +1034,55 @@ class MacTheme:
             background-color: #ffffff;
         }}
 
-        /* Dropdown & ComboBox */
-        QComboBox {{
-            background-color: rgba(255, 255, 255, 0.85);
-            border: 1px solid {cls.LIGHT_BORDER};
+        /* SpinBox & Font Controls */
+        QSpinBox {{
+            background-color: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.15);
             border-radius: 6px;
-            padding: 3px 8px;
+            padding: 2px 4px 2px 6px;
             color: {cls.LIGHT_TEXT_PRIMARY};
+            font-size: 12px;
+            min-height: 24px;
         }}
 
-        QComboBox::drop-down {{
+        QSpinBox:focus {{
+            border: 2px solid {cls.LIGHT_ACCENT};
+            background-color: #ffffff;
+        }}
+
+        QSpinBox::up-button, QSpinBox::down-button {{
+            background: transparent;
+            border: none;
+            width: 14px;
+        }}
+
+        QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+            background-color: rgba(0, 0, 0, 0.06);
+            border-radius: 2px;
+        }}
+
+        /* Dropdown & ComboBox */
+        QFontComboBox, QComboBox {{
+            background-color: #ffffff;
+            border: 1px solid {cls.LIGHT_BORDER};
+            border-radius: 6px;
+            padding: 2px 8px;
+            color: {cls.LIGHT_TEXT_PRIMARY};
+            font-size: 12px;
+            min-height: 24px;
+        }}
+
+        QFontComboBox:focus, QComboBox:focus {{
+            border: 2px solid {cls.LIGHT_ACCENT};
+            background-color: #ffffff;
+        }}
+
+        QFontComboBox::drop-down, QComboBox::drop-down {{
             border: none;
             width: 18px;
         }}
 
-        QComboBox QAbstractItemView {{
+        QFontComboBox QAbstractItemView, QComboBox QAbstractItemView {{
             background-color: {cls.LIGHT_BG_CARD};
             border: 1px solid {cls.LIGHT_BORDER};
             border-radius: 6px;

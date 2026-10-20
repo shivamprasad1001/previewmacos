@@ -14,8 +14,9 @@ class InspectorDialog(QDialog):
     def __init__(self, metadata: Dict[str, Any], parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Inspector")
-        self.setFixedSize(360, 420)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Tool)
+        self.setMinimumSize(320, 360)
+        self.resize(360, 440)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint)
 
         self.metadata = metadata
         self._setup_ui()
@@ -85,3 +86,17 @@ class InspectorDialog(QDialog):
                 return f"{num_bytes:.1f} {unit}"
             num_bytes /= 1024
         return f"{num_bytes:.1f} TB"
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, "_drag_pos"):
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)

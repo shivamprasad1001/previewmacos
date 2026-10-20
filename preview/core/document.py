@@ -259,7 +259,7 @@ class Document(QObject):
             if 0 <= page_idx < self.page_count:
                 page = self._pdf_doc[page_idx]
                 total_rot = (page.rotation + rot) % 360
-                scale = zoom * 1.5
+                scale = zoom
                 mat = pymupdf.Matrix(scale, scale).prerotate(total_rot)
                 pix = page.get_pixmap(matrix=mat, alpha=False)
                 

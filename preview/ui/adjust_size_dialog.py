@@ -19,7 +19,9 @@ class AdjustSizeDialog(QDialog):
     def __init__(self, image: Image.Image, original_file_size: int = 0, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Adjust Size")
-        self.setFixedSize(380, 360)
+        self.setMinimumSize(360, 340)
+        self.resize(390, 370)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowCloseButtonHint)
 
         self.image = image
         self.orig_w = image.width
@@ -185,3 +187,17 @@ class AdjustSizeDialog(QDialog):
                 return f"{num_bytes:.1f} {unit}"
             num_bytes /= 1024
         return f"{num_bytes:.1f} TB"
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, "_drag_pos"):
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)

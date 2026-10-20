@@ -1,3 +1,59 @@
+# Preview macOS v1.4.0 Release Notes
+
+Welcome to **Preview macOS v1.4.0**! This release brings major enhancements to toolbar controls, authentic macOS segmented styling, advanced selection tools (true Oval and Lasso crop/cut with transparency masking), rich font styling, and live color palettes.
+
+---
+
+### 💖 A Sincere Note of Thanks
+A heartfelt thank you to all our users, contributors, and testers! Your feedback, screenshots, feature requests, and issue reports continue to drive Preview macOS closer to 100% pixel-perfect parity with Apple Preview. We couldn't build this without your passion and dedication to open-source excellence!
+
+---
+
+### 🌟 What's New
+
+#### 🗂️ Segmented Open Button `[ 📁 Open | ▼ ]`
+* **Direct Open Action:** Clicking the primary "Open" segment directly opens the file browser dialog (<kbd>Ctrl</kbd>+<kbd>O</kbd>).
+* **Dedicated Dropdown Menu:** Clicking the downward arrow segment `▼` reveals instant options to **Open File(s)...** or **Open Folder of Images...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>).
+* **Authentic macOS Styling:** Pixel-perfect rounded borders, subtle divider line, and hover feedback matching macOS Big Sur / Sonoma design standards.
+
+#### ✂️ Advanced Selection & Cut Tools (Rectangle, Oval, Lasso)
+* **Dropdown Selection Tool:** The selection button is now a dropdown menu offering:
+  * **Rectangular Selection**
+  * **Oval / Elliptical Selection**
+  * **Lasso Selection** (freehand polygon tracing)
+* **True Oval & Lasso Cropping with Alpha Masking:**
+  * Cropping an elliptical selection now automatically cuts out the oval shape and creates a transparent background outside the ellipse.
+  * Cropping a lasso selection creates a clean polygon cutout with a transparent background.
+* **Selection Cut & Clear (`Delete` / `Backspace`):**
+  * Pressing <kbd>Delete</kbd> or <kbd>Backspace</kbd> with an active selection cuts and erases that area to transparent pixels.
+* **Copy Selection to Clipboard (`Ctrl`+`C` / `Ctrl`+`X`):**
+  * Copying an active oval or lasso selection transfers the transparently masked image directly to the system clipboard.
+* **Outside Selection Dimming:** The canvas now smoothly dims the area outside any active selection box or polygon, making the target area pop out cleanly.
+
+#### 🎨 Quick macOS Color Palettes
+* **Stroke & Fill Color Dropdowns:** Both color buttons now feature a color swatch preview with a dropdown arrow `[ Swatch | ▼ ]`.
+* **Instant Preset Palette:** Quick access to 11 macOS standard colors (Red, Orange, Yellow, Green, Cyan, Blue, Purple, Pink, Black, Gray, White), plus **No Fill (Transparent)** and **Show Colors...** for custom color wheel selection.
+* **Live Annotation Updates:** Selecting a color immediately updates any currently highlighted annotation on the canvas.
+
+#### 🔤 Rich Font Formatting
+* **Text Controls Toolbar:** Added dedicated controls for **Font Size** (`QSpinBox`), **Font Family** (`QFontComboBox`), **Bold (`B`)**, **Italic (`I`)**, and **Underline (`U`)**.
+* **Text Options Dropdown `[ A | ▼ ]`:** Instant menu to switch text alignment (**Align Left**, **Align Center**, **Align Right**) and select quick font size presets (10pt to 64pt).
+* **Rich Text Rendering:** Canvas text annotations render with exact bold, italic, underline, and alignment styles.
+
+#### 🖌️ Icon Redesign & Dropdown Indicators
+* **SF Symbols Apple Pencil:** Redesigned the markup toolbar toggle icon to match Apple's authentic circular pencil tip symbol.
+* **Crisp Dropdown Indicators:** Vector-rendered anti-aliased downward arrow triangles `▼` across all tool dropdowns.
+
+---
+
+### 🐛 Bug Fixes & Refinements
+* **Fixed Selection Tool Behavior:** Fixed Oval and Lasso tools previously drawing vector shapes instead of creating selection/cut regions.
+* **Fixed Color Adjustment Glitches:** Resolved issue where image color adjustments could cause temporary zoom out or intermediate display glitches during slider dragging.
+* **Fixed Secondary Window Mobility:** Secondary tool dialogs (Adjust Color, Adjust Size, Inspector) can now be freely repositioned and resized without layout locks.
+* **Expanded Test Suite:** Added comprehensive automated verification tests for segmented open controls, selection modes, and alpha crop masking (40 test cases passing).
+
+---
+
 # Preview macOS v1.3.1 Release Notes
 
 Welcome to **Preview macOS v1.3.1**! This patch release addresses a critical standalone packaging and startup failure encountered in the v1.3.0 release binaries.

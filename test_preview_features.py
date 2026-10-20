@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
 from PyQt6.QtWidgets import QApplication, QLabel
 from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtCore import QPointF, QRectF
+from PyQt6.QtCore import QPointF, QRectF, Qt
 
 # Initialize Qt App in offscreen mode
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
@@ -754,6 +754,232 @@ class TestPreviewParity(unittest.TestCase):
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
 
+    def test_35_pdf_render_scale_and_scroll_parity(self):
+        pdf_path = "/tmp/test_pdf_scale_scroll.pdf"
+        pdf = pymupdf.open()
+        p1 = pdf.new_page(width=612, height=792)
+        p1.insert_text(pymupdf.Point(72, 72), "Page 1 Content")
+        p2 = pdf.new_page(width=612, height=792)
+        p2.insert_text(pymupdf.Point(72, 72), "Page 2 Content")
+        pdf.save(pdf_path)
+        pdf.close()
+
+        doc = Document(pdf_path)
+        w, h = doc.get_page_size(0)
+        self.assertEqual((w, h), (612.0, 792.0))
+
+        # Ensure render_page at 1.0 zoom has 1:1 parity with get_page_size
+        pix_1 = doc.render_page(0, zoom=1.0)
+        self.assertEqual(pix_1.width(), 612)
+        self.assertEqual(pix_1.height(), 792)
+
+        # Ensure render_page at 0.5 zoom scales linearly
+        pix_half = doc.render_page(0, zoom=0.5)
+        self.assertEqual(pix_half.width(), 306)
+        self.assertEqual(pix_half.height(), 396)
+
+        # Test Canvas navigation signals on wheel scroll
+        from preview.ui.canvas import CanvasView
+        from PyQt6.QtCore import Qt, QPoint
+        from PyQt6.QtGui import QWheelEvent
+        canvas = CanvasView()
+        canvas.resize(800, 600)
+        canvas.set_document(doc)
+
+        next_called = []
+        prev_called = []
+        canvas.page_next_requested.connect(lambda: next_called.append(True))
+        canvas.page_prev_requested.connect(lambda: prev_called.append(True))
+
+        # Simulate wheel down event when page fits
+        ev_down = QWheelEvent(QPointF(400, 300), QPointF(400, 300), QPoint(0, 0), QPoint(0, -120),
+                              Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                              Qt.ScrollPhase.NoScrollPhase, False)
+        canvas.wheelEvent(ev_down)
+        self.assertTrue(len(next_called) > 0)
+
+        # Simulate wheel up event
+        ev_up = QWheelEvent(QPointF(400, 300), QPointF(400, 300), QPoint(0, 0), QPoint(0, 120),
+                            Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                            Qt.ScrollPhase.NoScrollPhase, False)
+        canvas.wheelEvent(ev_up)
+        self.assertTrue(len(prev_called) > 0)
+
+        # Test converting rendered PDF page to PIL Image for Adjust Color without TypeError
+        from PyQt6.QtCore import QBuffer, QIODevice
+        import io
+        from PIL import Image
+        qbuf = QBuffer()
+        qbuf.open(QIODevice.OpenModeFlag.WriteOnly)
+        pix_1.save(qbuf, "PNG")
+        pil_from_pdf = Image.open(io.BytesIO(qbuf.data().data()))
+        qbuf.close()
+        self.assertEqual(pil_from_pdf.size, (612, 792))
+
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+
+    def test_36_color_adjust_dialog_full_resolution_and_validation(self):
+        from preview.ui.adjust_color_dialog import AdjustColorDialog
+        from preview.ui.main_window import MacMainWindow
+        from unittest.mock import patch, MagicMock
+
+        # 1. Test that AdjustColorDialog preserves full resolution (no downscaling/proxy zoom-out)
+        large_img = Image.new("RGB", (2500, 1800), color=(100, 150, 200))
+        dlg = AdjustColorDialog(large_img)
+        self.assertEqual(dlg.original_image.size, (2500, 1800))
+        self.assertEqual(dlg.current_preview.size, (2500, 1800))
+
+        dlg.exposure_slider.setValue(25)
+        dlg._do_apply_changes()
+        self.assertEqual(dlg.current_preview.size, (2500, 1800))
+
+        dlg._on_slider_released()
+        self.assertEqual(dlg.current_preview.size, (2500, 1800))
+
+        # Test set_image
+        new_img = Image.new("RGB", (3000, 2000), color=(50, 60, 70))
+        dlg.set_image(new_img)
+        self.assertEqual(dlg.original_image.size, (3000, 2000))
+        self.assertEqual(dlg.current_preview.size, (3000, 2000))
+        dlg.close()
+
+        # 2. Test PDF document validation showing informative notice
+        win = MacMainWindow()
+        mock_doc = MagicMock()
+        mock_doc.is_pdf = True
+        mock_doc._pil_image = None
+        win.document = mock_doc
+
+        with patch("PyQt6.QtWidgets.QMessageBox.information") as mock_info:
+            win._open_adjust_color()
+            mock_info.assert_called_once()
+            self.assertIn("image documents", mock_info.call_args[0][2])
+
+        with patch("PyQt6.QtWidgets.QMessageBox.information") as mock_info:
+            win._open_adjust_size()
+            mock_info.assert_called_once()
+            self.assertIn("image documents", mock_info.call_args[0][2])
+        win.close()
+
+    def test_39_open_segmented_and_dropdown_markup_controls(self):
+        """Verifies Open segmented button [ 📂 Open | ▼ ] and dropdown menus for selection, color, font."""
+        win = MacMainWindow(initial_file=self.test_img_path)
+        
+        # 1. Open Segmented Control
+        self.assertTrue(hasattr(win, "open_segmented"))
+        self.assertTrue(hasattr(win, "open_btn"))
+        self.assertTrue(hasattr(win, "open_arrow_btn"))
+        self.assertEqual(win.open_btn.text(), "Open")
+        self.assertIsNotNone(win.open_arrow_btn.menu())
+        self.assertEqual(len(win.open_arrow_btn.menu().actions()), 2)
+        self.assertEqual(win.open_arrow_btn.menu().actions()[0].text(), "Open File(s)...")
+        self.assertEqual(win.open_arrow_btn.menu().actions()[1].text(), "Open Folder of Images...")
+
+        # 2. Markup Toolbar Dropdown Tools
+        mb = win.markup_bar
+        # Selection dropdown
+        self.assertIsNotNone(mb.select_btn.menu())
+        select_actions = mb.select_btn.menu().actions()
+        self.assertGreaterEqual(len(select_actions), 3)
+        self.assertIn("Rectangular Selection", select_actions[0].text())
+        self.assertIn("Oval", select_actions[1].text())
+        self.assertIn("Lasso", select_actions[2].text())
+        
+        # Trigger selection tool change
+        select_actions[0].trigger()
+        self.assertEqual(mb.current_tool, AnnotationType.CROP_BOX)
+        self.assertEqual(win.canvas.active_tool, AnnotationType.CROP_BOX)
+
+        # 3. Stroke and Fill Color Dropdowns
+        self.assertIsNotNone(mb.color_btn.menu())
+        stroke_actions = mb.color_btn.menu().actions()
+        self.assertGreaterEqual(len(stroke_actions), 10)
+        # Choose Blue from palette
+        blue_action = [a for a in stroke_actions if "Blue" in a.text()][0]
+        blue_action.trigger()
+        self.assertEqual(mb.stroke_color.name(), "#007aff")
+        self.assertEqual(win.canvas.stroke_color.name(), "#007aff")
+
+        self.assertIsNotNone(mb.fill_btn.menu())
+        fill_actions = mb.fill_btn.menu().actions()
+        self.assertGreaterEqual(len(fill_actions), 10)
+        green_action = [a for a in fill_actions if "Green" in a.text()][0]
+        green_action.trigger()
+        self.assertEqual(mb.fill_color.name(), "#34c759")
+        self.assertEqual(win.canvas.fill_color.name(), "#34c759")
+
+        # 4. Font Controls: Spin, Family, Bold, Italic, Underline, Alignment
+        mb.font_spin.setValue(24)
+        self.assertEqual(win.canvas.font_size, 24)
+
+        mb.bold_btn.setChecked(True)
+        self.assertTrue(getattr(win.canvas, "font_bold", False))
+
+        mb.italic_btn.setChecked(True)
+        self.assertTrue(getattr(win.canvas, "font_italic", False))
+
+        mb.underline_btn.setChecked(True)
+        self.assertTrue(getattr(win.canvas, "font_underline", False))
+
+        # Text options menu (alignment & sizes)
+        self.assertIsNotNone(mb.text_options_btn.menu())
+        text_menu_actions = mb.text_options_btn.menu().actions()
+        align_center = [a for a in text_menu_actions if "Align Center" in a.text()][0]
+        align_center.trigger()
+        self.assertEqual(win.canvas.text_alignment, Qt.AlignmentFlag.AlignHCenter)
+
+        win.close()
+
+    def test_40_oval_and_lasso_crop_cut_delete(self):
+        """Verifies oval and lasso selections crop with alpha transparency, cut, copy, and delete."""
+        win = MacMainWindow(initial_file=self.test_img_path)
+        canvas = win.canvas
+
+        # 1. Test Oval Crop
+        canvas.set_active_tool(AnnotationType.CROP_OVAL)
+        self.assertEqual(canvas.active_tool, AnnotationType.CROP_OVAL)
+        
+        canvas.crop_box = AnnotationItem(AnnotationType.CROP_OVAL)
+        canvas.crop_box.rect = QRectF(10, 10, 80, 80)
+        canvas.apply_crop()
+        
+        # Image should be 80x80 RGBA with transparent corners and opaque center
+        img = canvas.document._pil_image
+        self.assertEqual(img.size, (80, 80))
+        self.assertEqual(img.mode, "RGBA")
+        corner_alpha = img.getpixel((1, 1))[3]
+        center_alpha = img.getpixel((40, 40))[3]
+        self.assertEqual(corner_alpha, 0, "Corner outside ellipse should be transparent")
+        self.assertGreater(center_alpha, 200, "Center inside ellipse should be opaque")
+
+        # 2. Test Lasso Crop
+        canvas.set_active_tool(AnnotationType.CROP_LASSO)
+        self.assertEqual(canvas.active_tool, AnnotationType.CROP_LASSO)
+
+        canvas.crop_box = AnnotationItem(AnnotationType.CROP_LASSO)
+        canvas.crop_box.points = [
+            QPointF(10, 10),
+            QPointF(50, 10),
+            QPointF(50, 50),
+            QPointF(10, 50),
+            QPointF(10, 10)
+        ]
+        canvas.apply_crop()
+        img2 = canvas.document._pil_image
+        self.assertEqual(img2.size, (40, 40))
+        self.assertEqual(img2.mode, "RGBA")
+
+        # 3. Test Delete Selection (clears selection to transparent)
+        canvas.crop_box = AnnotationItem(AnnotationType.CROP_OVAL)
+        canvas.crop_box.rect = QRectF(5, 5, 20, 20)
+        canvas.delete_selection()
+        cleared_img = canvas.document._pil_image
+        self.assertEqual(cleared_img.getpixel((15, 15))[3], 0, "Pixels inside deleted oval should be cleared/transparent")
+
+        win.close()
+
 if __name__ == "__main__":
     unittest.main()
+
 

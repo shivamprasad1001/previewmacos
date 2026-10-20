@@ -25,35 +25,37 @@ class ColorAdjustEngine:
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGBA")
 
-        # 1. Exposure / Brightness (factor: 1.0 is neutral)
-        if exposure != 0.0:
-            factor = 1.0 + exposure
-            enhancer = ImageEnhance.Brightness(img)
-            img = enhancer.enhance(max(0.0, factor))
+        # 1. Combined Exposure, Contrast, Temperature, Tint via fast C lookup table
+        if exposure != 0.0 or contrast != 0.0 or temperature != 0.0 or tint != 0.0:
+            exp_factor = max(0.0, 1.0 + exposure)
+            con_factor = max(0.0, 1.0 + contrast)
+            r_scale = 1.0 + temperature * 0.25 + tint * 0.15
+            g_scale = 1.0 - abs(temperature) * 0.05 - tint * 0.2
+            b_scale = 1.0 - temperature * 0.25 + tint * 0.15
 
-        # 2. Contrast (factor: 1.0 is neutral)
-        if contrast != 0.0:
-            factor = 1.0 + contrast
-            enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(max(0.0, factor))
+            lut_r = [min(255, max(0, int((128.0 + (i * exp_factor - 128.0) * con_factor) * r_scale))) for i in range(256)]
+            lut_g = [min(255, max(0, int((128.0 + (i * exp_factor - 128.0) * con_factor) * g_scale))) for i in range(256)]
+            lut_b = [min(255, max(0, int((128.0 + (i * exp_factor - 128.0) * con_factor) * b_scale))) for i in range(256)]
 
-        # 3. Saturation (factor: 1.0 is neutral)
+            if img.mode == "RGBA":
+                lut = lut_r + lut_g + lut_b + list(range(256))
+            else:
+                lut = lut_r + lut_g + lut_b
+            img = img.point(lut)
+
+        # 2. Saturation (factor: 1.0 is neutral)
         if saturation != 0.0:
             factor = 1.0 + saturation
             enhancer = ImageEnhance.Color(img)
             img = enhancer.enhance(max(0.0, factor))
 
-        # 4. Sharpness
+        # 3. Sharpness
         if sharpness != 0.0:
             factor = 1.0 + sharpness * 1.5
             enhancer = ImageEnhance.Sharpness(img)
             img = enhancer.enhance(max(0.0, factor))
 
-        # 5. Temperature & Tint (RGB channel weighting)
-        if temperature != 0.0 or tint != 0.0:
-            img = ColorAdjustEngine._apply_temp_tint(img, temperature, tint)
-
-        # 6. Sepia effect
+        # 4. Sepia effect
         if sepia:
             img = ColorAdjustEngine._apply_sepia(img)
 
@@ -65,19 +67,13 @@ class ColorAdjustEngine:
         g_scale = 1.0 - abs(temp) * 0.05 - tint * 0.2
         b_scale = 1.0 - temp * 0.25 + tint * 0.15
 
-        has_alpha = (img.mode == "RGBA")
-        if has_alpha:
-            r, g, b, a = img.split()
-        else:
-            r, g, b = img.split()
+        lut_r = [min(255, max(0, int(i * r_scale))) for i in range(256)]
+        lut_g = [min(255, max(0, int(i * g_scale))) for i in range(256)]
+        lut_b = [min(255, max(0, int(i * b_scale))) for i in range(256)]
 
-        r = r.point(lambda i: min(255, max(0, int(i * r_scale))))
-        g = g.point(lambda i: min(255, max(0, int(i * g_scale))))
-        b = b.point(lambda i: min(255, max(0, int(i * b_scale))))
-
-        if has_alpha:
-            return Image.merge("RGBA", (r, g, b, a))
-        return Image.merge("RGB", (r, g, b))
+        if img.mode == "RGBA":
+            return img.point(lut_r + lut_g + lut_b + list(range(256)))
+        return img.point(lut_r + lut_g + lut_b)
 
     @staticmethod
     def _apply_sepia(img: Image.Image) -> Image.Image:
