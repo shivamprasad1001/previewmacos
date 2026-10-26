@@ -35,7 +35,7 @@ def draw_header_footer(page, page_num: int, total_pages: int, title: str = "Prev
 def generate_pdf_guide(output_pdf: str = "help/generated/preview_user_guide.pdf"):
     doc = pymupdf.open()
     date_str = time.strftime("%B %Y")
-    version_str = "1.5.0"
+    version_str = "1.6.0"
 
     # --- Page 1: Cover ---
     p1 = doc.new_page(width=A4_WIDTH, height=A4_HEIGHT)

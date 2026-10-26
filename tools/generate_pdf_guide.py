@@ -25,7 +25,7 @@ def generate_pdf_guides(data_path="preview/data/help_data.json", output_dir="pre
     # Title & Subtitle
     page1.insert_text(fitz.Point(40, 60), "Document Viewer for Linux", fontsize=24, color=(1, 1, 1), fontname="helv", fontfile=None)
     page1.insert_text(fitz.Point(40, 90), "Complete User Guide & Feature Manual (macOS Preview Clone)", fontsize=13, color=(0.9, 0.95, 1), fontname="helv")
-    page1.insert_text(fitz.Point(40, 115), f"Version {data.get('version', '1.4.0')}  |  Updated: {data.get('updated_at', '2026-10-20')}", fontsize=10, color=(0.85, 0.9, 1), fontname="helv")
+    page1.insert_text(fitz.Point(40, 115), f"Version {data.get('version', '1.6.0')}  |  Updated: {data.get('updated_at', '2026-10-26')}", fontsize=10, color=(0.85, 0.9, 1), fontname="helv")
 
     # Section 1: Quick Start (5 steps)
     page1.insert_text(fitz.Point(40, 175), "Quick Start Guide (5 Simple Steps)", fontsize=15, color=(0.1, 0.1, 0.1), fontname="helv")

@@ -16,10 +16,10 @@ Real macOS Preview allows opening multiple documents (PDFs, images) as tabs with
 - Each tab maintains independent zoom levels, active page index, scroll position, and undo/redo stacks.
 
 ### Acceptance Criteria
-- [ ] Implement macOS tab bar widget with smooth active indicator.
-- [ ] Support dragging tabs to reorder.
-- [ ] Handle independent document states (zoom, active page, undo history) per tab.
-- [ ] Add menu items: **View > Show Tab Bar**, **File > New Tab**, **File > Close Tab**.
+- [x] Implement macOS tab bar widget with smooth active indicator.
+- [x] Support dragging tabs to reorder.
+- [x] Handle independent document states (zoom, active page, undo history) per tab.
+- [x] Add menu items: **View > Show Tab Bar**, **File > New Tab**, **File > Close Tab**.
 
 ---
 
@@ -34,10 +34,10 @@ macOS Preview features a signature **Magnifier Loupe** annotation (a circular ma
 - **Callout Tool:** Speech bubble shape with a movable control point for the bubble tail.
 
 ### Acceptance Criteria
-- [ ] Add Loupe annotation item in `preview/core/annotations.py` and `preview/ui/canvas.py`.
-- [ ] Add Callout bubble with bezier or triangular tail anchor.
-- [ ] Add toolbar icons to the secondary markup bar.
-- [ ] Ensure baked PDF export handles Loupe magnification and callout shapes.
+- [x] Add Loupe annotation item in `preview/core/annotations.py` and `preview/ui/canvas.py`.
+- [x] Add Callout bubble with bezier or triangular tail anchor.
+- [x] Add toolbar icons to the secondary markup bar.
+- [x] Ensure baked PDF export handles Loupe magnification and callout shapes.
 
 ---
 

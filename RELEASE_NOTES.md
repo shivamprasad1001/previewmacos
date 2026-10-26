@@ -1,3 +1,41 @@
+# Preview macOS v1.6.0 Release Notes
+
+Welcome to **Preview macOS v1.6.0**! This major milestone delivers six high-priority features: native macOS-style Multi-Tab document interface, interactive Magnifier Loupe and Callout bubble annotations, bounded LRU cache with background page prefetching for 500+ page documents, multithreaded batch image resizing and format conversion, system dark/light theme auto-detection, and the 'Reduce File Size' Quartz PDF compression filter.
+
+---
+
+### 🌟 What's New in v1.6.0
+
+#### 📑 Multi-Tab Document Interface (macOS-Style Window Tabs)
+* **Isolated Per-Tab State:** Open multiple PDF documents and images within a single unified window. Each tab independently preserves its active page, zoom ratio, pan offset, annotations, and undo/redo history.
+* **macOS Window Tabs (`MacTabBarContainer`):** Authentic tab bar with drag-to-reorder, close buttons (`×`), and dirty state indicators (`●`).
+* **Open File in New Tab:** When opening or dragging files while a document is open, Preview offers the option to open in a new tab or replace the current document.
+* **Keyboard Shortcuts:** `Ctrl+T` (New Tab), `Ctrl+W` (Close Tab), `Ctrl+Shift+W` (Close Window), `Ctrl+Tab` (Next Tab), `Ctrl+Shift+Tab` (Previous Tab), `Ctrl+Shift+T` (Toggle Tab Bar).
+
+#### 🔍 Magnifier Loupe Tool & Speech Bubble Callout
+* **Interactive Magnifier Loupe:** Circular magnifying glass annotation enlarging the document pixels underneath in real-time (1.2x to 5.0x zoom) with interactive magnification handle.
+* **Speech Bubble Callout:** Curved dialogue bubble with text wrapping and an adjustable anchor pointer tail to spotlight specific sections or data spikes.
+* **High-DPI Vector & PDF Baking:** High-fidelity rasterization and vector rendering when exporting or saving to PDF.
+
+#### ⚡ Page Prefetching & LRU Eviction (500+ Page Support)
+* **Bounded LRU Memory Cache:** Implemented strict memory bounding (default 50 rendered pages / ~64MB) preventing memory exhaustion or sluggishness on massive 500+ page documents.
+* **Directional Background Prefetching:** Dedicated `PagePrefetchWorker` thread renders adjacent pages ($\pm 2$) in anticipation of scrolling for zero-latency page flips.
+
+#### 🔄 Batch Image Resizing & Format Conversion
+* **Multi-Threaded Conversion Sheet:** Accessible via `File > Batch Process Images...`, supporting batch processing across PNG, JPEG, WebP, TIFF, and BMP formats.
+* **Dimension Scaling Options:** Scale by percentage, constrain to max bounding dimensions (`1920 × 1080`), or fit within bounding boxes while preserving EXIF metadata.
+
+#### 🌓 System Dark/Light Theme Auto-Detection
+* **Desktop Environment Integration:** Auto-detects system dark/light mode across GNOME, KDE Plasma, and FreeDesktop D-Bus settings (`colorSchemeChanged`, `gsettings`, `kreadconfig6`).
+* **Theme Menu:** Added `Theme > Auto (System)` alongside manual Dark and Light mode toggles with live vector icon adaptation.
+
+#### 🗜️ 'Reduce File Size' PDF Compression Filter
+* **Native Quartz Filter:** Integrated directly into the macOS Export Dialog (`File > Export...`).
+* **Intelligent Downsampling:** Downsamples high-res images to custom DPI, re-compresses streams with optimized JPEG quality, deflates object streams, and cleans unused PDF objects.
+* **Live Reduction Estimation:** Real-time feedback calculating before/after byte sizes and percentage savings.
+
+---
+
 # Preview macOS v1.4.0 Release Notes
 
 Welcome to **Preview macOS v1.4.0**! This release brings major enhancements to toolbar controls, authentic macOS segmented styling, advanced selection tools (true Oval and Lasso crop/cut with transparency masking), rich font styling, and live color palettes.

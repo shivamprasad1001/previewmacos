@@ -1,6 +1,6 @@
 {
-  "version": "1.5.0",
-  "updated_at": "2026-10-20",
+  "version": "1.6.0",
+  "updated_at": "2026-10-26",
   "categories": [
     "Tools",
     "Features",
@@ -1121,6 +1121,13 @@
     }
   ],
   "whats_new": [
+    {
+      "date": "2026-10-26",
+      "version": "1.6.0",
+      "title": "Multi-Tab Interface, Loupe Tool, LRU Prefetching & Batch Converter",
+      "desc": "macOS-style tabs with independent state, interactive Magnifier Loupe and Callouts, 500+ page prefetch engine, batch image converter, dark/light theme auto-detection, and PDF size reduction.",
+      "feature_id": "multi-tab"
+    },
     {
       "date": "2026-10-20",
       "version": "1.4.0",
