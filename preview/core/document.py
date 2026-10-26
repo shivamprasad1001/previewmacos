@@ -413,19 +413,27 @@ class Document(QObject):
         pdf_bytes = gen_doc.tobytes()
         gen_doc.close()
 
-        doc = Document(pdf_bytes)
-        # Render through pages
-        for p in range(min(num_pages, 120)):
-            _ = doc.render_page(p, zoom=1.0)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf:
+            tf.write(pdf_bytes)
+            tmp_path = tf.name
 
-        cache_len = len(doc._rendered_cache)
-        max_limit = doc.max_cached_pages
-        return {
-            "num_pages": num_pages,
-            "cached_pages": cache_len,
-            "cache_limit": max_limit,
-            "is_bounded": cache_len <= max_limit,
-        }
+        try:
+            doc = Document(tmp_path)
+            # Render through pages
+            for p in range(min(num_pages, 120)):
+                _ = doc.render_page(p, zoom=1.0)
+
+            cache_len = len(doc._rendered_cache)
+            max_limit = doc.max_cached_pages
+            return {
+                "num_pages": num_pages,
+                "cached_pages": cache_len,
+                "cache_limit": max_limit,
+                "is_bounded": cache_len <= max_limit,
+            }
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
     def get_page_size(self, page_idx: int = 0) -> Tuple[float, float]:
         """Returns (width, height) of the given page in points or pixels."""

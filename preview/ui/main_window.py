@@ -2226,6 +2226,7 @@ class MacMainWindow(QMainWindow):
         self._set_appearance_mode(new_mode)
 
     def _apply_theme(self, theme_name: str, animate: bool = False):
+        self.current_theme = theme_name
         if animate and self.isVisible() and hasattr(self, "window_frame"):
             pix = self.window_frame.grab()
             overlay = QLabel(self.window_frame)
