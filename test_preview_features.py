@@ -874,9 +874,10 @@ class TestPreviewParity(unittest.TestCase):
         self.assertTrue(hasattr(win, "open_arrow_btn"))
         self.assertEqual(win.open_btn.text(), "Open")
         self.assertIsNotNone(win.open_arrow_btn.menu())
-        self.assertEqual(len(win.open_arrow_btn.menu().actions()), 2)
+        self.assertEqual(len(win.open_arrow_btn.menu().actions()), 3)
         self.assertEqual(win.open_arrow_btn.menu().actions()[0].text(), "Open File(s)...")
-        self.assertEqual(win.open_arrow_btn.menu().actions()[1].text(), "Open Folder of Images...")
+        self.assertEqual(win.open_arrow_btn.menu().actions()[1].text(), "Open in New Tab...")
+        self.assertEqual(win.open_arrow_btn.menu().actions()[2].text(), "Open Folder of Images...")
 
         # 2. Markup Toolbar Dropdown Tools
         mb = win.markup_bar
@@ -1760,6 +1761,66 @@ class TestPreviewParity(unittest.TestCase):
                 os.remove(pdf1_path)
             if os.path.exists(pdf2_path):
                 os.remove(pdf2_path)
+
+    def test_57_open_file_show_option_for_new_tab(self):
+        """Verifies that opening a file provides the option to open in a new tab."""
+        from preview.ui.main_window import MacMainWindow
+        import pymupdf
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf1:
+            doc1_path = tf1.name
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf2:
+            doc2_path = tf2.name
+
+        d1 = pymupdf.open()
+        d1.new_page().insert_text((50, 50), "Document 1")
+        d1.save(doc1_path)
+        d1.close()
+
+        d2 = pymupdf.open()
+        d2.new_page().insert_text((50, 50), "Document 2")
+        d2.save(doc2_path)
+        d2.close()
+
+        try:
+            win = MacMainWindow()
+            win._skip_save_prompt = True
+
+            # 1. Verify toolbar and file menu have "Open in New Tab..."
+            open_menu = win.open_arrow_btn.menu()
+            menu_action_texts = [a.text() for a in open_menu.actions()]
+            self.assertIn("Open in New Tab...", menu_action_texts)
+
+            file_menu_texts = [a.text() for a in win.file_menu.actions()]
+            self.assertIn("Open in New Tab...", file_menu_texts)
+
+            # 2. Open first document in current tab
+            win.open_file(doc1_path)
+            self.assertEqual(len(win.tabs), 1)
+            self.assertEqual(win.tabs[0].title, os.path.basename(doc1_path))
+
+            # 3. Simulate opening a second document with target prompt choosing 'new_tab'
+            win._default_open_target = "new_tab"
+            choice = win._prompt_open_target(os.path.basename(doc2_path))
+            self.assertEqual(choice, "new_tab")
+
+            # 4. Open in new tab via force_new_tab
+            win.new_tab(doc2_path)
+            self.assertEqual(len(win.tabs), 2)
+            self.assertEqual(win.active_tab_index, 1)
+            self.assertEqual(win.tabs[0].title, os.path.basename(doc1_path))
+            self.assertEqual(win.tabs[1].title, os.path.basename(doc2_path))
+
+            # 5. Verify prompt choice 'current_tab' replaces document in current tab
+            win._default_open_target = "current_tab"
+            choice_curr = win._prompt_open_target(os.path.basename(doc1_path))
+            self.assertEqual(choice_curr, "current_tab")
+        finally:
+            if os.path.exists(doc1_path):
+                os.remove(doc1_path)
+            if os.path.exists(doc2_path):
+                os.remove(doc2_path)
 
 if __name__ == "__main__":
     unittest.main()

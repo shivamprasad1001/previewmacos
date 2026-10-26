@@ -626,6 +626,11 @@ class MacMainWindow(QMainWindow):
         open_files_action.triggered.connect(self._open_file_dialog)
         open_menu.addAction(open_files_action)
 
+        open_new_tab_action = QAction("Open in New Tab...", self)
+        open_new_tab_action.setShortcut(QKeySequence("Ctrl+Alt+O"))
+        open_new_tab_action.triggered.connect(self._on_new_tab_triggered)
+        open_menu.addAction(open_new_tab_action)
+
         open_folder_action = QAction("Open Folder of Images...", self)
         open_folder_action.setShortcut(QKeySequence("Ctrl+Shift+O"))
         open_folder_action.triggered.connect(self._open_folder_dialog)
@@ -849,6 +854,11 @@ class MacMainWindow(QMainWindow):
         open_act.setShortcut(QKeySequence.StandardKey.Open)
         open_act.triggered.connect(self._open_file_dialog)
         self.file_menu.addAction(open_act)
+
+        open_in_new_tab_act = QAction("Open in New Tab...", self)
+        open_in_new_tab_act.setShortcut(QKeySequence("Ctrl+Alt+O"))
+        open_in_new_tab_act.triggered.connect(self._on_new_tab_triggered)
+        self.file_menu.addAction(open_in_new_tab_act)
 
         open_folder_act = QAction("Open Folder...", self)
         open_folder_act.setShortcut(QKeySequence("Ctrl+Shift+O"))
@@ -1575,16 +1585,68 @@ class MacMainWindow(QMainWindow):
             self.sidebar.select_page(prv)
             self._update_status()
 
-    def _open_file_dialog(self):
+    def _prompt_open_target(self, target_name: str) -> str:
+        """
+        When a document is already open, prompts the user whether to open
+        the selected file in a new tab or replace the current document.
+        Returns 'new_tab', 'current_tab', or 'cancel'.
+        """
+        if getattr(self, "_skip_save_prompt", False) or os.environ.get("PREVIEW_TESTING") or os.environ.get("CI"):
+            return getattr(self, "_default_open_target", "current_tab")
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Open Document")
+        msg.setText(f"How would you like to open \"{target_name}\"?")
+        msg.setInformativeText("You can open it in a new tab to keep your current document open, or replace the document in this tab.")
+        
+        btn_new_tab = msg.addButton("Open in New Tab", QMessageBox.ButtonRole.AcceptRole)
+        btn_current = msg.addButton("Open in Current Tab", QMessageBox.ButtonRole.ActionRole)
+        btn_cancel = msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        msg.setDefaultButton(btn_new_tab)
+
+        theme = getattr(self, "current_theme", MacTheme.DARK)
+        msg.setStyleSheet(MacTheme.get_stylesheet(theme))
+
+        msg.exec()
+        clicked = msg.clickedButton()
+        if clicked == btn_new_tab:
+            return "new_tab"
+        elif clicked == btn_current:
+            return "current_tab"
+        return "cancel"
+
+    def _open_file_dialog(self, force_new_tab: bool = False):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Open Document or Images", "", 
             "Supported Files (*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.tiff);;PDF Files (*.pdf);;Images (*.png *.jpg *.jpeg *.webp *.bmp *.tiff);;All Files (*.*)"
         )
-        if paths:
+        if not paths:
+            return
+
+        if force_new_tab:
             if len(paths) == 1:
-                self.open_file(paths[0])
+                self.new_tab(paths[0])
             else:
-                self.open_files(paths)
+                self.new_tab_files(paths)
+            return
+
+        # If a document is already open, offer option to open in new tab or replace
+        if self.document is not None:
+            target_name = os.path.basename(paths[0]) if len(paths) == 1 else f"{len(paths)} files"
+            choice = self._prompt_open_target(target_name)
+            if choice == "cancel":
+                return
+            elif choice == "new_tab":
+                if len(paths) == 1:
+                    self.new_tab(paths[0])
+                else:
+                    self.new_tab_files(paths)
+                return
+
+        if len(paths) == 1:
+            self.open_file(paths[0])
+        else:
+            self.open_files(paths)
 
     def _open_folder_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder of Images")
@@ -2521,6 +2583,22 @@ class MacMainWindow(QMainWindow):
         paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
         if not paths:
             return
+
+        # If a document is already open, offer option to open dropped files in a new tab
+        if self.document is not None:
+            target_name = os.path.basename(paths[0]) if len(paths) == 1 else f"{len(paths)} files"
+            choice = self._prompt_open_target(target_name)
+            if choice == "cancel":
+                return
+            elif choice == "new_tab":
+                if len(paths) == 1 and os.path.isdir(paths[0]):
+                    self.new_tab()
+                    self.open_folder(paths[0])
+                elif len(paths) == 1:
+                    self.new_tab(paths[0])
+                else:
+                    self.new_tab_files(paths)
+                return
 
         # If a single directory was dropped, open folder
         if len(paths) == 1 and os.path.isdir(paths[0]):

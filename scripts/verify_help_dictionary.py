@@ -143,6 +143,7 @@ def main():
         "revertooriginal": "reverttooriginal",
         "exportaspdf": "exportaspdf",
         "export": "exportdialog",
+        "openinnewtab": "newtab",
         "mergepdfs": "mergepdfs",
         "splitpdfextractpages": "splitpdfextractpages",
         "setpdfpasswordencryption": "passwordandencryption",
