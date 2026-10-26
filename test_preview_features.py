@@ -1448,6 +1448,75 @@ class TestPreviewParity(unittest.TestCase):
             if os.path.exists(gen_pdf):
                 os.remove(gen_pdf)
 
+    def test_54_batch_image_resizing_and_conversion(self):
+        """Test 54: Verify Batch Image Resizing & Format Conversion (Issue #5)."""
+        import tempfile
+        import shutil
+        from preview.ui.batch_dialog import BatchConvertDialog, BatchProcessWorker
+
+        temp_dir = tempfile.mkdtemp(prefix="preview_batch_test_")
+        out_dir = os.path.join(temp_dir, "output")
+        try:
+            # Create 3 test images with EXIF
+            test_files = []
+            for i in range(3):
+                p = os.path.join(temp_dir, f"img_{i}.png")
+                img = Image.new("RGBA", (200, 100), color=(100 + i * 30, 80, 50, 255))
+                exif = img.getexif()
+                exif[0x0112] = 1  # Orientation
+                img.save(p, format="PNG", exif=exif)
+                test_files.append(p)
+
+            # Test Dialog UI construction
+            dlg = BatchConvertDialog(image_paths=test_files, default_output_dir=out_dir)
+            self.assertEqual(len(dlg.image_paths), 3)
+            self.assertTrue(hasattr(dlg, "format_combo"))
+            self.assertTrue(hasattr(dlg, "quality_slider"))
+            self.assertTrue(hasattr(dlg, "dim_combo"))
+            self.assertTrue(hasattr(dlg, "exif_check"))
+            self.assertTrue(dlg.exif_check.isChecked())
+            dlg.close()
+
+            # Test Multithreaded Worker execution (resize 50% to JPEG)
+            from PyQt6.QtCore import QEventLoop, QTimer
+            worker = BatchProcessWorker(
+                image_paths=test_files,
+                output_dir=out_dir,
+                format_name="JPEG",
+                quality=85,
+                dimension_mode="scale",
+                scale_pct=50.0,
+                preserve_exif=True
+            )
+            result = []
+            worker.finished.connect(lambda s, f, errs: result.append((s, f, errs)))
+            loop = QEventLoop()
+            worker.finished.connect(loop.quit)
+            worker.start()
+            QTimer.singleShot(4000, loop.quit)
+            loop.exec()
+
+            self.assertEqual(len(result), 1)
+            success_count, fail_count, errors = result[0]
+            self.assertEqual(success_count, 3)
+            self.assertEqual(fail_count, 0)
+            self.assertEqual(len(errors), 0)
+
+            # Verify exported images
+            out_files = sorted(os.listdir(out_dir))
+            self.assertEqual(len(out_files), 3)
+            for f in out_files:
+                self.assertTrue(f.endswith(".jpg"))
+                out_path = os.path.join(out_dir, f)
+                with Image.open(out_path) as out_img:
+                    self.assertEqual(out_img.size, (100, 50))
+                    # Verify EXIF preservation
+                    ex = out_img.getexif()
+                    self.assertEqual(ex.get(0x0112), 1)
+        finally:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+
 if __name__ == "__main__":
     unittest.main()
 

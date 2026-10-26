@@ -86,9 +86,9 @@ macOS Preview allows selecting multiple images in the sidebar or opening a folde
 - Options: Target format (JPEG, PNG, WebP, TIFF), dimensions (Scale %, max width/height), and output quality.
 
 ### Acceptance Criteria
-- [ ] Build batch conversion dialog UI matching macOS design tokens.
-- [ ] Multithreaded batch processing with progress dialog.
-- [ ] Preserve EXIF metadata option.
+- [x] Build batch conversion dialog UI matching macOS design tokens.
+- [x] Multithreaded batch processing with progress dialog.
+- [x] Preserve EXIF metadata option.
 
 ---
 

@@ -33,6 +33,7 @@ from preview.ui.signature_dialog import SignatureDialog
 from preview.ui.inspector_dialog import InspectorDialog
 from preview.ui.about_dialog import AboutDialog
 from preview.ui.export_dialog import MacExportDialog
+from preview.ui.batch_dialog import BatchConvertDialog
 from preview.ui.save_dialog import MacSaveConfirmationDialog
 from preview.core.updater import UpdateCheckWorker, UpdateInfo
 from preview.ui.update_dialog import UpdateDialog, UpdateBanner
@@ -1088,6 +1089,10 @@ class MacMainWindow(QMainWindow):
         size_act.triggered.connect(self._open_adjust_size)
         self.tools_menu.addAction(size_act)
 
+        batch_act = QAction("Batch Resize / Convert Images...", self)
+        batch_act.triggered.connect(self._open_batch_dialog)
+        self.tools_menu.addAction(batch_act)
+
         insp_act = QAction("Show Inspector", self)
         insp_act.setShortcut(QKeySequence("Ctrl+I"))
         insp_act.triggered.connect(self._show_inspector)
@@ -2120,6 +2125,16 @@ class MacMainWindow(QMainWindow):
             self.canvas.history.push(ActionCommand("Adjust Size", undo_sz, redo_sz))
 
         dialog.size_applied.connect(on_size)
+        dialog.exec()
+
+    def _open_batch_dialog(self):
+        initial_paths = []
+        if self.document and not self.document.is_pdf:
+            if self.document.image_paths:
+                initial_paths = list(self.document.image_paths)
+            elif self.document.file_path:
+                initial_paths = [self.document.file_path]
+        dialog = BatchConvertDialog(image_paths=initial_paths, parent=self)
         dialog.exec()
 
     def _open_signature_dialog(self):

@@ -169,6 +169,7 @@ def main():
         "cropselection": "cropselection",
         "adjustcolor": "adjustcolor",
         "adjustsize": "adjustsize",
+        "batchresizeconvertimages": "adjustsize",
         "showinspector": "inspector",
         "inspector": "inspector",
         "toggledarklighttheme": "darklightthemetoggle",
