@@ -1297,7 +1297,44 @@ class TestPreviewParity(unittest.TestCase):
         self.assertTrue(os.path.exists(cheatsheet_pdf))
         doc_sheet = pymupdf.open(cheatsheet_pdf)
         self.assertEqual(doc_sheet.page_count, 1)
-        doc_sheet.close()
+    def test_51_theme_manager_and_auto_detection(self):
+        """Test 51: Verify ThemeManager and Auto System Theme detection (Issue #6)."""
+        from preview.theme import ThemeManager, MacTheme
+        # Check follow_system_theme
+        theme = ThemeManager.follow_system_theme()
+        self.assertIn(theme, [MacTheme.DARK, MacTheme.LIGHT])
+
+        # Check ThemeManager instance modes
+        tm = ThemeManager(default_mode="auto")
+        self.assertEqual(tm.mode, "auto")
+        self.assertIn(tm.get_resolved_theme(), [MacTheme.DARK, MacTheme.LIGHT])
+
+        tm.set_mode(MacTheme.LIGHT)
+        self.assertEqual(tm.mode, MacTheme.LIGHT)
+        self.assertEqual(tm.get_resolved_theme(), MacTheme.LIGHT)
+
+        tm.set_mode(MacTheme.DARK)
+        self.assertEqual(tm.mode, MacTheme.DARK)
+        self.assertEqual(tm.get_resolved_theme(), MacTheme.DARK)
+
+        # Check MacMainWindow actions
+        win = MacMainWindow(initial_file=self.test_img_path)
+        self.assertTrue(hasattr(win, "theme_auto_act"))
+        self.assertTrue(hasattr(win, "theme_dark_act"))
+        self.assertTrue(hasattr(win, "theme_light_act"))
+
+        win._set_appearance_mode(MacTheme.LIGHT)
+        self.assertEqual(win.current_theme, MacTheme.LIGHT)
+        self.assertTrue(win.theme_light_act.isChecked())
+
+        win._set_appearance_mode(MacTheme.DARK)
+        self.assertEqual(win.current_theme, MacTheme.DARK)
+        self.assertTrue(win.theme_dark_act.isChecked())
+
+        win._set_appearance_mode("auto")
+        self.assertEqual(win.appearance_mode, "auto")
+        self.assertTrue(win.theme_auto_act.isChecked())
+        win.close()
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,11 @@ macOS Theme definitions and styles for Preview app on Linux.
 Provides pixel-faithful macOS styling for both Dark and Light modes.
 """
 
+import sys
+import subprocess
+from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PyQt6.QtGui import QGuiApplication
+
 class MacTheme:
     DARK = "dark"
     LIGHT = "light"
@@ -1212,3 +1217,100 @@ class MacTheme:
             background: transparent;
         }}
         """
+
+
+class ThemeManager(QObject):
+    """
+    Manages application theme state and system color-scheme detection.
+    Supports 'auto' (follow OS theme), 'dark', and 'light'.
+    """
+    theme_changed = pyqtSignal(str)  # emits "dark" or "light"
+    _instance = None
+
+    AUTO = "auto"
+    DARK = MacTheme.DARK
+    LIGHT = MacTheme.LIGHT
+
+    def __init__(self, default_mode: str = "auto"):
+        super().__init__()
+        self._mode = default_mode  # "auto", "dark", "light"
+        app = QGuiApplication.instance()
+        if app and hasattr(app, "styleHints"):
+            try:
+                app.styleHints().colorSchemeChanged.connect(self._on_system_scheme_changed)
+            except Exception:
+                pass
+
+    @classmethod
+    def instance(cls) -> "ThemeManager":
+        if cls._instance is None:
+            cls._instance = ThemeManager()
+        return cls._instance
+
+    @classmethod
+    def follow_system_theme(cls) -> str:
+        """
+        Detect current system theme (dark or light) via Qt styleHints,
+        falling back to gsettings on GNOME/Linux or Windows registry.
+        """
+        app = QGuiApplication.instance()
+        if app and hasattr(app, "styleHints"):
+            try:
+                cs = app.styleHints().colorScheme()
+                if cs == Qt.ColorScheme.Light:
+                    return MacTheme.LIGHT
+                elif cs == Qt.ColorScheme.Dark:
+                    return MacTheme.DARK
+            except Exception:
+                pass
+
+        # Fallback for Linux GNOME / FreeDesktop
+        try:
+            res = subprocess.run(
+                ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+                capture_output=True, text=True, timeout=1
+            )
+            val = res.stdout.strip().lower()
+            if "prefer-dark" in val or "dark" in val:
+                return MacTheme.DARK
+            elif "prefer-light" in val or "light" in val:
+                return MacTheme.LIGHT
+        except Exception:
+            pass
+
+        # Fallback for Windows
+        if sys.platform == "win32":
+            try:
+                import winreg
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+                )
+                val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                return MacTheme.LIGHT if val == 1 else MacTheme.DARK
+            except Exception:
+                pass
+
+        return MacTheme.DARK
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    def set_mode(self, mode: str):
+        if mode not in (self.AUTO, self.DARK, self.LIGHT):
+            raise ValueError(f"Unknown theme mode: {mode}")
+        self._mode = mode
+        resolved = self.get_resolved_theme()
+        self.theme_changed.emit(resolved)
+
+    def get_resolved_theme(self) -> str:
+        if self._mode == self.AUTO:
+            return self.follow_system_theme()
+        return self._mode
+
+    def _on_system_scheme_changed(self, scheme):
+        if self._mode == self.AUTO:
+            target = MacTheme.DARK if scheme == Qt.ColorScheme.Dark else MacTheme.LIGHT
+            self.theme_changed.emit(target)
+

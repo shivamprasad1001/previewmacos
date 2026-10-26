@@ -172,6 +172,7 @@ def main():
         "showinspector": "inspector",
         "inspector": "inspector",
         "toggledarklighttheme": "darklightthemetoggle",
+        "autosystemdefault": "darklightthemetoggle",
         "preferences": "preferences",
         "open": "openfile",
         "openfile": "openfile",

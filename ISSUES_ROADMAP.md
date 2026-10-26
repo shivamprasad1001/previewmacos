@@ -103,8 +103,8 @@ Currently, theme switching is manual. The app should automatically match the sys
 - Fallback to reading `gsettings get org.gnome.desktop.interface color-scheme` on Linux.
 
 ### Acceptance Criteria
-- [ ] Implement `ThemeManager.follow_system_theme()` in `preview/theme.py`.
-- [ ] Add "Auto (System Default)" option to View > Appearance menu.
+- [x] Implement `ThemeManager.follow_system_theme()` in `preview/theme.py`.
+- [x] Add "Auto (System Default)" option to View > Appearance menu.
 
 ---
 

@@ -14,12 +14,12 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect, QFrame, QDialog
 )
 from PyQt6.QtGui import (
-    QAction, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
+    QAction, QActionGroup, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
     QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap, QCloseEvent
 )
 from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
-from preview.theme import MacTheme
+from preview.theme import MacTheme, ThemeManager
 from preview.icons import MacIconFactory
 from preview.core.document import Document
 from preview.core.annotations import AnnotationType
@@ -408,7 +408,10 @@ class MacMainWindow(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
-        self.current_theme: str = self._detect_system_theme()
+        self.theme_manager = ThemeManager.instance()
+        self.appearance_mode: str = "auto"
+        self.current_theme: str = self.theme_manager.get_resolved_theme()
+        self.theme_manager.theme_changed.connect(self._on_theme_manager_changed)
         self.document: Optional[Document] = None
         self.inspector_dialog: Optional[InspectorDialog] = None
         self.color_dialog: Optional[AdjustColorDialog] = None
@@ -967,6 +970,28 @@ class MacMainWindow(QMainWindow):
         frameless_act.setChecked(self.is_frameless)
         frameless_act.toggled.connect(self._toggle_frameless_mode)
         self.view_menu.addAction(frameless_act)
+
+        appearance_menu = self.view_menu.addMenu("Appearance")
+        self.theme_group = QActionGroup(self)
+        self.theme_group.setExclusive(True)
+
+        self.theme_auto_act = QAction("Auto (System Default)", self, checkable=True)
+        self.theme_auto_act.setChecked(self.appearance_mode == "auto")
+        self.theme_auto_act.triggered.connect(lambda: self._set_appearance_mode("auto"))
+        self.theme_group.addAction(self.theme_auto_act)
+        appearance_menu.addAction(self.theme_auto_act)
+
+        self.theme_dark_act = QAction("Dark", self, checkable=True)
+        self.theme_dark_act.setChecked(self.appearance_mode == MacTheme.DARK)
+        self.theme_dark_act.triggered.connect(lambda: self._set_appearance_mode(MacTheme.DARK))
+        self.theme_group.addAction(self.theme_dark_act)
+        appearance_menu.addAction(self.theme_dark_act)
+
+        self.theme_light_act = QAction("Light", self, checkable=True)
+        self.theme_light_act.setChecked(self.appearance_mode == MacTheme.LIGHT)
+        self.theme_light_act.triggered.connect(lambda: self._set_appearance_mode(MacTheme.LIGHT))
+        self.theme_group.addAction(self.theme_light_act)
+        appearance_menu.addAction(self.theme_light_act)
 
         self.view_menu.addSeparator()
 
@@ -1900,44 +1925,46 @@ class MacMainWindow(QMainWindow):
         self.show()
 
     def _detect_system_theme(self) -> str:
-        app = QApplication.instance()
-        if app and hasattr(app, "styleHints"):
-            try:
-                cs = app.styleHints().colorScheme()
-                if cs == Qt.ColorScheme.Light:
-                    return MacTheme.LIGHT
-                elif cs == Qt.ColorScheme.Dark:
-                    return MacTheme.DARK
-            except Exception:
-                pass
-        try:
-            import subprocess
-            res = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
-                                 capture_output=True, text=True, timeout=1)
-            if "prefer-dark" in res.stdout.lower() or "dark" in res.stdout.lower():
-                return MacTheme.DARK
-            elif "prefer-light" in res.stdout.lower() or "light" in res.stdout.lower():
-                return MacTheme.LIGHT
-        except Exception:
-            pass
-        return MacTheme.DARK
+        return ThemeManager.follow_system_theme()
+
+    def _on_theme_manager_changed(self, new_theme: str):
+        if self.current_theme != new_theme:
+            self.current_theme = new_theme
+            if hasattr(self, 'theme_btn'):
+                self.theme_btn.setText("☀️" if self.current_theme == MacTheme.DARK else "🌙")
+            self._apply_theme(self.current_theme, animate=True)
 
     def _on_system_color_scheme_changed(self, scheme):
-        target = MacTheme.DARK if scheme == Qt.ColorScheme.Dark else MacTheme.LIGHT
-        if self.current_theme != target:
-            self.current_theme = target
+        if getattr(self, "appearance_mode", "auto") == "auto":
+            target = MacTheme.DARK if scheme == Qt.ColorScheme.Dark else MacTheme.LIGHT
+            if self.current_theme != target:
+                self.current_theme = target
+                if hasattr(self, 'theme_btn'):
+                    self.theme_btn.setText("☀️" if self.current_theme == MacTheme.DARK else "🌙")
+                self._apply_theme(self.current_theme, animate=True)
+
+    def _set_appearance_mode(self, mode: str):
+        self.appearance_mode = mode
+        if hasattr(self, "theme_auto_act"):
+            self.theme_auto_act.setChecked(mode == "auto")
+        if hasattr(self, "theme_dark_act"):
+            self.theme_dark_act.setChecked(mode == MacTheme.DARK)
+        if hasattr(self, "theme_light_act"):
+            self.theme_light_act.setChecked(mode == MacTheme.LIGHT)
+        if hasattr(self, "theme_manager"):
+            self.theme_manager.set_mode(mode)
+            resolved = self.theme_manager.get_resolved_theme()
+        else:
+            resolved = ThemeManager.follow_system_theme() if mode == "auto" else mode
+        if self.current_theme != resolved:
+            self.current_theme = resolved
             if hasattr(self, 'theme_btn'):
                 self.theme_btn.setText("☀️" if self.current_theme == MacTheme.DARK else "🌙")
             self._apply_theme(self.current_theme, animate=True)
 
     def _toggle_theme(self):
-        if self.current_theme == MacTheme.DARK:
-            self.current_theme = MacTheme.LIGHT
-            self.theme_btn.setText("🌙")
-        else:
-            self.current_theme = MacTheme.DARK
-            self.theme_btn.setText("☀️")
-        self._apply_theme(self.current_theme, animate=True)
+        new_mode = MacTheme.LIGHT if self.current_theme == MacTheme.DARK else MacTheme.DARK
+        self._set_appearance_mode(new_mode)
 
     def _apply_theme(self, theme_name: str, animate: bool = False):
         if animate and self.isVisible() and hasattr(self, "window_frame"):
