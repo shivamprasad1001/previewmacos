@@ -1,5 +1,5 @@
 {
-  "total": 127,
+  "total": 132,
   "entries": [
     {
       "id": "about-document-viewer",
@@ -2193,6 +2193,83 @@
         "zoom-to-fit",
         "actual-size",
         "view-and-navigate"
+      ]
+    },
+    {
+      "id": "new-tab",
+      "name": "New Tab",
+      "letter": "N",
+      "meaning": "Opens a new document tab within the current window.",
+      "where": "File > New Tab or Tab Bar > + button",
+      "steps": [
+        "Select File > New Tab or press Ctrl + T.",
+        "Choose a document or image to open in the new tab."
+      ],
+      "shortcut": "Ctrl + T",
+      "related": [
+        "close-tab",
+        "show-tab-bar"
+      ]
+    },
+    {
+      "id": "close-tab",
+      "name": "Close Tab",
+      "letter": "C",
+      "meaning": "Closes the active document tab and prompts to save unsaved modifications.",
+      "where": "File > Close Tab or Tab Bar > Close button",
+      "steps": [
+        "Select File > Close Tab or press Ctrl + W.",
+        "If changes were made, choose Save or Don't Save."
+      ],
+      "shortcut": "Ctrl + W",
+      "related": [
+        "new-tab",
+        "close-window"
+      ]
+    },
+    {
+      "id": "show-tab-bar",
+      "name": "Show Tab Bar",
+      "letter": "S",
+      "meaning": "Toggles visibility of the document tab bar below the toolbar.",
+      "where": "View > Show Tab Bar",
+      "steps": [
+        "Select View > Show Tab Bar or press Ctrl + Shift + T."
+      ],
+      "shortcut": "Ctrl + Shift + T",
+      "related": [
+        "new-tab",
+        "close-tab"
+      ]
+    },
+    {
+      "id": "select-next-tab",
+      "name": "Select Next Tab",
+      "letter": "S",
+      "meaning": "Switches focus to the next open document tab.",
+      "where": "Window > Select Next Tab",
+      "steps": [
+        "Select Window > Select Next Tab or press Ctrl + Tab."
+      ],
+      "shortcut": "Ctrl + Tab",
+      "related": [
+        "select-previous-tab",
+        "new-tab"
+      ]
+    },
+    {
+      "id": "select-previous-tab",
+      "name": "Select Previous Tab",
+      "letter": "S",
+      "meaning": "Switches focus to the previous open document tab.",
+      "where": "Window > Select Previous Tab",
+      "steps": [
+        "Select Window > Select Previous Tab or press Ctrl + Shift + Tab."
+      ],
+      "shortcut": "Ctrl + Shift + Tab",
+      "related": [
+        "select-next-tab",
+        "new-tab"
       ]
     }
   ]

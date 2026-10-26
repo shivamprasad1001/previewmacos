@@ -1637,8 +1637,133 @@ class TestPreviewParity(unittest.TestCase):
             if os.path.exists(baked_path):
                 os.remove(baked_path)
 
+    def test_56_multi_tab_interface(self):
+        """Test Issue #1: Multi-Tab Document Interface (macOS-style Window Tabs)."""
+        from preview.ui.main_window import MacMainWindow
+        from preview.core.annotations import AnnotationItem, AnnotationType
+        from PyQt6.QtCore import QPointF, QRectF
+        import pymupdf
+        import tempfile
+
+        # Generate two sample PDFs
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf1:
+            pdf1_path = tf1.name
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf2:
+            pdf2_path = tf2.name
+
+        doc1 = pymupdf.open()
+        for i in range(3):
+            p = doc1.new_page(width=400, height=400)
+            p.insert_text((50, 50), f"Doc 1 Page {i}")
+        doc1.save(pdf1_path)
+        doc1.close()
+
+        doc2 = pymupdf.open()
+        for i in range(2):
+            p = doc2.new_page(width=500, height=500)
+            p.insert_text((50, 50), f"Doc 2 Page {i}")
+        doc2.save(pdf2_path)
+        doc2.close()
+
+        try:
+            win = MacMainWindow()
+            win._skip_save_prompt = True
+
+            # 1. Verify initial single tab state
+            self.assertEqual(len(win.tabs), 1)
+            self.assertEqual(win.active_tab_index, 0)
+            self.assertEqual(win.tab_container.tab_bar.count(), 1)
+            # When only 1 tab, tab bar is hidden by default
+            self.assertTrue(win.tab_container.isHidden())
+
+            # 2. Toggle Tab Bar visibility
+            win._toggle_tab_bar_visible()
+            self.assertTrue(win.show_tab_bar_always)
+            self.assertFalse(win.tab_container.isHidden())
+            win._toggle_tab_bar_visible()
+            self.assertFalse(win.show_tab_bar_always)
+            self.assertTrue(win.tab_container.isHidden())
+
+            # 3. Load doc1 in tab 0
+            win.open_file(pdf1_path)
+            self.assertEqual(win.tabs[0].title, os.path.basename(pdf1_path))
+            self.assertEqual(win.document.page_count, 3)
+
+            # Change state in tab 0: navigate to page 2, change zoom, add annotation
+            win.canvas.set_page(2)
+            win.canvas.set_zoom(1.75)
+            annot = AnnotationItem(AnnotationType.RECTANGLE)
+            annot.rect = QRectF(20, 20, 80, 80)
+            win.canvas.annotations[2] = [annot]
+            win.set_modified(True)
+
+            self.assertIn("●", win.tab_container.tab_bar.tabText(0))
+
+            # 4. Create new tab via new_tab(pdf2_path)
+            tab2 = win.new_tab(pdf2_path)
+            self.assertEqual(len(win.tabs), 2)
+            self.assertEqual(win.active_tab_index, 1)
+            self.assertEqual(win.tab_container.tab_bar.count(), 2)
+            # With >= 2 tabs, tab bar is automatically visible
+            self.assertFalse(win.tab_container.isHidden())
+            self.assertEqual(win.document.page_count, 2)
+            self.assertEqual(win.canvas.current_page, 0)
+            win.canvas.set_zoom(1.25)
+            self.assertNotIn("●", win.tab_container.tab_bar.tabText(1))
+
+            # 5. Switch back to tab 0 and verify independent state preserved
+            win.switch_to_tab(0)
+            self.assertEqual(win.active_tab_index, 0)
+            self.assertEqual(win.document.page_count, 3)
+            self.assertEqual(win.canvas.current_page, 2)
+            self.assertEqual(win.canvas.zoom, 1.75)
+            self.assertIn(2, win.canvas.annotations)
+            self.assertEqual(len(win.canvas.annotations[2]), 1)
+            self.assertTrue(win.is_document_modified())
+
+            # Switch to tab 1 and verify zoom 1.25 preserved
+            win.switch_to_tab(1)
+            self.assertEqual(win.canvas.zoom, 1.25)
+            win.switch_to_tab(0)
+
+            # 6. Cycle tabs forward and backward
+            win.cycle_tab(forward=True)
+            self.assertEqual(win.active_tab_index, 1)
+            win.cycle_tab(forward=True)
+            self.assertEqual(win.active_tab_index, 0)
+            win.cycle_tab(forward=False)
+            self.assertEqual(win.active_tab_index, 1)
+
+            # 7. Drag / Move tab reordering
+            win._on_tab_moved(0, 1)
+            # Order in win.tabs should now be doc2 then doc1
+            self.assertEqual(win.tabs[0].title, os.path.basename(pdf2_path))
+            self.assertEqual(win.tabs[1].title, os.path.basename(pdf1_path))
+
+            # 8. Close tab
+            win.set_modified(False)
+            win.tabs[1].is_modified = False
+            closed = win.close_tab(1)
+            self.assertTrue(closed)
+            self.assertEqual(len(win.tabs), 1)
+            self.assertEqual(win.tab_container.tab_bar.count(), 1)
+            self.assertTrue(win.tab_container.isHidden())
+            self.assertEqual(win.tabs[0].title, os.path.basename(pdf2_path))
+
+            # Close last remaining tab resets to single empty tab
+            closed_last = win.close_tab(0)
+            self.assertTrue(closed_last)
+            self.assertEqual(len(win.tabs), 1)
+            self.assertEqual(win.tabs[0].title, "Untitled")
+        finally:
+            if os.path.exists(pdf1_path):
+                os.remove(pdf1_path)
+            if os.path.exists(pdf2_path):
+                os.remove(pdf2_path)
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
 

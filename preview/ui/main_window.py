@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
     QAction, QActionGroup, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
     QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap, QCloseEvent
 )
-from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
+from PyQt6.QtCore import Qt, QPoint, QPointF, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
 from preview.theme import MacTheme, ThemeManager
 from preview.icons import MacIconFactory
@@ -35,6 +35,7 @@ from preview.ui.about_dialog import AboutDialog
 from preview.ui.export_dialog import MacExportDialog
 from preview.ui.batch_dialog import BatchConvertDialog
 from preview.ui.save_dialog import MacSaveConfirmationDialog
+from preview.ui.tab_bar import MacTabBarContainer, DocumentTabState
 from preview.core.updater import UpdateCheckWorker, UpdateInfo
 from preview.ui.update_dialog import UpdateDialog, UpdateBanner
 
@@ -503,6 +504,18 @@ class MacMainWindow(QMainWindow):
         self.main_layout.addWidget(self.toolbar_widget)
         self.main_layout.addWidget(self.markup_bar)
 
+        # 3.5 macOS Tab Bar (collapsible / multi-tab)
+        self.tab_container = MacTabBarContainer(self)
+        self.tab_container.new_tab_clicked.connect(self._on_new_tab_triggered)
+        self.tab_container.tab_close_requested.connect(self.close_tab)
+        self.tab_container.current_changed.connect(self._on_tab_bar_current_changed)
+        self.tab_container.tab_moved.connect(self._on_tab_moved)
+        self.main_layout.addWidget(self.tab_container)
+
+        self.tabs: List[DocumentTabState] = []
+        self.active_tab_index: int = -1
+        self.show_tab_bar_always: bool = False
+
         # 4. Central Splitter (Sidebar + Canvas) takes 100% remaining space
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
@@ -529,6 +542,8 @@ class MacMainWindow(QMainWindow):
 
         # 7. Floating Slideshow HUD
         self.slideshow_hud = FloatingSlideshowHUD(self, self.canvas)
+
+        self._init_tabs()
 
     def _setup_toolbar(self):
         self.toolbar_widget = DraggableToolbar(self)
@@ -825,6 +840,11 @@ class MacMainWindow(QMainWindow):
 
         # 2. File Menu
         self.file_menu = self.top_menubar.addMenu("File")
+        new_tab_act = QAction("New Tab", self)
+        new_tab_act.setShortcut(QKeySequence("Ctrl+T"))
+        new_tab_act.triggered.connect(self._on_new_tab_triggered)
+        self.file_menu.addAction(new_tab_act)
+
         open_act = QAction("Open...", self)
         open_act.setShortcut(QKeySequence.StandardKey.Open)
         open_act.triggered.connect(self._open_file_dialog)
@@ -893,8 +913,13 @@ class MacMainWindow(QMainWindow):
 
         self.file_menu.addSeparator()
 
+        close_tab_act = QAction("Close Tab", self)
+        close_tab_act.setShortcut(QKeySequence("Ctrl+W"))
+        close_tab_act.triggered.connect(lambda: self.close_tab())
+        self.file_menu.addAction(close_tab_act)
+
         close_act = QAction("Close Window", self)
-        close_act.setShortcut(QKeySequence("Ctrl+W"))
+        close_act.setShortcut(QKeySequence("Ctrl+Shift+W"))
         close_act.triggered.connect(self.close)
         self.file_menu.addAction(close_act)
 
@@ -950,6 +975,12 @@ class MacMainWindow(QMainWindow):
         toggle_sb_bar.setChecked(True)
         toggle_sb_bar.toggled.connect(self._toggle_status_bar)
         self.view_menu.addAction(toggle_sb_bar)
+
+        self.toggle_tab_bar_act = QAction("Show Tab Bar", self, checkable=True)
+        self.toggle_tab_bar_act.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        self.toggle_tab_bar_act.setChecked(self.show_tab_bar_always)
+        self.toggle_tab_bar_act.triggered.connect(self._toggle_tab_bar_visible)
+        self.view_menu.addAction(self.toggle_tab_bar_act)
 
         view_mode_menu = self.view_menu.addMenu("PDF View Mode")
         self.single_mode_act = QAction("Single Page", self, checkable=True)
@@ -1109,6 +1140,18 @@ class MacMainWindow(QMainWindow):
         zoom_win_act.triggered.connect(self._toggle_maximize)
         self.win_menu.addAction(zoom_win_act)
 
+        self.win_menu.addSeparator()
+
+        next_tab_act = QAction("Select Next Tab", self)
+        next_tab_act.setShortcuts([QKeySequence("Ctrl+Tab"), QKeySequence("Ctrl+PageDown")])
+        next_tab_act.triggered.connect(lambda: self.cycle_tab(forward=True))
+        self.win_menu.addAction(next_tab_act)
+
+        prev_tab_act = QAction("Select Previous Tab", self)
+        prev_tab_act.setShortcuts([QKeySequence("Ctrl+Shift+Tab"), QKeySequence("Ctrl+PageUp")])
+        prev_tab_act.triggered.connect(lambda: self.cycle_tab(forward=False))
+        self.win_menu.addAction(prev_tab_act)
+
         # 8. Help Menu
         self.help_menu = self.top_menubar.addMenu("Help")
         preview_help_act = QAction("Preview Help", self)
@@ -1133,12 +1176,12 @@ class MacMainWindow(QMainWindow):
         self.help_menu.addAction(about_h_act)
 
         # Register keyboard shortcuts into window actions
-        for a in [open_act, open_folder_act, self.save_act, self.save_as_act, self.revert_act, export_pdf_act, export_act,
-                  print_act, print_prev_act, close_act, undo_act, redo_act, copy_text_act,
-                  extract_all_act, toggle_sb, toggle_mb_act, toggle_sb_bar, slideshow_act,
+        for a in [new_tab_act, open_act, open_folder_act, self.save_act, self.save_as_act, self.revert_act, export_pdf_act, export_act,
+                  print_act, print_prev_act, close_tab_act, close_act, undo_act, redo_act, copy_text_act,
+                  extract_all_act, toggle_sb, toggle_mb_act, toggle_sb_bar, self.toggle_tab_bar_act, slideshow_act,
                   frameless_act, actual_size, zoom_to_fit, zoom_in_act, zoom_out_act, next_act,
                   prev_act, first_act, last_act, markup_act, loupe_act, crop_act, rot_l_act,
-                  rot_r_act, color_act, size_act, insp_act, min_act, zoom_win_act, theme_act,
+                  rot_r_act, color_act, size_act, insp_act, min_act, zoom_win_act, next_tab_act, prev_tab_act, theme_act,
                   quit_act, pref_act, hide_act, check_updates_act, check_up_h_act,
                   preview_help_act, shortcuts_guide_act]:
             self.addAction(a)
@@ -1182,6 +1225,9 @@ class MacMainWindow(QMainWindow):
                 self.document.is_dirty = False
             if hasattr(self, "canvas") and self.canvas:
                 self.canvas.history.mark_saved()
+        if hasattr(self, "tabs") and 0 <= self.active_tab_index < len(self.tabs):
+            self.tabs[self.active_tab_index].is_modified = modified
+            self._sync_tab_bar_text(self.active_tab_index)
         self._update_modified_ui()
 
     def _update_modified_ui(self):
@@ -1199,6 +1245,193 @@ class MacMainWindow(QMainWindow):
             self.traffic_cluster.btn_close.set_modified(is_mod)
         if hasattr(self, "revert_act") and self.revert_act:
             self.revert_act.setEnabled(is_mod and bool(self.document and self.document.file_path))
+        if hasattr(self, "tabs") and 0 <= self.active_tab_index < len(self.tabs):
+            self.tabs[self.active_tab_index].is_modified = is_mod
+            self._sync_tab_bar_text(self.active_tab_index)
+
+    def _init_tabs(self):
+        initial_tab = DocumentTabState(
+            title="Untitled",
+            history=self.canvas.history if self.canvas else HistoryManager(on_changed=lambda m: self.canvas.document_modified.emit(m) if self.canvas else None)
+        )
+        self.tabs.append(initial_tab)
+        self.tab_container.tab_bar.addTab(initial_tab.title)
+        self.active_tab_index = 0
+        self.tab_container.tab_bar.setCurrentIndex(0)
+        self._update_tab_bar_visibility()
+
+    def _update_tab_bar_visibility(self):
+        visible = (len(self.tabs) > 1) or self.show_tab_bar_always
+        self.tab_container.setVisible(visible)
+        if hasattr(self, "toggle_tab_bar_act"):
+            self.toggle_tab_bar_act.setChecked(self.show_tab_bar_always)
+            self.toggle_tab_bar_act.setText("Hide Tab Bar" if self.show_tab_bar_always else "Show Tab Bar")
+
+    def _toggle_tab_bar_visible(self):
+        self.show_tab_bar_always = not self.show_tab_bar_always
+        self._update_tab_bar_visibility()
+
+    def _sync_tab_bar_text(self, idx: int):
+        if hasattr(self, "tabs") and 0 <= idx < len(self.tabs) and hasattr(self, "tab_container") and idx < self.tab_container.tab_bar.count():
+            tab = self.tabs[idx]
+            display_text = f"{tab.title} ●" if tab.is_modified else tab.title
+            self.tab_container.tab_bar.setTabText(idx, display_text)
+            if tab.file_path:
+                self.tab_container.tab_bar.setTabToolTip(idx, tab.file_path)
+
+    def _save_current_tab_state(self):
+        if hasattr(self, "tabs") and 0 <= self.active_tab_index < len(self.tabs):
+            tab = self.tabs[self.active_tab_index]
+            tab.document = self.document
+            tab.file_path = self.document.file_path if self.document else None
+            tab.title = self.document.file_name if self.document else "Untitled"
+            tab.current_page = self.canvas.current_page if self.canvas else 0
+            tab.zoom = self.canvas.zoom if self.canvas else 1.0
+            tab.view_mode = self.canvas.view_mode if self.canvas else "Single"
+            tab.pan_offset = QPointF(self.canvas._pan_offset) if self.canvas else QPointF(0, 0)
+            tab.annotations = dict(self.canvas.annotations) if self.canvas else {}
+            tab.history = self.canvas.history if self.canvas else HistoryManager()
+            tab.is_modified = self.is_document_modified()
+            self._sync_tab_bar_text(self.active_tab_index)
+
+    def _load_tab_state(self, index: int):
+        if not hasattr(self, "tabs") or not (0 <= index < len(self.tabs)):
+            return
+        tab = self.tabs[index]
+        self.document = tab.document
+        if self.canvas:
+            self.canvas.document = tab.document
+            self.canvas.annotations = tab.annotations
+            self.canvas.history = tab.history
+            if self.canvas.history:
+                self.canvas.history.on_changed = lambda m: self.canvas.document_modified.emit(m)
+            self.canvas.view_mode = tab.view_mode
+            self.canvas.zoom = tab.zoom
+            self.canvas._pan_offset = QPointF(tab.pan_offset)
+            self.canvas.current_page = tab.current_page
+            self.canvas.crop_box = None
+            self.canvas._active_annotation = None
+            self.canvas._selected_annotation = None
+
+        if tab.document:
+            self.sidebar.set_document(tab.document)
+            self.sidebar.select_page(tab.current_page)
+        else:
+            self.sidebar.clear()
+            if hasattr(self, "title_label") and self.title_label:
+                self.title_label.setText("Document Viewer")
+            if hasattr(self, "page_badge") and self.page_badge:
+                self.page_badge.setText("")
+
+        self.set_modified(tab.is_modified)
+        self._update_modified_ui()
+        self._update_status()
+        if self.canvas:
+            self.canvas.update()
+
+    def switch_to_tab(self, index: int):
+        if not hasattr(self, "tabs") or not (0 <= index < len(self.tabs)):
+            return
+        if index == self.active_tab_index:
+            return
+        self._save_current_tab_state()
+        self.active_tab_index = index
+        self.tab_container.tab_bar.blockSignals(True)
+        self.tab_container.tab_bar.setCurrentIndex(index)
+        self.tab_container.tab_bar.blockSignals(False)
+        self._load_tab_state(index)
+
+    def _on_tab_bar_current_changed(self, index: int):
+        if hasattr(self, "tabs") and 0 <= index < len(self.tabs) and index != self.active_tab_index:
+            self.switch_to_tab(index)
+
+    def _on_tab_moved(self, from_idx: int, to_idx: int):
+        if hasattr(self, "tabs") and 0 <= from_idx < len(self.tabs) and 0 <= to_idx < len(self.tabs):
+            tab = self.tabs.pop(from_idx)
+            self.tabs.insert(to_idx, tab)
+            self.active_tab_index = self.tab_container.tab_bar.currentIndex()
+
+    def new_tab(self, file_path: Optional[str] = None) -> DocumentTabState:
+        self._save_current_tab_state()
+        hist = HistoryManager(on_changed=lambda m: self.canvas.document_modified.emit(m) if self.canvas else None)
+        new_tab_state = DocumentTabState(title="Untitled", history=hist)
+        self.tabs.append(new_tab_state)
+        new_idx = len(self.tabs) - 1
+        self.tab_container.tab_bar.blockSignals(True)
+        self.tab_container.tab_bar.addTab(new_tab_state.title)
+        self.tab_container.tab_bar.blockSignals(False)
+        self.switch_to_tab(new_idx)
+        if file_path:
+            self.open_file(file_path)
+        self._update_tab_bar_visibility()
+        return new_tab_state
+
+    def new_tab_files(self, file_paths: List[str]) -> DocumentTabState:
+        self._save_current_tab_state()
+        hist = HistoryManager(on_changed=lambda m: self.canvas.document_modified.emit(m) if self.canvas else None)
+        new_tab_state = DocumentTabState(title="Untitled", history=hist)
+        self.tabs.append(new_tab_state)
+        new_idx = len(self.tabs) - 1
+        self.tab_container.tab_bar.blockSignals(True)
+        self.tab_container.tab_bar.addTab(new_tab_state.title)
+        self.tab_container.tab_bar.blockSignals(False)
+        self.switch_to_tab(new_idx)
+        self.open_files(file_paths)
+        self._update_tab_bar_visibility()
+        return new_tab_state
+
+    def close_tab(self, index: Optional[int] = None) -> bool:
+        if index is None:
+            index = self.active_tab_index
+        if not hasattr(self, "tabs") or not (0 <= index < len(self.tabs)):
+            return False
+
+        tab_to_close = self.tabs[index]
+        if tab_to_close.is_modified or (index == self.active_tab_index and self.is_document_modified()):
+            if index != self.active_tab_index:
+                self.switch_to_tab(index)
+            if not self.maybe_save_changes():
+                return False
+
+        self.tabs.pop(index)
+        self.tab_container.tab_bar.blockSignals(True)
+        self.tab_container.tab_bar.removeTab(index)
+        self.tab_container.tab_bar.blockSignals(False)
+
+        if not self.tabs:
+            self.new_tab()
+        else:
+            new_active = min(index, len(self.tabs) - 1)
+            self.active_tab_index = -1
+            self.switch_to_tab(new_active)
+
+        self._update_tab_bar_visibility()
+        return True
+
+    def cycle_tab(self, forward: bool = True):
+        if len(self.tabs) > 1:
+            step = 1 if forward else -1
+            next_idx = (self.active_tab_index + step) % len(self.tabs)
+            self.switch_to_tab(next_idx)
+
+    def select_next_tab(self):
+        self.cycle_tab(forward=True)
+
+    def select_previous_tab(self):
+        self.cycle_tab(forward=False)
+
+    def _on_new_tab_triggered(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Open Document in New Tab", "", 
+            "Supported Files (*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.tiff);;PDF Files (*.pdf);;Images (*.png *.jpg *.jpeg *.webp *.bmp *.tiff);;All Files (*.*)"
+        )
+        if paths:
+            if len(paths) == 1:
+                self.new_tab(paths[0])
+            else:
+                self.new_tab_files(paths)
+        else:
+            self.new_tab()
 
     def maybe_save_changes(self) -> bool:
         """
@@ -1233,11 +1466,16 @@ class MacMainWindow(QMainWindow):
         return False
 
     def closeEvent(self, event: QCloseEvent):
-        """Intercepts window close to prompt for unsaved edits."""
-        if self.maybe_save_changes():
-            event.accept()
-        else:
-            event.ignore()
+        """Intercepts window close to prompt for unsaved edits across all tabs."""
+        for i in range(len(getattr(self, "tabs", []))):
+            tab = self.tabs[i]
+            if tab.is_modified or (i == self.active_tab_index and self.is_document_modified()):
+                if i != self.active_tab_index:
+                    self.switch_to_tab(i)
+                if not self.maybe_save_changes():
+                    event.ignore()
+                    return
+        event.accept()
 
     def open_file(self, file_path: str):
         if not self.maybe_save_changes():
@@ -1303,6 +1541,20 @@ class MacMainWindow(QMainWindow):
         self.set_modified(False)
         self._update_modified_ui()
         self._update_status()
+
+        if hasattr(self, "tabs") and 0 <= self.active_tab_index < len(self.tabs):
+            tab = self.tabs[self.active_tab_index]
+            tab.document = self.document
+            tab.file_path = self.document.file_path
+            tab.title = self.document.file_name or "Untitled"
+            tab.current_page = 0
+            tab.zoom = self.canvas.zoom
+            tab.view_mode = self.canvas.view_mode
+            tab.pan_offset = QPointF(0, 0)
+            tab.annotations = self.canvas.annotations
+            tab.history = self.canvas.history
+            tab.is_modified = False
+            self._sync_tab_bar_text(self.active_tab_index)
 
         # Re-fit image/page to canvas after layout is settled
         QTimer.singleShot(60, self.canvas.zoom_to_fit)
@@ -1998,6 +2250,8 @@ class MacMainWindow(QMainWindow):
             self._update_all_icons()
             self.sidebar.thumb_list.update()
             self.traffic_cluster.update()
+            if hasattr(self, "tab_container") and self.tab_container:
+                self.tab_container.update_theme(theme_name)
             anim.start()
         else:
             qss = MacTheme.get_stylesheet(theme_name)
@@ -2005,6 +2259,8 @@ class MacMainWindow(QMainWindow):
             self._update_all_icons()
             self.sidebar.thumb_list.update()
             self.traffic_cluster.update()
+            if hasattr(self, "tab_container") and self.tab_container:
+                self.tab_container.update_theme(theme_name)
 
     def _rotate_left(self):
         if self.canvas and (self.canvas.crop_box or self.canvas._selected_annotation):

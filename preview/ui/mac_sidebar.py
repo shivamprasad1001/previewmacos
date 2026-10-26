@@ -289,10 +289,14 @@ class MacSidebar(QWidget):
         if self.current_view_mode == "Contact Sheet":
             self.thumb_list.doItemsLayout()
 
-    def set_document(self, doc: Document):
+    def set_document(self, doc: Optional[Document]):
         self.document = doc
         self.reload_thumbnails()
         self.reload_outline()
+
+    def clear(self):
+        self.set_document(None)
+
 
     def reload_thumbnails(self):
         self.thumb_list.blockSignals(True)
