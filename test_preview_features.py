@@ -1390,6 +1390,64 @@ class TestPreviewParity(unittest.TestCase):
             if os.path.exists(compressed_pdf):
                 os.remove(compressed_pdf)
 
+    def test_53_lru_cache_prefetching_and_benchmark(self):
+        """Test 53: Verify LRU cache bounded eviction, smart prefetching, and 1,000-page benchmark (Issue #4)."""
+        import time
+        import tempfile
+        from preview.core.document import LRUCache
+
+        # 1. Test LRUCache mechanics
+        cache = LRUCache(maxsize=3)
+        cache.set("a", 1)
+        cache.set("b", 2)
+        cache.set("c", 3)
+        self.assertEqual(len(cache), 3)
+
+        # Access "a" so "b" becomes the least recently used
+        _ = cache.get("a")
+        cache.set("d", 4)
+        self.assertEqual(len(cache), 3)
+        self.assertNotIn("b", cache)  # evicted
+        self.assertIn("a", cache)
+        self.assertIn("c", cache)
+        self.assertIn("d", cache)
+
+        # 2. Test Smart Background Prefetching
+        gen_pdf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False).name
+        try:
+            mupdf_doc = pymupdf.open()
+            for i in range(10):
+                p = mupdf_doc.new_page(width=400, height=500)
+                p.insert_text((40, 40), f"Page {i+1}")
+            mupdf_doc.save(gen_pdf)
+            mupdf_doc.close()
+
+            doc = Document(gen_pdf)
+            self.assertEqual(doc.page_count, 10)
+            self.assertEqual(doc.max_cached_pages, 50)
+
+            # View page 3 and prefetch adjacent pages
+            doc.prefetch_adjacent_pages(3, zoom=1.0)
+            if doc._prefetch_worker:
+                from PyQt6.QtCore import QEventLoop, QTimer
+                loop = QEventLoop()
+                doc._prefetch_worker.finished.connect(loop.quit)
+                QTimer.singleShot(1500, loop.quit)
+                loop.exec()
+
+            # Check that adjacent page (2 or 4) was prefetched into cache
+            adjacent_cached = any(k[0] in (2, 4) for k in doc._rendered_cache.keys())
+            self.assertTrue(adjacent_cached)
+
+            # 3. Benchmark 1,000-page PDF memory footprint
+            bench = Document.benchmark_memory_footprint(num_pages=1000)
+            self.assertEqual(bench["num_pages"], 1000)
+            self.assertTrue(bench["is_bounded"])
+            self.assertLessEqual(bench["cached_pages"], bench["cache_limit"])
+        finally:
+            if os.path.exists(gen_pdf):
+                os.remove(gen_pdf)
+
 if __name__ == "__main__":
     unittest.main()
 

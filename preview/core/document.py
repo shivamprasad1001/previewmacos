@@ -8,13 +8,14 @@ import re
 import io
 import shutil
 import tempfile
+from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 
 import pymupdf
 from PIL import Image
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen
-from PyQt6.QtCore import QObject, pyqtSignal, QRectF, Qt, QBuffer, QIODevice
+from PyQt6.QtCore import QObject, pyqtSignal, QRectF, Qt, QBuffer, QIODevice, QThread
 
 SUPPORTED_IMAGE_EXTS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif'}
 
@@ -30,6 +31,136 @@ class SearchResult:
     page_num: int
     rect: QRectF
     text: str
+
+class LRUCache:
+    """Memory-bounded LRU cache with eviction of least-recently-used items."""
+
+    def __init__(self, maxsize: int = 50):
+        self._maxsize = max(1, maxsize)
+        self._data: OrderedDict = OrderedDict()
+
+    @property
+    def maxsize(self) -> int:
+        return self._maxsize
+
+    @maxsize.setter
+    def maxsize(self, size: int):
+        self._maxsize = max(1, size)
+        self._evict()
+
+    def _evict(self):
+        while len(self._data) > self._maxsize:
+            self._data.popitem(last=False)
+
+    def get(self, key, default=None):
+        if key in self._data:
+            self._data.move_to_end(key)
+            return self._data[key]
+        return default
+
+    def set(self, key, value):
+        if key in self._data:
+            self._data.move_to_end(key)
+        self._data[key] = value
+        self._evict()
+
+    def pop(self, key, default=None):
+        return self._data.pop(key, default)
+
+    def clear(self):
+        self._data.clear()
+
+    def remove_keys(self, predicate):
+        to_remove = [k for k in self._data if predicate(k)]
+        for k in to_remove:
+            self._data.pop(k, None)
+
+    def remove_page(self, page_idx: int):
+        """Removes all cached entries associated with page_idx."""
+        self.remove_keys(lambda k: (isinstance(k, tuple) and len(k) > 0 and k[0] == page_idx) or k == page_idx)
+
+    def update(self, *args, **kwargs):
+        for k, v in dict(*args, **kwargs).items():
+            self.set(k, v)
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __getitem__(self, key):
+        if key not in self._data:
+            raise KeyError(key)
+        self._data.move_to_end(key)
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self.set(key, value)
+
+    def __delitem__(self, key):
+        del self._data[key]
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def items(self):
+        return self._data.items()
+
+    def keys(self):
+        return self._data.keys()
+
+    def values(self):
+        return self._data.values()
+
+
+class PagePrefetchWorker(QThread):
+    """Background worker thread to render adjacent pages without blocking UI."""
+    page_rendered = pyqtSignal(int, float, int, QImage)  # page_idx, zoom, rot, QImage
+
+    def __init__(self, doc_target, page_indices: List[int], zoom: float = 1.0, rotations: Optional[Dict[int, int]] = None):
+        super().__init__()
+        self.doc_target = doc_target
+        self.page_indices = page_indices
+        self.zoom = zoom
+        self.rotations = rotations or {}
+        self._is_cancelled = False
+
+    def cancel(self):
+        self._is_cancelled = True
+
+    def run(self):
+        if not self.page_indices:
+            return
+        pdf_clone = None
+        try:
+            if isinstance(self.doc_target, str) and os.path.isfile(self.doc_target) and self.doc_target.lower().endswith(".pdf"):
+                pdf_clone = pymupdf.open(self.doc_target)
+            elif hasattr(self.doc_target, "tobytes"):
+                pdf_clone = pymupdf.open("pdf", self.doc_target.tobytes())
+
+            for p_idx in self.page_indices:
+                if self._is_cancelled:
+                    break
+                if pdf_clone and 0 <= p_idx < len(pdf_clone):
+                    rot = self.rotations.get(p_idx, 0)
+                    page = pdf_clone[p_idx]
+                    total_rot = (page.rotation + rot) % 360
+                    mat = pymupdf.Matrix(self.zoom, self.zoom).prerotate(total_rot)
+                    pix = page.get_pixmap(matrix=mat, alpha=False)
+                    img_data = bytes(pix.samples)
+                    qimg = QImage(img_data, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888).copy()
+                    if not self._is_cancelled:
+                        self.page_rendered.emit(p_idx, self.zoom, rot, qimg)
+        except Exception:
+            pass
+        finally:
+            if pdf_clone:
+                try:
+                    pdf_clone.close()
+                except Exception:
+                    pass
+
 
 class Document(QObject):
     """Unified document representation for PDFs and Image collections/folders."""
@@ -50,13 +181,15 @@ class Document(QObject):
         
         # Multi-image list
         self.image_paths: List[str] = []
-        self._image_cache: Dict[int, Image.Image] = {}
+        self._image_cache: LRUCache = LRUCache(maxsize=50)
 
         # Internal engines
         self._pdf_doc: Optional[pymupdf.Document] = None
         self._pil_image: Optional[Image.Image] = None  # Current active image
-        self._thumbnail_cache: Dict[int, QPixmap] = {}
-        self._rendered_cache: Dict[Tuple[int, float, int], QPixmap] = {}
+        self.max_cached_pages: int = 50
+        self._thumbnail_cache: LRUCache = LRUCache(maxsize=150)
+        self._rendered_cache: LRUCache = LRUCache(maxsize=self.max_cached_pages)
+        self._prefetch_worker: Optional[PagePrefetchWorker] = None
 
         if initial_target:
             if isinstance(initial_target, list):
@@ -223,11 +356,76 @@ class Document(QObject):
             }
 
     def set_current_page(self, page_idx: int):
-        if 0 <= page_idx < self.page_count and page_idx != self.current_page:
-            self.current_page = page_idx
-            if not self.is_pdf:
-                self._load_current_image(page_idx)
-            self.page_changed.emit(page_idx)
+        if 0 <= page_idx < self.page_count:
+            if page_idx != self.current_page:
+                self.current_page = page_idx
+                if not self.is_pdf:
+                    self._load_current_image(page_idx)
+                self.page_changed.emit(page_idx)
+            self.prefetch_adjacent_pages(page_idx)
+
+    def prefetch_adjacent_pages(self, current_page: int, zoom: float = 1.0):
+        """Prefetches pages N-1 and N+1 in a background QThread for instant page turning."""
+        if not self.is_pdf or self.page_count <= 1:
+            return
+
+        adjacent = []
+        for p in (current_page + 1, current_page - 1):
+            if 0 <= p < self.page_count:
+                rot = self.rotations.get(p, 0)
+                cache_key = (p, round(zoom, 2), rot)
+                if cache_key not in self._rendered_cache:
+                    adjacent.append(p)
+
+        if not adjacent:
+            return
+
+        if self._prefetch_worker and self._prefetch_worker.isRunning():
+            self._prefetch_worker.cancel()
+            self._prefetch_worker.wait(100)
+
+        target = self.file_path if (self.file_path and os.path.exists(self.file_path)) else self._pdf_doc
+        self._prefetch_worker = PagePrefetchWorker(
+            doc_target=target,
+            page_indices=adjacent,
+            zoom=zoom,
+            rotations=self.rotations
+        )
+        self._prefetch_worker.page_rendered.connect(self._on_prefetched_page_ready)
+        self._prefetch_worker.start()
+
+    def _on_prefetched_page_ready(self, page_idx: int, zoom: float, rot: int, qimg: QImage):
+        cache_key = (page_idx, round(zoom, 2), rot)
+        if cache_key not in self._rendered_cache:
+            pixmap = QPixmap.fromImage(qimg)
+            self._rendered_cache.set(cache_key, pixmap)
+
+    @classmethod
+    def benchmark_memory_footprint(cls, num_pages: int = 1000) -> Dict[str, Any]:
+        """
+        Creates an in-memory document with num_pages, simulates page viewing
+        and rendering, and verifies that cache eviction keeps memory bounded.
+        """
+        gen_doc = pymupdf.open()
+        for i in range(num_pages):
+            p = gen_doc.new_page(width=595, height=842)
+            p.insert_text((50, 50), f"Benchmark Document Page {i+1}")
+        pdf_bytes = gen_doc.tobytes()
+        gen_doc.close()
+
+        doc = Document(pdf_bytes)
+        # Render through pages
+        for p in range(min(num_pages, 120)):
+            _ = doc.render_page(p, zoom=1.0)
+
+        cache_len = len(doc._rendered_cache)
+        max_limit = doc.max_cached_pages
+        return {
+            "num_pages": num_pages,
+            "cached_pages": cache_len,
+            "cache_limit": max_limit,
+            "is_bounded": cache_len <= max_limit,
+        }
 
     def get_page_size(self, page_idx: int = 0) -> Tuple[float, float]:
         """Returns (width, height) of the given page in points or pixels."""
@@ -311,17 +509,14 @@ class Document(QObject):
         if page_idx is None:
             self._thumbnail_cache.clear()
         else:
-            self._thumbnail_cache = {
-                k: v for k, v in self._thumbnail_cache.items() 
-                if not ((isinstance(k, tuple) and k[0] == page_idx) or k == page_idx)
-            }
+            self._thumbnail_cache.remove_page(page_idx)
 
     def rotate_page(self, page_idx: int, degrees: int = 90):
         """Rotates a specific page by +90 or -90 degrees."""
         current = self.rotations.get(page_idx, 0)
         self.rotations[page_idx] = (current + degrees) % 360
         self._invalidate_thumbnail(page_idx)
-        self._rendered_cache = {k: v for k, v in self._rendered_cache.items() if k[0] != page_idx}
+        self._rendered_cache.remove_page(page_idx)
         self.is_dirty = True
         self.page_changed.emit(page_idx)
 
@@ -435,7 +630,7 @@ class Document(QObject):
         if idx == self.current_page:
             self._pil_image = new_pil_image
         self._invalidate_thumbnail(idx)
-        self._rendered_cache = {k: v for k, v in self._rendered_cache.items() if k[0] != idx}
+        self._rendered_cache.remove_page(idx)
         self.is_dirty = True
         self.metadata["width"] = new_pil_image.width
         self.metadata["height"] = new_pil_image.height

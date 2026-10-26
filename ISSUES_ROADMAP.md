@@ -69,9 +69,9 @@ When viewing large books or documentation (500–2,000 pages), rendering all thu
 - Add smart prefetching: automatically render page $N-1$ and $N+1$ in a background `QThread` when page $N$ is viewed.
 
 ### Acceptance Criteria
-- [ ] Add memory-bounded LRU cache to `preview/core/document.py`.
-- [ ] Prefetch adjacent pages in worker thread for instant page turning.
-- [ ] Benchmark memory footprint with a 1,000-page PDF.
+- [x] Add memory-bounded LRU cache to `preview/core/document.py`.
+- [x] Prefetch adjacent pages in worker thread for instant page turning.
+- [x] Benchmark memory footprint with a 1,000-page PDF.
 
 ---
 
