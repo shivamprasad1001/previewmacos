@@ -586,7 +586,91 @@ class Document(QObject):
         except Exception:
             return ""
 
-    def export_all_to_pdf(self, output_path: str):
+    @classmethod
+    def compress_pdf_document(cls, pdf_doc, output_path: Optional[str] = None) -> bytes:
+        """
+        Compresses a PyMuPDF Document by downsampling high-resolution images,
+        re-encoding images with optimized JPEG compression, stripping redundant
+        font subsets/objects, and saving with garbage=4, deflate=True, clean=True.
+        """
+        import io
+        from PIL import Image
+
+        for page in pdf_doc:
+            try:
+                img_list = page.get_images(full=True)
+                for img_info in img_list:
+                    xref = img_info[0]
+                    try:
+                        extracted = pdf_doc.extract_image(xref)
+                        if not extracted or "image" not in extracted:
+                            continue
+                        img_bytes = extracted["image"]
+                        width = extracted.get("width", 0)
+                        height = extracted.get("height", 0)
+
+                        pil_img = Image.open(io.BytesIO(img_bytes))
+                        max_dim = 1200
+                        if width > max_dim or height > max_dim:
+                            scale = min(max_dim / width, max_dim / height)
+                            new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
+                            pil_img = pil_img.resize(new_size, Image.Resampling.LANCZOS)
+
+                        buf = io.BytesIO()
+                        if pil_img.mode in ("RGBA", "P"):
+                            pil_img = pil_img.convert("RGB")
+                        pil_img.save(buf, format="JPEG", quality=75, optimize=True)
+                        page.replace_image(xref, stream=buf.getvalue())
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+        try:
+            pdf_doc.subset_fonts()
+        except Exception:
+            pass
+
+        if output_path:
+            pdf_doc.save(output_path, garbage=4, deflate=True, clean=True)
+            return b""
+        else:
+            return pdf_doc.tobytes(garbage=4, deflate=True, clean=True)
+
+    def estimate_reduced_size(self) -> tuple[int, int]:
+        """
+        Returns (before_size_in_bytes, after_size_in_bytes) estimation
+        for the Reduce File Size compression filter.
+        """
+        import io
+        try:
+            if self.is_pdf and self._pdf_doc:
+                before_size = os.path.getsize(self.file_path) if (self.file_path and os.path.exists(self.file_path)) else len(self._pdf_doc.tobytes())
+                clone = pymupdf.open("pdf", self._pdf_doc.tobytes())
+                compressed_bytes = self.compress_pdf_document(clone)
+                after_size = len(compressed_bytes)
+                clone.close()
+                return max(1, before_size), max(1, min(before_size, after_size))
+            else:
+                before_size = os.path.getsize(self.file_path) if (self.file_path and os.path.exists(self.file_path)) else 500000
+                img = self._get_pil_for_page(0)
+                if img:
+                    buf_orig = io.BytesIO()
+                    img.save(buf_orig, format="PNG")
+                    orig_len = max(1, len(buf_orig.getvalue()))
+                    buf_comp = io.BytesIO()
+                    cimg = img.copy()
+                    if cimg.mode in ("RGBA", "P"):
+                        cimg = cimg.convert("RGB")
+                    cimg.save(buf_comp, format="JPEG", quality=75, optimize=True)
+                    after_size = max(1024, len(buf_comp.getvalue()))
+                    return max(before_size, orig_len), after_size
+                return before_size, max(1024, int(before_size * 0.35))
+        except Exception:
+            bs = os.path.getsize(self.file_path) if (self.file_path and os.path.exists(self.file_path)) else 1000000
+            return bs, max(1024, int(bs * 0.35))
+
+    def export_all_to_pdf(self, output_path: str, reduce_size: bool = False):
         """Exports the entire document (PDF or multi-image collection) to a clean PDF."""
         import io
         if self.is_pdf and self._pdf_doc:
@@ -594,7 +678,12 @@ class Document(QObject):
                 if deg != 0 and p_idx < len(self._pdf_doc):
                     page = self._pdf_doc[p_idx]
                     page.set_rotation((page.rotation + deg) % 360)
-            self._pdf_doc.save(output_path)
+            if reduce_size:
+                clone = pymupdf.open("pdf", self._pdf_doc.tobytes())
+                self.compress_pdf_document(clone, output_path)
+                clone.close()
+            else:
+                self._pdf_doc.save(output_path)
         else:
             master = pymupdf.open()
             for idx in range(self.page_count):
@@ -607,16 +696,20 @@ class Document(QObject):
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
                 buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=95)
+                quality = 75 if reduce_size else 95
+                img.save(buf, format="JPEG", quality=quality)
                 img_doc = pymupdf.open(stream=buf.getvalue(), filetype="jpg")
                 pdf_bytes = img_doc.convert_to_pdf()
                 page_pdf = pymupdf.open("pdf", pdf_bytes)
                 master.insert_pdf(page_pdf)
-            master.save(output_path)
+            if reduce_size:
+                self.compress_pdf_document(master, output_path)
+            else:
+                master.save(output_path)
             master.close()
         self.is_dirty = False
 
-    def export_document(self, output_path: str, format_name: str = "PDF", quality: int = 95, page_idx: Optional[int] = None):
+    def export_document(self, output_path: str, format_name: str = "PDF", quality: int = 95, page_idx: Optional[int] = None, reduce_size: bool = False):
         ext = os.path.splitext(output_path)[1].lower()
         target_page = self.current_page if page_idx is None else page_idx
         
@@ -626,7 +719,12 @@ class Document(QObject):
                     if deg != 0 and p_idx < len(self._pdf_doc):
                         page = self._pdf_doc[p_idx]
                         page.set_rotation((page.rotation + deg) % 360)
-                self._pdf_doc.save(output_path)
+                if reduce_size:
+                    clone = pymupdf.open("pdf", self._pdf_doc.tobytes())
+                    self.compress_pdf_document(clone, output_path)
+                    clone.close()
+                else:
+                    self._pdf_doc.save(output_path)
             else:
                 pix = self.render_page(target_page, zoom=2.0)
                 pix.save(output_path, quality=quality)
@@ -641,7 +739,8 @@ class Document(QObject):
             if ext == '.pdf':
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
-                img.save(output_path, "PDF", resolution=150.0)
+                res = 72.0 if reduce_size else 150.0
+                img.save(output_path, "PDF", resolution=res)
             elif ext in ['.jpg', '.jpeg']:
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")

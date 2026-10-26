@@ -1334,7 +1334,61 @@ class TestPreviewParity(unittest.TestCase):
         win._set_appearance_mode("auto")
         self.assertEqual(win.appearance_mode, "auto")
         self.assertTrue(win.theme_auto_act.isChecked())
-        win.close()
+    def test_52_reduce_file_size_pdf_compression(self):
+        """Test 52: Verify 'Reduce File Size' PDF compression preset and size estimation (Issue #7)."""
+        import tempfile
+        import io
+        from preview.ui.export_dialog import MacExportDialog
+
+        # Create a sample PDF with high-res image
+        sample_pdf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False).name
+        compressed_pdf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False).name
+        try:
+            doc_gen = pymupdf.open()
+            page = doc_gen.new_page(width=612, height=792)
+            high_res = Image.new("RGB", (1600, 1600), color=(180, 50, 70))
+            buf = io.BytesIO()
+            high_res.save(buf, format="JPEG", quality=100)
+            page.insert_image(pymupdf.Rect(50, 50, 550, 700), stream=buf.getvalue())
+            doc_gen.save(sample_pdf)
+            doc_gen.close()
+
+            # Test Document compression & size estimation
+            doc = Document(sample_pdf)
+            before_sz, after_sz = doc.estimate_reduced_size()
+            self.assertGreater(before_sz, 0)
+            self.assertGreater(after_sz, 0)
+
+            doc.export_all_to_pdf(compressed_pdf, reduce_size=True)
+            self.assertTrue(os.path.exists(compressed_pdf))
+            self.assertGreater(os.path.getsize(compressed_pdf), 0)
+
+            # Check that compressed PDF opens and has valid page count
+            chk = pymupdf.open(compressed_pdf)
+            self.assertEqual(chk.page_count, 1)
+            chk.close()
+
+            # Test MacExportDialog UI preset & size estimation
+            dlg = MacExportDialog(current_file_path=sample_pdf, page_count=1, current_page=0, document=doc)
+            self.assertTrue(hasattr(dlg, "filter_combo"))
+            self.assertIn("Reduce File Size", [dlg.filter_combo.itemText(i) for i in range(dlg.filter_combo.count())])
+
+            # Select Reduce File Size preset
+            dlg.filter_combo.setCurrentText("Reduce File Size")
+            self.assertTrue(dlg.reduce_file_size)
+            self.assertFalse(dlg.size_estimate_label.isHidden())
+            self.assertIn("Estimated:", dlg.size_estimate_label.text())
+
+            # Switch back to None
+            dlg.filter_combo.setCurrentText("None")
+            self.assertFalse(dlg.reduce_file_size)
+            self.assertTrue(dlg.size_estimate_label.isHidden())
+            dlg.close()
+        finally:
+            if os.path.exists(sample_pdf):
+                os.remove(sample_pdf)
+            if os.path.exists(compressed_pdf):
+                os.remove(compressed_pdf)
 
 if __name__ == "__main__":
     unittest.main()

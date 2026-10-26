@@ -1595,19 +1595,21 @@ class MacMainWindow(QMainWindow):
             current_file_path=self.document.file_path,
             page_count=self.document.page_count,
             current_page=self.canvas.current_page,
+            document=self.document,
             parent=self
         )
         if dlg.exec() == QDialog.DialogCode.Accepted and dlg.selected_path:
             try:
                 target_page = None if dlg.export_all_pages else self.canvas.current_page
                 if dlg.selected_format == "PDF" and dlg.export_all_pages:
-                    self.document.export_all_to_pdf(dlg.selected_path)
+                    self.document.export_all_to_pdf(dlg.selected_path, reduce_size=dlg.reduce_file_size)
                 else:
                     self.document.export_document(
                         dlg.selected_path, 
                         format_name=dlg.selected_format,
                         quality=dlg.selected_quality,
-                        page_idx=target_page
+                        page_idx=target_page,
+                        reduce_size=dlg.reduce_file_size
                     )
                 self._show_status(f"Exported to {os.path.basename(dlg.selected_path)}")
             except Exception as e:

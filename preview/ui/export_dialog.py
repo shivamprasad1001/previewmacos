@@ -18,15 +18,16 @@ class MacExportDialog(QDialog):
     """macOS-authentic Export dialog sheet."""
 
     def __init__(self, current_file_path: Optional[str] = None, page_count: int = 1, 
-                 current_page: int = 0, parent: Optional[QWidget] = None):
+                 current_page: int = 0, document: Optional[object] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Export")
-        self.setFixedSize(460, 360)
+        self.setFixedSize(480, 420)
         self.setModal(True)
 
         self.current_file_path = current_file_path or ""
         self.page_count = max(1, page_count)
         self.current_page = current_page
+        self.document = document
 
         base_name = "Untitled"
         if self.current_file_path:
@@ -38,6 +39,7 @@ class MacExportDialog(QDialog):
         self.selected_quality: int = 90
         self.selected_dpi: int = 150
         self.export_all_pages: bool = True
+        self.reduce_file_size: bool = False
 
         self._setup_ui()
 
@@ -72,6 +74,26 @@ class MacExportDialog(QDialog):
         row_fmt.addWidget(fmt_lbl)
         row_fmt.addWidget(self.fmt_combo)
         layout.addLayout(row_fmt)
+
+        # 2b. Quartz Filter / Presets (Reduce File Size)
+        self.filter_widget = QWidget()
+        row_filter = QHBoxLayout(self.filter_widget)
+        row_filter.setContentsMargins(0, 0, 0, 0)
+        filter_lbl = QLabel("Quartz Filter:")
+        filter_lbl.setFixedWidth(90)
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItem("None")
+        self.filter_combo.addItem("Reduce File Size")
+        self.filter_combo.currentTextChanged.connect(self._on_filter_changed)
+        row_filter.addWidget(filter_lbl)
+        row_filter.addWidget(self.filter_combo)
+        layout.addWidget(self.filter_widget)
+
+        # Size estimation label
+        self.size_estimate_label = QLabel()
+        self.size_estimate_label.setStyleSheet("color: #0a84ff; font-size: 11px; margin-left: 90px; font-weight: 500;")
+        self.size_estimate_label.setVisible(False)
+        layout.addWidget(self.size_estimate_label)
 
         # 3. Quality Slider (visible for JPEG and WebP)
         self.quality_widget = QWidget()
@@ -156,6 +178,43 @@ class MacExportDialog(QDialog):
     def _on_format_changed(self, fmt: str):
         is_lossy = fmt in ("JPEG", "WebP")
         self.quality_widget.setVisible(is_lossy)
+        is_pdf = (fmt == "PDF")
+        self.filter_widget.setVisible(is_pdf)
+        if not is_pdf:
+            self.size_estimate_label.setVisible(False)
+        else:
+            if self.filter_combo.currentText() == "Reduce File Size":
+                self.size_estimate_label.setVisible(True)
+
+    def _on_filter_changed(self, text: str):
+        if text == "Reduce File Size":
+            self.reduce_file_size = True
+            before_bytes, after_bytes = self._get_size_estimation()
+            reduction_pct = max(0, int((1.0 - (after_bytes / max(1, before_bytes))) * 100))
+            b_str = self._format_size(before_bytes)
+            a_str = self._format_size(after_bytes)
+            self.size_estimate_label.setText(f"Estimated: {b_str} → {a_str} (~{reduction_pct}% reduction)")
+            self.size_estimate_label.setVisible(True)
+        else:
+            self.reduce_file_size = False
+            self.size_estimate_label.setVisible(False)
+
+    def _get_size_estimation(self) -> tuple[int, int]:
+        if self.document and hasattr(self.document, "estimate_reduced_size"):
+            return self.document.estimate_reduced_size()
+        if self.current_file_path and os.path.exists(self.current_file_path):
+            bs = os.path.getsize(self.current_file_path)
+            return bs, max(1024, int(bs * 0.35))
+        return 1024 * 1024, int(1024 * 1024 * 0.35)
+
+    @staticmethod
+    def _format_size(num_bytes: int) -> str:
+        if num_bytes < 1024:
+            return f"{num_bytes} B"
+        elif num_bytes < 1024 * 1024:
+            return f"{num_bytes / 1024:.1f} KB"
+        else:
+            return f"{num_bytes / (1024 * 1024):.1f} MB"
 
     def _on_save_clicked(self):
         fmt = self.fmt_combo.currentText()
@@ -185,6 +244,7 @@ class MacExportDialog(QDialog):
         self.selected_format = fmt
         self.selected_quality = self.quality_slider.value()
         self.selected_dpi = self.dpi_combo.currentData() or 150
+        self.reduce_file_size = (fmt == "PDF" and self.filter_combo.currentText() == "Reduce File Size")
         if hasattr(self, "radio_all"):
             self.export_all_pages = self.radio_all.isChecked()
         else:

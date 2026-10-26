@@ -119,5 +119,5 @@ One of the most frequently used features in macOS Preview is **File > Export... 
 - Strip redundant font subsets and unused objects using PyMuPDF's `garbage=4, deflate=True, clean=True` parameters.
 
 ### Acceptance Criteria
-- [ ] Add "Reduce File Size" preset to `preview/ui/export_dialog.py`.
-- [ ] Provide before/after size estimation.
+- [x] Add "Reduce File Size" preset to `preview/ui/export_dialog.py`.
+- [x] Provide before/after size estimation.
