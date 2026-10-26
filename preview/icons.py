@@ -641,6 +641,22 @@ class MacIconFactory:
         painter.drawLine(QPointF(cx, cy - ch), QPointF(cx, cy + ch))
 
     @staticmethod
+    def _draw_callout(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
+        # Speech bubble / Callout shape
+        body = QRectF(r.left(), r.top(), r.width(), r.height() * 0.72)
+        path = QPainterPath()
+        path.addRoundedRect(body, 3, 3)
+        tri = QPainterPath()
+        tri.moveTo(r.left() + r.width() * 0.25, r.top() + r.height() * 0.72)
+        tri.lineTo(r.left() + r.width() * 0.15, r.bottom())
+        tri.lineTo(r.left() + r.width() * 0.45, r.top() + r.height() * 0.72)
+        tri.closeSubpath()
+        combined = path.united(tri)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(combined)
+
+    @staticmethod
     def _draw_print(painter: QPainter, r: QRectF, color: QColor, pen: QPen):
         # Printer body and paper
         painter.setPen(pen)

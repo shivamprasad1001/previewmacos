@@ -589,6 +589,33 @@ class CanvasView(QWidget):
                 self.update()
                 return
 
+            # 3.5 Handle Loupe and Callout
+            if self.active_tool == AnnotationType.LOUPE:
+                item = AnnotationItem(AnnotationType.LOUPE)
+                item.stroke_color = QColor(self.stroke_color) if self.stroke_color else QColor("#007aff")
+                item.stroke_width = 3.0
+                item.magnification = 2.0
+                item.rect = QRectF(doc_pt, doc_pt)
+                self._active_annotation = item
+                self._get_current_annotations().append(item)
+                self.update()
+                return
+
+            if self.active_tool == AnnotationType.CALLOUT:
+                item = AnnotationItem(AnnotationType.CALLOUT)
+                item.stroke_color = QColor(self.stroke_color)
+                item.stroke_width = self.stroke_width
+                item.fill_color = QColor(self.fill_color) if (self.fill_color and self.fill_color.alpha() > 0) else QColor(255, 255, 255, 240)
+                item.font_size = self.font_size
+                item.font_family = self.font_family
+                item.text = "Callout"
+                item.rect = QRectF(doc_pt, doc_pt)
+                item.tail_point = QPointF(doc_pt.x() - 25, doc_pt.y() + 50)
+                self._active_annotation = item
+                self._get_current_annotations().append(item)
+                self.update()
+                return
+
             # 4. Handle Text tool
             if self.active_tool == AnnotationType.TEXT:
                 text, ok = QInputDialog.getText(self, "Add Text", "Enter annotation text:", text="Text")
@@ -683,7 +710,7 @@ class CanvasView(QWidget):
             doc_pt = self.view_to_doc_coords(event.position())
             for item in reversed(self._get_current_annotations()):
                 if item.contains_point(doc_pt):
-                    if item.item_type == AnnotationType.TEXT:
+                    if item.item_type in (AnnotationType.TEXT, AnnotationType.CALLOUT):
                         self._edit_text_annotation(item)
                         return
                     elif item.item_type == AnnotationType.NOTE:
@@ -812,9 +839,16 @@ class CanvasView(QWidget):
             elif self._active_annotation.item_type in (AnnotationType.RECTANGLE, 
                                                         AnnotationType.ROUNDED_RECT, 
                                                         AnnotationType.ELLIPSE,
-                                                        AnnotationType.REDACT):
+                                                        AnnotationType.REDACT,
+                                                        AnnotationType.LOUPE,
+                                                        AnnotationType.CALLOUT):
                 p1 = self._active_annotation.rect.topLeft()
                 self._active_annotation.rect = QRectF(p1, doc_pt_clamped).normalized()
+                if self._active_annotation.item_type == AnnotationType.CALLOUT:
+                    self._active_annotation.tail_point = QPointF(
+                        self._active_annotation.rect.left() - 25,
+                        self._active_annotation.rect.bottom() + 40
+                    )
             elif self._active_annotation.item_type in (AnnotationType.LINE, AnnotationType.ARROW):
                 if len(self._active_annotation.points) >= 2:
                     self._active_annotation.points[1] = doc_pt_clamped
@@ -864,6 +898,8 @@ class CanvasView(QWidget):
                 self.setCursor(Qt.CursorShape.SizeHorCursor)
             elif handle in (Handle.START, Handle.END):
                 self.setCursor(Qt.CursorShape.CrossCursor)
+            elif handle in (Handle.TAIL, Handle.MAGNIFY):
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
             elif self._selected_annotation.contains_point(doc_pt):
                 self.setCursor(Qt.CursorShape.SizeAllCursor)
             else:
@@ -890,6 +926,10 @@ class CanvasView(QWidget):
                 old_pts = [QPointF(p) for p in self._resize_orig_points]
                 new_b = QRectF(item.get_bounds())
                 new_pts = [QPointF(p) for p in item.points]
+                old_tail = QPointF(getattr(item, "tail_point", QPointF()))
+                new_tail = QPointF(getattr(item, "tail_point", QPointF()))
+                old_mag = getattr(item, "magnification", 2.0)
+                new_mag = getattr(item, "magnification", 2.0)
                 page = self.current_page
                 def undo_resize():
                     if self.current_page != page:
@@ -898,6 +938,10 @@ class CanvasView(QWidget):
                         item.points = [QPointF(p) for p in old_pts]
                     else:
                         item.rect = QRectF(old_b)
+                        if item.item_type == AnnotationType.CALLOUT:
+                            item.tail_point = QPointF(old_tail)
+                        elif item.item_type == AnnotationType.LOUPE:
+                            item.magnification = old_mag
                     self.update()
                 def redo_resize():
                     if self.current_page != page:
@@ -906,6 +950,10 @@ class CanvasView(QWidget):
                         item.points = [QPointF(p) for p in new_pts]
                     else:
                         item.rect = QRectF(new_b)
+                        if item.item_type == AnnotationType.CALLOUT:
+                            item.tail_point = QPointF(new_tail)
+                        elif item.item_type == AnnotationType.LOUPE:
+                            item.magnification = new_mag
                     self.update()
                 self.history.push(ActionCommand("Resize Annotation", undo_resize, redo_resize))
             self.update()
@@ -913,6 +961,13 @@ class CanvasView(QWidget):
 
         if self._active_annotation:
             item = self._active_annotation
+            if item.item_type == AnnotationType.LOUPE and (item.rect.width() < 10 or item.rect.height() < 10):
+                c = item.rect.center()
+                item.rect = QRectF(c.x() - 50, c.y() - 50, 100, 100)
+            elif item.item_type == AnnotationType.CALLOUT and (item.rect.width() < 10 or item.rect.height() < 10):
+                c = item.rect.center()
+                item.rect = QRectF(c.x() - 60, c.y() - 30, 120, 60)
+                item.tail_point = QPointF(item.rect.left() - 25, item.rect.bottom() + 35)
             page = self.current_page
             self._push_add_command(item, page)
             self._active_annotation = None
@@ -1597,7 +1652,7 @@ class CanvasView(QWidget):
         w_doc, h_doc = self.document.get_page_size(self.current_page)
         painter.setClipRect(QRectF(0, 0, w_doc * self.zoom, h_doc * self.zoom))
         for item in self._get_current_annotations():
-            item.draw(painter, zoom=self.zoom)
+            item.draw(painter, zoom=self.zoom, page_pixmap=page_pix)
         
         # 4. Draw Crop Selection & Dim Outside Region
         if self.crop_box:

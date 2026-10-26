@@ -1517,8 +1517,129 @@ class TestPreviewParity(unittest.TestCase):
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
 
+    def test_55_loupe_and_callout_annotations(self):
+        """Test Issue #2: Magnifier Loupe Tool & Speech Bubble Callout annotations, handles, and baking."""
+        from preview.core.annotations import AnnotationItem, AnnotationType, Handle
+        from preview.core.document import Document
+        from PyQt6.QtCore import QPointF, QRectF
+        from PyQt6.QtGui import QColor, QPixmap, QPainter
+        import pymupdf
+        import tempfile
+
+        # 1. Test Loupe Model & Handles
+        loupe = AnnotationItem(AnnotationType.LOUPE)
+        loupe.rect = QRectF(100, 100, 80, 80)
+        loupe.magnification = 2.0
+        loupe.stroke_color = QColor("#007aff")
+        loupe.stroke_width = 3.0
+
+        self.assertEqual(loupe.item_type, AnnotationType.LOUPE)
+        self.assertEqual(loupe.magnification, 2.0)
+        self.assertEqual(loupe.get_bounds(), QRectF(100, 100, 80, 80))
+        self.assertTrue(loupe.contains_point(QPointF(140, 140)))
+
+        handles = loupe.get_handles_positions(zoom=1.0)
+        self.assertIn(Handle.MAGNIFY, handles)
+        self.assertIn(Handle.NW, handles)
+        self.assertIn(Handle.SE, handles)
+
+        # Hit test magnify handle
+        mag_pt = handles[Handle.MAGNIFY]
+        hit = loupe.get_handle_at_point(mag_pt, zoom=1.0)
+        self.assertEqual(hit, Handle.MAGNIFY)
+
+        # Resize by MAGNIFY handle
+        loupe.resize_by_handle(Handle.MAGNIFY, QPointF(140 + 60, 140), QRectF(100, 100, 80, 80))
+        self.assertGreater(loupe.magnification, 2.0)
+
+        # Resize by SE handle
+        orig_bounds = QRectF(100, 100, 80, 80)
+        loupe.resize_by_handle(Handle.SE, QPointF(220, 220), orig_bounds)
+        self.assertEqual(loupe.rect.width(), 120)
+        self.assertEqual(loupe.rect.height(), 120)
+
+        # Render Loupe with painter and underlying page pixmap
+        page_pix = QPixmap(300, 300)
+        page_pix.fill(QColor("#ffffff"))
+        paint_pix = QPixmap(300, 300)
+        paint_pix.fill(QColor("#ffffff"))
+        p = QPainter(paint_pix)
+        loupe.is_selected = True
+        loupe.draw(p, zoom=1.0, page_pixmap=page_pix)
+        p.end()
+
+        # 2. Test Callout Model & Handles
+        callout = AnnotationItem(AnnotationType.CALLOUT)
+        callout.rect = QRectF(150, 150, 120, 60)
+        callout.tail_point = QPointF(120, 260)
+        callout.text = "Important Note!"
+        callout.stroke_color = QColor("#ff9500")
+        callout.stroke_width = 2.0
+        callout.fill_color = QColor(255, 255, 255, 230)
+
+        self.assertEqual(callout.item_type, AnnotationType.CALLOUT)
+        self.assertEqual(callout.text, "Important Note!")
+        bounds = callout.get_bounds()
+        self.assertTrue(bounds.contains(QPointF(150, 150)))
+        self.assertTrue(bounds.contains(QPointF(120, 260)))
+
+        c_handles = callout.get_handles_positions(zoom=1.0)
+        self.assertIn(Handle.TAIL, c_handles)
+        self.assertEqual(c_handles[Handle.TAIL], QPointF(120, 260))
+
+        # Drag tail handle
+        callout.resize_by_handle(Handle.TAIL, QPointF(100, 280), bounds)
+        self.assertEqual(callout.tail_point, QPointF(100, 280))
+
+        # Translate Callout
+        callout.translate(10, -5)
+        self.assertEqual(callout.rect.left(), 160)
+        self.assertEqual(callout.tail_point, QPointF(110, 275))
+
+        # Render Callout
+        p2 = QPainter(paint_pix)
+        callout.is_selected = True
+        callout.draw(p2, zoom=1.0)
+        p2.end()
+
+        # 3. Test Baking Loupe and Callout into PDF
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf_src:
+            src_pdf = tf_src.name
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf_dst:
+            baked_path = tf_dst.name
+
+        doc_pdf = pymupdf.open()
+        p = doc_pdf.new_page(width=500, height=500)
+        p.insert_text((50, 100), "Base Document Text to Magnify", fontsize=18)
+        doc_pdf.save(src_pdf)
+        doc_pdf.close()
+
+        doc = Document(src_pdf)
+        annots_map = {
+            0: [loupe, callout]
+        }
+
+        try:
+            res = doc.save_with_annotations(baked_path, annots_map)
+            self.assertTrue(res)
+            self.assertTrue(os.path.exists(baked_path))
+
+            # Verify saved PDF loads and contains baked images
+            saved_doc = pymupdf.open(baked_path)
+            self.assertEqual(len(saved_doc), 1)
+            page0 = saved_doc[0]
+            images = page0.get_images()
+            self.assertGreaterEqual(len(images), 2)  # Loupe and Callout baked as images
+            saved_doc.close()
+        finally:
+            if os.path.exists(src_pdf):
+                os.remove(src_pdf)
+            if os.path.exists(baked_path):
+                os.remove(baked_path)
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
 

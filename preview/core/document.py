@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import pymupdf
 from PIL import Image
-from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen
+from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
 from PyQt6.QtCore import QObject, pyqtSignal, QRectF, Qt, QBuffer, QIODevice, QThread
 
 SUPPORTED_IMAGE_EXTS = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif'}
@@ -1102,7 +1102,7 @@ class Document(QObject):
                     page.set_rotation((page.rotation + deg) % 360)
             self.rotations.clear()
 
-            from preview.core.annotations import AnnotationType
+            from preview.core.annotations import AnnotationType, AnnotationItem
 
             for p_idx, annots in annotations_map.items():
                 if 0 <= p_idx < len(self._pdf_doc):
@@ -1178,6 +1178,50 @@ class Document(QObject):
                             r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
                             page.add_redact_annot(r, fill=(0, 0, 0))
                             page.apply_redactions()
+
+                        elif itype == AnnotationType.LOUPE:
+                            r = pymupdf.Rect(item.rect.left(), item.rect.top(), item.rect.right(), item.rect.bottom())
+                            if r.width > 0 and r.height > 0:
+                                scale = 2.0
+                                pix = QPixmap(int(r.width * scale), int(r.height * scale))
+                                pix.fill(Qt.GlobalColor.transparent)
+                                page_sub = page.get_pixmap(clip=r, matrix=pymupdf.Matrix(scale, scale), alpha=False)
+                                sub_qimg = QImage(page_sub.samples, page_sub.width, page_sub.height, page_sub.stride, QImage.Format.Format_RGB888)
+                                sub_pix = QPixmap.fromImage(sub_qimg)
+                                p = QPainter(pix)
+                                p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                                p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                                offset_item = AnnotationItem(AnnotationType.LOUPE)
+                                offset_item.rect = QRectF(0, 0, r.width, r.height)
+                                offset_item.magnification = getattr(item, "magnification", 2.0)
+                                offset_item.stroke_color = getattr(item, "stroke_color", QColor("#007aff"))
+                                offset_item.stroke_width = getattr(item, "stroke_width", 2.5)
+                                offset_item.draw(p, zoom=scale, page_pixmap=sub_pix)
+                                p.end()
+                                buf = QBuffer()
+                                buf.open(QIODevice.OpenModeFlag.WriteOnly)
+                                pix.save(buf, "PNG")
+                                page.insert_image(r, stream=buf.data().data())
+                                buf.close()
+
+                        elif itype == AnnotationType.CALLOUT:
+                            bounds = item.get_bounds()
+                            r = pymupdf.Rect(bounds.left(), bounds.top(), bounds.right(), bounds.bottom())
+                            if r.width > 0 and r.height > 0:
+                                scale = 2.0
+                                pix = QPixmap(int(r.width * scale), int(r.height * scale))
+                                pix.fill(Qt.GlobalColor.transparent)
+                                p = QPainter(pix)
+                                p.setRenderHint(QPainter.RenderHint.Antialiasing)
+                                p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                                p.translate(-bounds.left() * scale, -bounds.top() * scale)
+                                item.draw(p, zoom=scale)
+                                p.end()
+                                buf = QBuffer()
+                                buf.open(QIODevice.OpenModeFlag.WriteOnly)
+                                pix.save(buf, "PNG")
+                                page.insert_image(r, stream=buf.data().data())
+                                buf.close()
 
                         elif itype == AnnotationType.SIGNATURE:
                             if len(item.points) > 1 or item.rect.isValid():

@@ -340,15 +340,19 @@ class MarkupToolbar(QWidget):
         menu = QMenu(self)
         
         shapes = [
-            ("Rectangle", AnnotationType.RECTANGLE),
-            ("Rounded Rectangle", AnnotationType.ROUNDED_RECT),
-            ("Oval / Circle", AnnotationType.ELLIPSE),
-            ("Line", AnnotationType.LINE),
-            ("Arrow", AnnotationType.ARROW),
+            ("Rectangle", AnnotationType.RECTANGLE, None),
+            ("Rounded Rectangle", AnnotationType.ROUNDED_RECT, None),
+            ("Oval / Circle", AnnotationType.ELLIPSE, None),
+            ("Line", AnnotationType.LINE, None),
+            ("Arrow", AnnotationType.ARROW, None),
+            ("Speech Bubble / Callout", AnnotationType.CALLOUT, "callout"),
+            ("Magnifier Loupe", AnnotationType.LOUPE, "loupe"),
         ]
         
-        for name, stype in shapes:
+        for name, stype, icon_name in shapes:
             action = QAction(name, self)
+            if icon_name:
+                action.setIcon(MacIconFactory.create_icon(icon_name, self._theme_col, 16))
             action.triggered.connect(lambda _, t=stype: self._select_shape_tool(t))
             menu.addAction(action)
 
