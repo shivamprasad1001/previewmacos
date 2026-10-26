@@ -16,7 +16,7 @@ We take the security of Preview seriously. If you discover a security vulnerabil
 
 Instead, please send an email to:
 - **Shivam Prasad**: [shivamprasad1001@gmail.com](mailto:shivamprasad1001@gmail.com)
-- **TriviLabs Security**: [security@trivilabs.in](mailto:security@trivilabs.in)
+- **TriviLabs Security**: [security@trivilabs.in](mailto:hello@trivilabs.in)
 
 Please include:
 1. Description of the vulnerability and its potential impact.
