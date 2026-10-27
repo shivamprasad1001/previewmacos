@@ -1762,9 +1762,10 @@ class TestPreviewParity(unittest.TestCase):
             if os.path.exists(pdf2_path):
                 os.remove(pdf2_path)
 
-    def test_57_open_file_show_option_for_new_tab(self):
-        """Verifies that opening a file provides the option to open in a new tab."""
+    def test_57_open_file_automatically_opens_in_new_tab(self):
+        """Verifies that opening a new file when a document is already open automatically opens in a new tab."""
         from preview.ui.main_window import MacMainWindow
+        from unittest.mock import patch
         import pymupdf
         import tempfile
 
@@ -1795,27 +1796,28 @@ class TestPreviewParity(unittest.TestCase):
             file_menu_texts = [a.text() for a in win.file_menu.actions()]
             self.assertIn("Open in New Tab...", file_menu_texts)
 
-            # 2. Open first document in current tab
-            win.open_file(doc1_path)
+            # 2. Open first document in current tab (when window starts empty)
+            with patch("preview.ui.main_window.QFileDialog.getOpenFileNames", return_value=([doc1_path], "")):
+                win._open_file_dialog()
+
             self.assertEqual(len(win.tabs), 1)
             self.assertEqual(win.tabs[0].title, os.path.basename(doc1_path))
 
-            # 3. Simulate opening a second document with target prompt choosing 'new_tab'
-            win._default_open_target = "new_tab"
-            choice = win._prompt_open_target(os.path.basename(doc2_path))
-            self.assertEqual(choice, "new_tab")
+            # 3. Open second document via _open_file_dialog when doc1 is already loaded
+            # It should automatically open in a new tab without modal prompts
+            with patch("preview.ui.main_window.QFileDialog.getOpenFileNames", return_value=([doc2_path], "")):
+                win._open_file_dialog()
 
-            # 4. Open in new tab via force_new_tab
-            win.new_tab(doc2_path)
             self.assertEqual(len(win.tabs), 2)
             self.assertEqual(win.active_tab_index, 1)
             self.assertEqual(win.tabs[0].title, os.path.basename(doc1_path))
             self.assertEqual(win.tabs[1].title, os.path.basename(doc2_path))
 
-            # 5. Verify prompt choice 'current_tab' replaces document in current tab
-            win._default_open_target = "current_tab"
-            choice_curr = win._prompt_open_target(os.path.basename(doc1_path))
-            self.assertEqual(choice_curr, "current_tab")
+            # 4. Also verify _open_recent_item automatically opens in a new tab when a document is open
+            win._open_recent_item(doc1_path)
+            self.assertEqual(len(win.tabs), 3)
+            self.assertEqual(win.active_tab_index, 2)
+            self.assertEqual(win.tabs[2].title, os.path.basename(doc1_path))
         finally:
             if os.path.exists(doc1_path):
                 os.remove(doc1_path)

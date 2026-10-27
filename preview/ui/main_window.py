@@ -1585,36 +1585,6 @@ class MacMainWindow(QMainWindow):
             self.sidebar.select_page(prv)
             self._update_status()
 
-    def _prompt_open_target(self, target_name: str) -> str:
-        """
-        When a document is already open, prompts the user whether to open
-        the selected file in a new tab or replace the current document.
-        Returns 'new_tab', 'current_tab', or 'cancel'.
-        """
-        if getattr(self, "_skip_save_prompt", False) or os.environ.get("PREVIEW_TESTING") or os.environ.get("CI"):
-            return getattr(self, "_default_open_target", "current_tab")
-
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Open Document")
-        msg.setText(f"How would you like to open \"{target_name}\"?")
-        msg.setInformativeText("You can open it in a new tab to keep your current document open, or replace the document in this tab.")
-        
-        btn_new_tab = msg.addButton("Open in New Tab", QMessageBox.ButtonRole.AcceptRole)
-        btn_current = msg.addButton("Open in Current Tab", QMessageBox.ButtonRole.ActionRole)
-        btn_cancel = msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_new_tab)
-
-        theme = getattr(self, "current_theme", MacTheme.DARK)
-        msg.setStyleSheet(MacTheme.get_stylesheet(theme))
-
-        msg.exec()
-        clicked = msg.clickedButton()
-        if clicked == btn_new_tab:
-            return "new_tab"
-        elif clicked == btn_current:
-            return "current_tab"
-        return "cancel"
-
     def _open_file_dialog(self, force_new_tab: bool = False):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Open Document or Images", "", 
@@ -1623,25 +1593,13 @@ class MacMainWindow(QMainWindow):
         if not paths:
             return
 
-        if force_new_tab:
+        # If a document is already open or force_new_tab is requested, automatically open in a new tab
+        if force_new_tab or self.document is not None:
             if len(paths) == 1:
                 self.new_tab(paths[0])
             else:
                 self.new_tab_files(paths)
             return
-
-        # If a document is already open, offer option to open in new tab or replace
-        if self.document is not None:
-            target_name = os.path.basename(paths[0]) if len(paths) == 1 else f"{len(paths)} files"
-            choice = self._prompt_open_target(target_name)
-            if choice == "cancel":
-                return
-            elif choice == "new_tab":
-                if len(paths) == 1:
-                    self.new_tab(paths[0])
-                else:
-                    self.new_tab_files(paths)
-                return
 
         if len(paths) == 1:
             self.open_file(paths[0])
@@ -1651,6 +1609,8 @@ class MacMainWindow(QMainWindow):
     def _open_folder_dialog(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder of Images")
         if folder:
+            if self.document is not None:
+                self.new_tab()
             self.open_folder(folder)
 
     def _save_file(self):
@@ -1766,6 +1726,14 @@ class MacMainWindow(QMainWindow):
         self.recent_menu.addAction(clear_act)
 
     def _open_recent_item(self, path: str):
+        if self.document is not None:
+            if os.path.isdir(path):
+                self.new_tab()
+                self.open_folder(path)
+            elif os.path.isfile(path):
+                self.new_tab(path)
+            return
+
         if os.path.isdir(path):
             self.open_folder(path)
         elif os.path.isfile(path):
@@ -2584,21 +2552,16 @@ class MacMainWindow(QMainWindow):
         if not paths:
             return
 
-        # If a document is already open, offer option to open dropped files in a new tab
+        # If a document is already open, automatically open in a new tab
         if self.document is not None:
-            target_name = os.path.basename(paths[0]) if len(paths) == 1 else f"{len(paths)} files"
-            choice = self._prompt_open_target(target_name)
-            if choice == "cancel":
-                return
-            elif choice == "new_tab":
-                if len(paths) == 1 and os.path.isdir(paths[0]):
-                    self.new_tab()
-                    self.open_folder(paths[0])
-                elif len(paths) == 1:
-                    self.new_tab(paths[0])
-                else:
-                    self.new_tab_files(paths)
-                return
+            if len(paths) == 1 and os.path.isdir(paths[0]):
+                self.new_tab()
+                self.open_folder(paths[0])
+            elif len(paths) == 1:
+                self.new_tab(paths[0])
+            else:
+                self.new_tab_files(paths)
+            return
 
         # If a single directory was dropped, open folder
         if len(paths) == 1 and os.path.isdir(paths[0]):
