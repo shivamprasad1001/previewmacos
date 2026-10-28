@@ -123,6 +123,7 @@ def main():
         "markup": "markuptoolbar",
         "showhidemarkuptoolbar": "markuptoolbar",
         "showmarkuptoolbar": "markuptoolbar",
+        "moretools": "markuptoolbar",
         "togglesidebar": "sidebar",
         "showmagnifierloupe": "loupemagnifier",
         "magnifier": "loupemagnifier",
@@ -210,7 +211,23 @@ def main():
         "contactsheet": "contactsheetview",
         "tableofcontents": "tableofcontentsview",
         "deletepage": "deletepage",
-        "duplicatepage": "duplicatepage"
+        "duplicatepage": "duplicatepage",
+        "selectpointer": "pointerselecttool",
+        "handpandocument": "handtool",
+        "showhideinspectorpanel": "inspector",
+        "toggleinspectorpanel": "inspector",
+        "editmode": "editmode",
+        "editmodemarkuptools": "editmode",
+        "editmodeannotationandmarkuptools": "editmode",
+        "viewmode": "viewmode",
+        "viewmodebrowsing": "viewmode",
+        "viewmodecleandocumentreading": "viewmode",
+        "organizemode": "organizemode",
+        "organizemodepagesdocuments": "organizemode",
+        "organizemodepagedocumentmanagement": "organizemode",
+        "underlinetextmarkup": "underlinetextmarkup",
+        "strikethroughtextmarkup": "strikethroughtextmarkup",
+        "textalignmentpresets": "textformatting"
     }
 
     for action in sorted(code_actions):

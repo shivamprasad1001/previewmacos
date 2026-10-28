@@ -1,5 +1,5 @@
 {
-  "total": 132,
+  "total": 142,
   "entries": [
     {
       "id": "about-document-viewer",
@@ -16,6 +16,42 @@
       "related": [
         "check-for-updates",
         "what-is-preview"
+      ]
+    },
+    {
+      "id": "add-image-overlay",
+      "name": "Add Image Overlay",
+      "letter": "A",
+      "meaning": "Overlays an external image or graphics layer onto the current image or PDF document page.",
+      "where": "Markup Toolbar > Add Image Overlay (Ctrl+Shift+I) or Edit Menu > Add Image Overlay...",
+      "steps": [
+        "Open any image or PDF document.",
+        "Click Add Image Overlay in the Markup Toolbar or press Ctrl + Shift + I.",
+        "Choose an image file or paste an image from clipboard with Ctrl + V.",
+        "Drag to reposition or drag corner handles to resize the overlay layer."
+      ],
+      "shortcut": "Ctrl + Shift + I",
+      "related": [
+        "markup-toolbar",
+        "sign-document",
+        "crop-selection"
+      ]
+    },
+    {
+      "id": "add-image-overlay-menu",
+      "name": "Add Image Overlay...",
+      "letter": "A",
+      "meaning": "Opens a file dialog to overlay another image or graphic onto the active page.",
+      "where": "Edit > Add Image Overlay... or Tools > Add Image Overlay...",
+      "steps": [
+        "Select Edit > Add Image Overlay... or Tools > Add Image Overlay...",
+        "Pick a photo, logo, badge, or graphic file from your disk.",
+        "The image is inserted as an interactive layer on the current page."
+      ],
+      "shortcut": "Ctrl + Shift + I",
+      "related": [
+        "add-image-overlay",
+        "markup-toolbar"
       ]
     },
     {
@@ -644,6 +680,24 @@
       "shortcut": "F11",
       "related": [
         "traffic-light-buttons",
+        "slideshow-mode"
+      ]
+    },
+    {
+      "id": "full-screen",
+      "name": "Full Screen",
+      "letter": "F",
+      "meaning": "Expands the document viewer to occupy the entire screen display.",
+      "where": "View > Full Screen or Header Bar > Full Screen Button",
+      "steps": [
+        "Click the Full Screen button on the top toolbar or press F11.",
+        "The application expands to full screen presentation.",
+        "Press F11 or Esc to exit full screen."
+      ],
+      "shortcut": "F11",
+      "related": [
+        "frameless-window-mode",
+        "zoom-maximize",
         "slideshow-mode"
       ]
     },
@@ -2270,6 +2324,127 @@
       "related": [
         "select-next-tab",
         "new-tab"
+      ]
+    },
+    {
+      "id": "editmode",
+      "name": "Edit Mode",
+      "letter": "E",
+      "meaning": "Professional editing workspace providing full annotation, drawing, signing, and markup tools.",
+      "where": "Top Toolbar > Mode Switcher > Edit, or View > Workspace Mode > Edit Mode",
+      "steps": [
+        "Click Edit on the workspace mode switcher or press Alt + 2.",
+        "Select text markup, drawing, redaction, or signing tools from the markup bar.",
+        "Adjust properties in the dynamic context formatting bar or the right Inspector panel."
+      ],
+      "shortcut": "Alt + 2",
+      "related": [
+        "viewmode",
+        "organizemode",
+        "markup-toolbar"
+      ]
+    },
+    {
+      "id": "viewmode",
+      "name": "View Mode",
+      "letter": "V",
+      "meaning": "Clean, distraction-free document browsing and reading workspace.",
+      "where": "Top Toolbar > Mode Switcher > View, or View > Workspace Mode > View Mode",
+      "steps": [
+        "Click View on the workspace mode switcher or press Alt + 1.",
+        "Navigate pages with arrow keys or the sidebar.",
+        "Zoom and search without distracting editing toolbars."
+      ],
+      "shortcut": "Alt + 1",
+      "related": [
+        "editmode",
+        "organizemode"
+      ]
+    },
+    {
+      "id": "organizemode",
+      "name": "Organize Mode",
+      "letter": "O",
+      "meaning": "Page and document management workspace for rotating, reordering, inserting, deleting, merging, and splitting pages.",
+      "where": "Top Toolbar > Mode Switcher > Organize, or View > Workspace Mode > Organize Mode",
+      "steps": [
+        "Click Organize on the workspace mode switcher or press Alt + 3.",
+        "Review pages in the Contact Sheet grid view.",
+        "Use the quick action bar to rotate, duplicate, insert, delete, merge, or split documents."
+      ],
+      "shortcut": "Alt + 3",
+      "related": [
+        "viewmode",
+        "editmode",
+        "organize-pdf-pages"
+      ]
+    },
+    {
+      "id": "handtool",
+      "name": "Hand Tool",
+      "letter": "H",
+      "meaning": "Pans and navigates smoothly across the canvas by dragging with the mouse.",
+      "where": "Markup Toolbar > Navigation Group > Hand Button",
+      "steps": [
+        "Click the Hand icon in the markup toolbar or press H.",
+        "Click and drag anywhere on the document canvas to scroll smoothly."
+      ],
+      "shortcut": "H",
+      "related": [
+        "pointer-select-tool",
+        "zoom-in",
+        "zoom-out"
+      ]
+    },
+    {
+      "id": "underlinetextmarkup",
+      "name": "Underline Text Markup",
+      "letter": "U",
+      "meaning": "Draws an authentic underline markup below selected words or paragraphs.",
+      "where": "Markup Toolbar > Text Markup Group > Underline Button",
+      "steps": [
+        "Click the Underline tool in the markup toolbar.",
+        "Drag across any text on the page to stamp a clean underline annotation.",
+        "Customize color and line style in the Inspector panel."
+      ],
+      "shortcut": "",
+      "related": [
+        "strikethroughtextmarkup",
+        "highlighter-tool"
+      ]
+    },
+    {
+      "id": "strikethroughtextmarkup",
+      "name": "Strikethrough Text Markup",
+      "letter": "S",
+      "meaning": "Draws a crisp strikethrough line directly across text or sections.",
+      "where": "Markup Toolbar > Text Markup Group > Strikethrough Button",
+      "steps": [
+        "Click the Strikethrough tool in the markup toolbar.",
+        "Drag across text on the document to draw a strikethrough markup.",
+        "Change color or thickness in the context formatting bar."
+      ],
+      "shortcut": "",
+      "related": [
+        "underlinetextmarkup",
+        "redaction-tool"
+      ]
+    },
+    {
+      "id": "textformatting",
+      "name": "Text Alignment and Formatting",
+      "letter": "T",
+      "meaning": "Configures font family, font size, bold, italic, underline, alignment, and color for text annotations.",
+      "where": "Markup Toolbar > Context Formatting Bar or Right Inspector Panel",
+      "steps": [
+        "Select any text annotation box on the canvas.",
+        "Use the font family dropdown and size stepper to adjust typography.",
+        "Click Bold, Italic, or Underline toggles, and select text color."
+      ],
+      "shortcut": "",
+      "related": [
+        "text-box-tool",
+        "inspector"
       ]
     }
   ]

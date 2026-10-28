@@ -9,7 +9,10 @@ import math
 from PIL import Image, ImageDraw, ImageChops
 from PIL.ImageQt import ImageQt
 
-from PyQt6.QtWidgets import QWidget, QInputDialog, QMenu, QDialog, QApplication
+from PyQt6.QtWidgets import (
+    QWidget, QInputDialog, QMenu, QDialog, QApplication,
+    QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFrame
+)
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPixmap, QCursor, QMouseEvent, 
     QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent, QPainterPath, QPolygonF
@@ -20,6 +23,95 @@ from preview.core.document import Document, SearchResult
 from preview.core.annotations import AnnotationItem, AnnotationType, Handle
 from preview.core.history import HistoryManager, ActionCommand
 from preview.ui.sticky_note_dialog import StickyNoteDialog
+from preview.icons import MacIconFactory
+
+
+class EmptyStateOverlay(QWidget):
+    """Empty state centered overlay shown when no document is open."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setObjectName("emptyStateOverlay")
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setAcceptDrops(True)
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        self.card = QFrame()
+        self.card.setObjectName("emptyStateCard")
+        self.card.setProperty("dragHover", "false")
+        card_layout = QVBoxLayout(self.card)
+        card_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.setContentsMargins(40, 36, 40, 36)
+        card_layout.setSpacing(14)
+
+        # Centered icon
+        self.icon_label = QLabel()
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setPixmap(MacIconFactory.create_icon("folder-open", "#007aff", 48).pixmap(48, 48))
+        card_layout.addWidget(self.icon_label)
+
+        # Title
+        self.title_label = QLabel("Open a file to get started")
+        self.title_label.setObjectName("emptyStateTitle")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(self.title_label)
+
+        # Open button
+        self.open_btn = QPushButton("Open File...")
+        self.open_btn.setObjectName("emptyStateOpenBtn")
+        self.open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.open_btn.setIcon(MacIconFactory.create_icon("folder-open", "#ffffff", 16))
+        self.open_btn.clicked.connect(self._on_open_clicked)
+        btn_box = QHBoxLayout()
+        btn_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        btn_box.addWidget(self.open_btn)
+        card_layout.addLayout(btn_box)
+
+        # Hint
+        self.hint_label = QLabel("or drag and drop a PDF or image here")
+        self.hint_label.setObjectName("emptyStateHint")
+        self.hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(self.hint_label)
+
+        layout.addWidget(self.card)
+
+    def set_drag_hover(self, hover: bool):
+        val = "true" if hover else "false"
+        if self.card.property("dragHover") != val:
+            self.card.setProperty("dragHover", val)
+            self.card.style().unpolish(self.card)
+            self.card.style().polish(self.card)
+            self.card.update()
+
+    def _on_open_clicked(self):
+        win = self.window()
+        if hasattr(win, "_open_file_dialog"):
+            win._open_file_dialog()
+        elif hasattr(win, "open_file_dialog"):
+            win.open_file_dialog()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.set_drag_hover(True)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self.set_drag_hover(False)
+        event.accept()
+
+    def dropEvent(self, event):
+        self.set_drag_hover(False)
+        win = self.window()
+        if hasattr(win, "dropEvent"):
+            win.dropEvent(event)
+
 
 class CanvasView(QWidget):
     """Interactive canvas rendering document pages and annotations."""
@@ -31,6 +123,7 @@ class CanvasView(QWidget):
     page_next_requested = pyqtSignal()
     page_prev_requested = pyqtSignal()
     document_modified = pyqtSignal(bool)
+    annotation_selected = pyqtSignal(object)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -116,12 +209,43 @@ class CanvasView(QWidget):
         # View Mode: "Single", "Two-Up"
         self.view_mode: str = "Single"
 
+        self.setAcceptDrops(True)
+        self.empty_state_overlay = EmptyStateOverlay(self)
+        self.empty_state_overlay.setGeometry(self.rect())
+        self.empty_state_overlay.setVisible(True)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if hasattr(self, "empty_state_overlay"):
+            self.empty_state_overlay.setGeometry(self.rect())
+            self.empty_state_overlay.setVisible(self.document is None)
         if self._auto_fit and self.document:
             self.zoom_to_fit()
         if hasattr(self, "floating_pill") and self.floating_pill:
             self.floating_pill._reposition()
+
+    # --- Drag and Drop Handling ---
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            if hasattr(self, "empty_state_overlay"):
+                self.empty_state_overlay.set_drag_hover(True)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        if hasattr(self, "empty_state_overlay"):
+            self.empty_state_overlay.set_drag_hover(False)
+        event.accept()
+
+    def dropEvent(self, event):
+        if hasattr(self, "empty_state_overlay"):
+            self.empty_state_overlay.set_drag_hover(False)
+        win = self.window()
+        if hasattr(win, "dropEvent"):
+            win.dropEvent(event)
 
     @property
     def is_modified(self) -> bool:
@@ -130,6 +254,8 @@ class CanvasView(QWidget):
 
     def set_document(self, doc: Document):
         self.document = doc
+        if hasattr(self, "empty_state_overlay"):
+            self.empty_state_overlay.setVisible(self.document is None)
         self.current_page = 0
         self.annotations.clear()
         self.history.clear()
@@ -252,13 +378,41 @@ class CanvasView(QWidget):
         self.update()
         self._spring_to_bounds()
 
+    def animate_zoom_to(self, target_zoom: float, center: Optional[QPointF] = None, duration: int = 150):
+        if hasattr(self, "_zoom_anim") and self._zoom_anim and self._zoom_anim.state() == QVariantAnimation.State.Running:
+            self._zoom_anim.stop()
+        
+        target_zoom = max(0.05, min(10.0, target_zoom))
+        if center is None:
+            center = QPointF(self.width() / 2.0, self.height() / 2.0)
+        
+        start_zoom = self.zoom
+        if abs(start_zoom - target_zoom) < 0.001 or not self.isVisible():
+            if self.zoom > 0:
+                self.zoom_at(center, target_zoom / self.zoom)
+            return
+
+        self._zoom_anim = QVariantAnimation(self)
+        self._zoom_anim.setDuration(duration)
+        self._zoom_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._zoom_anim.setStartValue(start_zoom)
+        self._zoom_anim.setEndValue(target_zoom)
+
+        def on_tick(val):
+            curr = self.zoom
+            if curr > 0:
+                self.zoom_at(center, val / curr)
+
+        self._zoom_anim.valueChanged.connect(on_tick)
+        self._zoom_anim.start()
+
     def zoom_in(self):
         center = QPointF(self.width() / 2.0, self.height() / 2.0)
-        self.zoom_at(center, 1.25)
+        self.animate_zoom_to(self.zoom * 1.25, center=center)
 
     def zoom_out(self):
         center = QPointF(self.width() / 2.0, self.height() / 2.0)
-        self.zoom_at(center, 1.0 / 1.25)
+        self.animate_zoom_to(self.zoom / 1.25, center=center)
 
     def zoom_actual_size(self):
         self._auto_fit = False
@@ -339,7 +493,7 @@ class CanvasView(QWidget):
             self.set_active_tool(AnnotationType.NONE)
             center = QPointF(self.width() / 2.0, self.height() / 2.0)
             self._loupe_pos = center
-            self.status_message.emit("Magnifier active — Move cursor to inspect, Esc to close")
+            self.status_message.emit("Magnifier active - Move cursor to inspect, Esc to close")
         else:
             self._loupe_pos = QPointF(-1000, -1000)
             self.status_message.emit("Magnifier closed")
@@ -438,11 +592,11 @@ class CanvasView(QWidget):
         return QPointF(max(0.0, min(float(w_doc), float(pt.x()))),
                        max(0.0, min(float(h_doc), float(pt.y()))))
 
-    def is_inside_doc_bounds(self, pt: QPointF) -> bool:
+    def is_inside_doc_bounds(self, pt: QPointF, tolerance: float = 2.0) -> bool:
         if not self.document:
             return False
         w_doc, h_doc = self.document.get_page_size(self.current_page)
-        return (0.0 <= pt.x() <= w_doc) and (0.0 <= pt.y() <= h_doc)
+        return (-tolerance <= pt.x() <= w_doc + tolerance) and (-tolerance <= pt.y() <= h_doc + tolerance)
 
     def get_document_page_rect(self) -> QRectF:
         """Returns the primary page rectangle in canvas view coordinates."""
@@ -522,16 +676,18 @@ class CanvasView(QWidget):
                         self.update()
                         return
 
-            # 0b. If markup is disabled, do not allow creating or interacting with annotations/selections
+            # 0b. Without editing mode (markup disabled), disable text and word selection
             if not self.markup_enabled:
-                if self.document and self.document.is_pdf:
-                    self._is_selecting_text = True
-                    self._text_sel_start = doc_pt
-                    self._text_sel_rects.clear()
-                    self._selected_text = ""
-                else:
-                    self._is_panning = True
-                    self._pan_start = event.position()
+                self._clear_text_selection()
+                self._is_panning = True
+                self._pan_start = event.position()
+                self._update_cursor()
+                return
+
+            if self.active_tool == AnnotationType.HAND:
+                self._is_panning = True
+                self._pan_start = event.position()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
                 return
 
             # Check if clicking on a resize handle of the currently selected annotation
@@ -574,10 +730,11 @@ class CanvasView(QWidget):
                 self.update()
                 return
 
-            # 3. Handle Shapes & Redaction
+            # 3. Handle Shapes & Redaction & Underline & Strikethrough
             if self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
                                     AnnotationType.ELLIPSE, AnnotationType.LINE, 
-                                    AnnotationType.ARROW, AnnotationType.REDACT):
+                                    AnnotationType.ARROW, AnnotationType.REDACT,
+                                    AnnotationType.UNDERLINE, AnnotationType.STRIKETHROUGH):
                 item = AnnotationItem(self.active_tool)
                 item.stroke_color = QColor(self.stroke_color)
                 item.stroke_width = self.stroke_width
@@ -675,6 +832,7 @@ class CanvasView(QWidget):
                 item.is_selected = (item is clicked_item)
             
             self._selected_annotation = clicked_item
+            self.annotation_selected.emit(clicked_item)
             if clicked_item:
                 self._is_dragging_item = True
                 self._drag_start_doc_pt = doc_pt
@@ -694,16 +852,7 @@ class CanvasView(QWidget):
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
         if not self.markup_enabled:
-            # When markup is closed, only allow selecting words in PDF
-            if event.button() == Qt.MouseButton.LeftButton and self.document and self.document.is_pdf:
-                doc_pt = self.view_to_doc_coords(event.position())
-                words = self.document.get_page_words(self.current_page)
-                for r, w in words:
-                    if r.contains(doc_pt):
-                        self._text_sel_rects = [r]
-                        self._selected_text = w
-                        self.update()
-                        return
+            # Word and text selection is disabled without editing mode
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
@@ -841,7 +990,9 @@ class CanvasView(QWidget):
                                                         AnnotationType.ELLIPSE,
                                                         AnnotationType.REDACT,
                                                         AnnotationType.LOUPE,
-                                                        AnnotationType.CALLOUT):
+                                                        AnnotationType.CALLOUT,
+                                                        AnnotationType.UNDERLINE,
+                                                        AnnotationType.STRIKETHROUGH):
                 p1 = self._active_annotation.rect.topLeft()
                 self._active_annotation.rect = QRectF(p1, doc_pt_clamped).normalized()
                 if self._active_annotation.item_type == AnnotationType.CALLOUT:
@@ -885,25 +1036,48 @@ class CanvasView(QWidget):
             else:
                 self._hovered_link = None
 
-        # 6. Hover cursor update over resize handles
-        if self.active_tool == AnnotationType.NONE and self._selected_annotation and not event.buttons():
-            handle = self._selected_annotation.get_handle_at_point(doc_pt, self.zoom)
+        # 6. Hover cursor update over resize handles (selected annotation or crop box)
+        target_annot = self._selected_annotation or self.crop_box
+        if self.active_tool == AnnotationType.NONE and target_annot and not event.buttons():
+            handle = target_annot.get_handle_at_point(doc_pt, self.zoom)
             if handle in (Handle.NW, Handle.SE):
                 self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                return
             elif handle in (Handle.NE, Handle.SW):
                 self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                return
             elif handle in (Handle.N, Handle.S):
                 self.setCursor(Qt.CursorShape.SizeVerCursor)
+                return
             elif handle in (Handle.E, Handle.W):
                 self.setCursor(Qt.CursorShape.SizeHorCursor)
+                return
             elif handle in (Handle.START, Handle.END):
                 self.setCursor(Qt.CursorShape.CrossCursor)
+                return
             elif handle in (Handle.TAIL, Handle.MAGNIFY):
                 self.setCursor(Qt.CursorShape.PointingHandCursor)
-            elif self._selected_annotation.contains_point(doc_pt):
+                return
+            elif target_annot.contains_point(doc_pt):
                 self.setCursor(Qt.CursorShape.SizeAllCursor)
-            else:
-                self._update_cursor()
+                return
+
+        # 7. Hover over annotations in Edit mode (pointing hand cursor to indicate selectable)
+        if self.markup_enabled and self.active_tool == AnnotationType.NONE and not event.buttons():
+            for item in reversed(self._get_current_annotations()):
+                if item.contains_point(doc_pt):
+                    self.setCursor(Qt.CursorShape.PointingHandCursor)
+                    return
+
+        # 8. Hover over selectable PDF text only in Edit mode
+        if self.markup_enabled and self.active_tool == AnnotationType.NONE and self.document and self.document.is_pdf and not event.buttons():
+            words = self.document.get_page_words(self.current_page)
+            if any(r.contains(doc_pt) for r, w in words):
+                self.setCursor(Qt.CursorShape.IBeamCursor)
+                return
+
+        if self.active_tool == AnnotationType.NONE and not event.buttons():
+            self._update_cursor()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if self._is_panning:
@@ -1015,11 +1189,13 @@ class CanvasView(QWidget):
     def set_markup_enabled(self, enabled: bool):
         """Controls whether annotation and selection tools are active or if canvas is in view-only mode."""
         self.markup_enabled = enabled
+        self._clear_text_selection()
         if not enabled:
             self.unselect_tools()
             if self._selected_annotation:
                 self._selected_annotation.is_selected = False
                 self._selected_annotation = None
+                self.annotation_selected.emit(None)
             self.crop_box = None
             self.crop_available.emit(False)
             self._update_cursor()
@@ -1034,6 +1210,7 @@ class CanvasView(QWidget):
         if self._selected_annotation:
             self._selected_annotation.is_selected = False
             self._selected_annotation = None
+            self.annotation_selected.emit(None)
         self._update_cursor()
         self.update()
 
@@ -1046,64 +1223,67 @@ class CanvasView(QWidget):
         return super().event(event)
 
     def wheelEvent(self, event: QWheelEvent):
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        # Zoom in/out when scrolling on image documents or when Ctrl modifier is held
+        is_image = not (self.document and self.document.is_pdf)
+        if (event.modifiers() & Qt.KeyboardModifier.ControlModifier) or is_image:
             delta = event.angleDelta().y()
             if delta != 0:
                 factor = 1.0015 ** delta
                 self.zoom_at(event.position(), factor)
             event.accept()
-        else:
-            dy = event.angleDelta().y() / 2.0
-            dx = event.angleDelta().x() / 2.0
-            raw_dy = event.angleDelta().y()
+            return
 
-            # For multi-page PDFs, handle smooth page navigation on mouse wheel
-            if self.document and self.document.is_pdf and self.document.page_count > 1:
-                min_x, max_x, min_y, max_y = self._get_resting_bounds()
-                cur_y = self._pan_offset.y()
-                self._wheel_reset_timer.start(350)
+        dy = event.angleDelta().y() / 2.0
+        dx = event.angleDelta().x() / 2.0
+        raw_dy = event.angleDelta().y()
 
-                # Case 1: Page fits vertically inside viewport (min_y == max_y)
-                if abs(max_y - min_y) < 1.0:
-                    self._page_wheel_accumulator += raw_dy
-                    if self._page_wheel_accumulator <= -80:
-                        self._page_wheel_accumulator = 0.0
-                        self.page_next_requested.emit()
-                    elif self._page_wheel_accumulator >= 80:
-                        self._page_wheel_accumulator = 0.0
-                        self.page_prev_requested.emit()
-                    event.accept()
-                    return
+        # For multi-page PDFs, handle smooth page navigation on mouse wheel
+        if self.document and self.document.is_pdf and self.document.page_count > 1:
+            min_x, max_x, min_y, max_y = self._get_resting_bounds()
+            cur_y = self._pan_offset.y()
+            self._wheel_reset_timer.start(350)
 
-                # Case 2: Page is taller than viewport (min_y < max_y)
-                # At the bottom scrolling down -> turn to next page
-                if cur_y <= min_y + 4 and raw_dy < 0:
-                    self._page_wheel_accumulator += raw_dy
-                    if self._page_wheel_accumulator <= -100:
-                        self._page_wheel_accumulator = 0.0
-                        self.page_next_requested.emit()
-                        # Position next page at top
-                        _, _, _, new_max_y = self._get_resting_bounds()
-                        self._pan_offset.setY(new_max_y)
-                    event.accept()
-                    return
-                # At the top scrolling up -> turn to previous page
-                elif cur_y >= max_y - 4 and raw_dy > 0:
-                    self._page_wheel_accumulator += raw_dy
-                    if self._page_wheel_accumulator >= 100:
-                        self._page_wheel_accumulator = 0.0
-                        self.page_prev_requested.emit()
-                        # Position previous page at bottom
-                        new_min_y, _, _, _ = self._get_resting_bounds()
-                        self._pan_offset.setY(new_min_y)
-                    event.accept()
-                    return
-                else:
+            # Case 1: Page fits vertically inside viewport (min_y == max_y)
+            if abs(max_y - min_y) < 1.0:
+                self._page_wheel_accumulator += raw_dy
+                if self._page_wheel_accumulator <= -80:
                     self._page_wheel_accumulator = 0.0
+                    self.page_next_requested.emit()
+                elif self._page_wheel_accumulator >= 80:
+                    self._page_wheel_accumulator = 0.0
+                    self.page_prev_requested.emit()
+                event.accept()
+                return
 
-            self._apply_pan_delta(QPointF(dx, dy))
-            self._spring_timer.start(100)
-            event.accept()
+            # Case 2: Page is taller than viewport (min_y < max_y)
+            # At the bottom scrolling down -> turn to next page
+            if cur_y <= min_y + 4 and raw_dy < 0:
+                self._page_wheel_accumulator += raw_dy
+                if self._page_wheel_accumulator <= -100:
+                    self._page_wheel_accumulator = 0.0
+                    self.page_next_requested.emit()
+                    # Position next page at top
+                    _, _, _, new_max_y = self._get_resting_bounds()
+                    self._pan_offset.setY(new_max_y)
+                event.accept()
+                return
+            # At the top scrolling up -> turn to previous page
+            elif cur_y >= max_y - 4 and raw_dy > 0:
+                self._page_wheel_accumulator += raw_dy
+                if self._page_wheel_accumulator >= 100:
+                    self._page_wheel_accumulator = 0.0
+                    self.page_prev_requested.emit()
+                    # Position previous page at bottom
+                    new_min_y, _, _, _ = self._get_resting_bounds()
+                    self._pan_offset.setY(new_min_y)
+                event.accept()
+                return
+            else:
+                self._page_wheel_accumulator = 0.0
+
+        self._apply_pan_delta(QPointF(dx, dy))
+        self._spring_timer.start(100)
+        event.accept()
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_Escape:
@@ -1146,6 +1326,13 @@ class CanvasView(QWidget):
                 self.redo()
                 event.accept()
                 return
+            elif event.key() == Qt.Key.Key_V:
+                clipboard = QApplication.clipboard()
+                pixmap = clipboard.pixmap()
+                if not pixmap.isNull():
+                    self.add_image_overlay(pixmap)
+                    event.accept()
+                    return
 
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
             self._space_held = True
@@ -1600,10 +1787,6 @@ class CanvasView(QWidget):
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
         if not self.document:
-            # Draw placeholder when no file is open
-            painter.setPen(QPen(QColor("#8e8e93")))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, 
-                             "Drag and drop a PDF or image here,\nor click Open File")
             return
 
         # 1. Render Document Page
@@ -1912,3 +2095,51 @@ class CanvasView(QWidget):
                 self.status_message.emit(f"Copied {len(txt)} characters to clipboard")
             else:
                 self.status_message.emit("No selectable text on this page")
+
+    def add_image_overlay(self, pixmap: QPixmap, pos: Optional[QPointF] = None) -> Optional[AnnotationItem]:
+        """Adds an interactive image overlay item onto the current page, like Canva."""
+        if not self.document or pixmap.isNull():
+            return None
+
+        item = AnnotationItem(AnnotationType.IMAGE_OVERLAY)
+        item.overlay_pixmap = pixmap
+
+        page_sz = self.document.get_page_size(self.current_page)
+        pw, ph = (page_sz[0], page_sz[1]) if page_sz else (800.0, 600.0)
+
+        orig_w = max(1.0, float(pixmap.width()))
+        orig_h = max(1.0, float(pixmap.height()))
+        aspect = orig_w / orig_h
+
+        max_w = min(pw * 0.6, 320.0)
+        max_h = min(ph * 0.6, 320.0)
+
+        if orig_w / max_w > orig_h / max_h:
+            target_w = max_w
+            target_h = target_w / aspect
+        else:
+            target_h = max_h
+            target_w = target_h * aspect
+
+        target_w = max(40.0, target_w)
+        target_h = max(40.0, target_h)
+
+        if pos is None:
+            cx = (pw - target_w) / 2.0
+            cy = (ph - target_h) / 2.0
+            pos = QPointF(max(10.0, cx), max(10.0, cy))
+
+        item.rect = QRectF(pos.x(), pos.y(), target_w, target_h)
+        item.is_selected = True
+
+        for existing in self._get_current_annotations():
+            existing.is_selected = False
+
+        self._get_current_annotations().append(item)
+        self._selected_annotation = item
+        self._push_add_command(item, self.current_page)
+        self.annotation_selected.emit(item)
+        self.document_modified.emit(True)
+        self.status_message.emit("Image overlay added. Drag to move, resize with corner handles.")
+        self.update()
+        return item

@@ -38,6 +38,8 @@ from preview.ui.save_dialog import MacSaveConfirmationDialog
 from preview.ui.tab_bar import MacTabBarContainer, DocumentTabState
 from preview.core.updater import UpdateCheckWorker, UpdateInfo
 from preview.ui.update_dialog import UpdateDialog, UpdateBanner
+from preview.ui.inspector_panel import MacInspectorPanel
+from preview.ui.organize_toolbar import OrganizeActionBar
 
 class FloatingStatusPill(QWidget):
     """Small floating pill displaying page and zoom info at bottom center of canvas, fading after 2s."""
@@ -171,7 +173,7 @@ class FloatingSlideshowHUD(QWidget):
         self.exit_btn = QToolButton()
         self.exit_btn.setText("✕")
         self.exit_btn.setToolTip("Exit Slideshow (Esc)")
-        self.exit_btn.clicked.connect(self.main_win._toggle_slideshow)
+        self.exit_btn.clicked.connect(lambda: self.main_win.toggle_fullscreen(auto_advance=False))
         layout.addWidget(self.exit_btn)
 
         self.adjustSize()
@@ -318,16 +320,8 @@ class DraggableToolbar(QWidget):
         self.update_title_geometry()
 
     def update_title_geometry(self):
-        title_w = getattr(self.main_win, 'title_widget', None)
-        if title_w:
-            hint = title_w.sizeHint()
-            w = self.width()
-            h = self.height()
-            tw = min(hint.width(), max(120, w - 380))
-            th = max(24, hint.height())
-            x = (w - tw) // 2
-            y = (h - th) // 2
-            title_w.setGeometry(x, y, tw, th)
+        """Header bar layout with stretch items automatically centers the title container."""
+        pass
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -414,6 +408,7 @@ class MacMainWindow(QMainWindow):
         self.appearance_mode: str = "auto"
         self.current_theme: str = self.theme_manager.get_resolved_theme()
         self.theme_manager.theme_changed.connect(self._on_theme_manager_changed)
+        self.current_workspace_mode: str = "View"
         self.document: Optional[Document] = None
         self.inspector_dialog: Optional[InspectorDialog] = None
         self.color_dialog: Optional[AdjustColorDialog] = None
@@ -491,7 +486,8 @@ class MacMainWindow(QMainWindow):
         self.canvas.status_message.connect(self._show_status)
         self.canvas.page_next_requested.connect(self.next_page)
         self.canvas.page_prev_requested.connect(self.prev_page)
-        self.canvas.document_modified.connect(lambda _: self._update_modified_ui())
+        self.canvas.document_modified.connect(lambda _: self._on_document_or_annotations_modified())
+        self.canvas.annotation_selected.connect(self._on_annotation_selected)
 
         # 2. Secondary Markup Toolbar (collapsible 38px)
         self.markup_bar = MarkupToolbar(self)
@@ -499,10 +495,16 @@ class MacMainWindow(QMainWindow):
         self._connect_markup_bar()
         self.canvas.crop_available.connect(self.markup_bar.set_crop_enabled)
 
+        # 2.5 Mode C Organize Action Bar (collapsible)
+        self.organize_bar = OrganizeActionBar(self)
+        self.organize_bar.setVisible(False)
+        self._connect_organize_bar()
+
         # 3. Unified macOS Toolbar (fixed 52px tall, 1px bottom border)
         self._setup_toolbar()
         self.main_layout.addWidget(self.toolbar_widget)
         self.main_layout.addWidget(self.markup_bar)
+        self.main_layout.addWidget(self.organize_bar)
 
         # 3.5 macOS Tab Bar (collapsible / multi-tab)
         self.tab_container = MacTabBarContainer(self)
@@ -516,13 +518,19 @@ class MacMainWindow(QMainWindow):
         self.active_tab_index: int = -1
         self.show_tab_bar_always: bool = False
 
-        # 4. Central Splitter (Sidebar + Canvas) takes 100% remaining space
+        # 3.8 Right Inspector Panel (collapsible 280px)
+        self.inspector_panel = MacInspectorPanel(self)
+        self.inspector_panel.setVisible(False)
+        self._connect_inspector_panel()
+
+        # 4. Central Splitter (Sidebar + Canvas + Inspector) takes 100% remaining space
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         self.splitter.setHandleWidth(1)
         self.splitter.addWidget(self.sidebar)
         self.splitter.addWidget(self.canvas)
-        self.splitter.setSizes([190, 960])
+        self.splitter.addWidget(self.inspector_panel)
+        self.splitter.setSizes([240, 960, 0])
         self.main_layout.addWidget(self.splitter, 1)
 
         # 5. Footer Status Bar
@@ -545,80 +553,91 @@ class MacMainWindow(QMainWindow):
 
         self._init_tabs()
 
+    def _create_divider(self) -> QWidget:
+        div = QWidget()
+        div.setObjectName("toolbarDivider")
+        div.setFixedSize(1, 20)
+        return div
+
     def _setup_toolbar(self):
         self.toolbar_widget = DraggableToolbar(self)
         self.toolbar_widget.setObjectName("macToolbar")
-        self.toolbar_widget.setFixedHeight(52)
+        self.toolbar_widget.setFixedHeight(48)
         self.toolbar_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         toolbar_layout = QHBoxLayout(self.toolbar_widget)
-        toolbar_layout.setContentsMargins(14, 0, 14, 0)
-        toolbar_layout.setSpacing(6)
+        toolbar_layout.setContentsMargins(16, 0, 16, 0)
+        toolbar_layout.setSpacing(0)
 
-        # 1. Traffic lights cluster (Close, Minimize, Maximize) spaced 8px apart
+        # 1. Left Group: Window Controls + Sidebar Toggle + Back/Forward + Open
         self.traffic_cluster = TrafficLightCluster(self)
         toolbar_layout.addWidget(self.traffic_cluster)
         self.traffic_cluster.setVisible(self.is_frameless)
+        if self.is_frameless:
+            toolbar_layout.addSpacing(8)
 
-        toolbar_layout.addSpacing(12)
-
-        # 2. Sidebar toggle (icon-only, 28px high, 6px radius)
+        # Sidebar toggle (32x32)
         self.sidebar_btn = QToolButton()
         self.sidebar_btn.setObjectName("sidebarBtn")
-        self.sidebar_btn.setFixedSize(28, 28)
+        self.sidebar_btn.setFixedSize(32, 32)
         self.sidebar_btn.setToolTip("Toggle Sidebar (Ctrl+B) - Learn more (F1)")
+        self.sidebar_btn.setAccessibleName("Toggle Sidebar")
         self.sidebar_btn.clicked.connect(self._toggle_sidebar)
         toolbar_layout.addWidget(self.sidebar_btn)
 
-        toolbar_layout.addSpacing(6)
+        toolbar_layout.addSpacing(8)
 
-        # 3. Previous / Next Joined Segmented Pair
+        # Nav segmented pair (64x32)
         self.nav_segmented = QWidget()
         self.nav_segmented.setObjectName("navSegmented")
-        self.nav_segmented.setFixedSize(56, 28)
+        self.nav_segmented.setFixedSize(64, 32)
         nav_layout = QHBoxLayout(self.nav_segmented)
         nav_layout.setContentsMargins(0, 0, 0, 0)
         nav_layout.setSpacing(0)
 
         self.prev_btn = QToolButton()
         self.prev_btn.setObjectName("prevBtn")
-        self.prev_btn.setFixedSize(28, 28)
+        self.prev_btn.setFixedSize(32, 32)
         self.prev_btn.setToolTip("Previous Page / Image (Left Arrow)")
+        self.prev_btn.setAccessibleName("Previous Page")
         self.prev_btn.clicked.connect(self.prev_page)
         nav_layout.addWidget(self.prev_btn)
 
         self.next_btn = QToolButton()
         self.next_btn.setObjectName("nextBtn")
-        self.next_btn.setFixedSize(28, 28)
+        self.next_btn.setFixedSize(32, 32)
         self.next_btn.setToolTip("Next Page / Image (Right Arrow)")
+        self.next_btn.setAccessibleName("Next Page")
         self.next_btn.clicked.connect(self.next_page)
         nav_layout.addWidget(self.next_btn)
 
         toolbar_layout.addWidget(self.nav_segmented)
 
-        toolbar_layout.addSpacing(6)
+        toolbar_layout.addSpacing(8)
 
-        # 4. Open Segmented Control: [ 📁 Open | ▼ ] (Icon + Text with Dropdown Segment)
+        # Open Segmented Control (32px tall)
         self.open_segmented = QWidget()
         self.open_segmented.setObjectName("openSegmented")
-        self.open_segmented.setFixedHeight(28)
+        self.open_segmented.setFixedHeight(32)
         open_seg_layout = QHBoxLayout(self.open_segmented)
         open_seg_layout.setContentsMargins(0, 0, 0, 0)
         open_seg_layout.setSpacing(0)
 
         self.open_btn = QToolButton()
         self.open_btn.setObjectName("openMainBtn")
-        self.open_btn.setFixedHeight(28)
+        self.open_btn.setFixedHeight(32)
         self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.open_btn.setText("Open")
         self.open_btn.setToolTip("Open Document or Images (Ctrl+O) - Learn more (F1)")
+        self.open_btn.setAccessibleName("Open Document")
         self.open_btn.clicked.connect(self._open_file_dialog)
         open_seg_layout.addWidget(self.open_btn)
 
         self.open_arrow_btn = QToolButton()
         self.open_arrow_btn.setObjectName("openArrowBtn")
-        self.open_arrow_btn.setFixedSize(18, 28)
+        self.open_arrow_btn.setFixedSize(20, 32)
         self.open_arrow_btn.setToolTip("Open Options")
+        self.open_arrow_btn.setAccessibleName("Open Options")
 
         open_menu = QMenu(self)
         open_files_action = QAction("Open File(s)...", self)
@@ -642,11 +661,23 @@ class MacMainWindow(QMainWindow):
 
         toolbar_layout.addWidget(self.open_segmented)
 
-        # Spacer to allow centering of title
+        # Thin Vertical Divider 1
+        toolbar_layout.addSpacing(16)
+        self.divider1 = self._create_divider()
+        toolbar_layout.addWidget(self.divider1)
+        toolbar_layout.addSpacing(16)
+
         toolbar_layout.addStretch(1)
 
-        # 5. Centered Title Widget with Lucide file icon, medium weight 13px Inter title
-        self.title_widget = QWidget(self.toolbar_widget)
+        # 2. Center Group: Document Filename + Mode Segmented Control
+        self.center_container = QWidget()
+        self.center_container.setObjectName("toolbarCenterContainer")
+        center_layout = QHBoxLayout(self.center_container)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(8)
+        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.title_widget = QWidget(self.center_container)
         self.title_widget.setObjectName("titleWidget")
         title_box = QHBoxLayout(self.title_widget)
         title_box.setContentsMargins(0, 0, 0, 0)
@@ -655,7 +686,7 @@ class MacMainWindow(QMainWindow):
 
         self.proxy_icon_label = QLabel()
         self.proxy_icon_label.setFixedSize(16, 16)
-        self.title_label = QLabel("Document Viewer")
+        self.title_label = QLabel("No document")
         self.title_label.setObjectName("windowTitleLabel")
         self.page_badge = QLabel("")
         self.page_badge.setObjectName("pageBadge")
@@ -664,26 +695,84 @@ class MacMainWindow(QMainWindow):
         title_box.addWidget(self.proxy_icon_label)
         title_box.addWidget(self.title_label)
         title_box.addWidget(self.page_badge)
+        center_layout.addWidget(self.title_widget)
 
-        # 6. Zoom Out / In Joined Segmented Pair
+        center_layout.addSpacing(8)
+
+        # Mode Segmented Control: [ View | Edit | Organize ]
+        self.mode_segmented = QWidget(self.center_container)
+        self.mode_segmented.setObjectName("modeSegmented")
+        self.mode_segmented.setFixedHeight(32)
+        mode_layout = QHBoxLayout(self.mode_segmented)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        mode_layout.setSpacing(0)
+
+        self.mode_view_btn = QToolButton()
+        self.mode_view_btn.setObjectName("modeViewBtn")
+        self.mode_view_btn.setCheckable(True)
+        self.mode_view_btn.setChecked(True)
+        self.mode_view_btn.setText("View")
+        self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.mode_view_btn.setFixedHeight(32)
+        self.mode_view_btn.setToolTip("View Mode: Clean document reading (Alt+1)")
+        self.mode_view_btn.setAccessibleName("View Mode")
+        self.mode_view_btn.clicked.connect(lambda: self.set_workspace_mode("View"))
+        mode_layout.addWidget(self.mode_view_btn)
+
+        self.mode_edit_btn = QToolButton()
+        self.mode_edit_btn.setObjectName("modeEditBtn")
+        self.mode_edit_btn.setCheckable(True)
+        self.mode_edit_btn.setText("Edit")
+        self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.mode_edit_btn.setFixedHeight(32)
+        self.mode_edit_btn.setToolTip("Edit Mode: Annotation and markup tools (Alt+2)")
+        self.mode_edit_btn.setAccessibleName("Edit Mode")
+        self.mode_edit_btn.clicked.connect(lambda: self.set_workspace_mode("Edit"))
+        mode_layout.addWidget(self.mode_edit_btn)
+
+        self.mode_organize_btn = QToolButton()
+        self.mode_organize_btn.setObjectName("modeOrganizeBtn")
+        self.mode_organize_btn.setCheckable(True)
+        self.mode_organize_btn.setText("Organize")
+        self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.mode_organize_btn.setFixedHeight(32)
+        self.mode_organize_btn.setToolTip("Organize Mode: Page & document management (Alt+3)")
+        self.mode_organize_btn.setAccessibleName("Organize Mode")
+        self.mode_organize_btn.clicked.connect(lambda: self.set_workspace_mode("Organize"))
+        mode_layout.addWidget(self.mode_organize_btn)
+
+        center_layout.addWidget(self.mode_segmented)
+        toolbar_layout.addWidget(self.center_container)
+
+        toolbar_layout.addStretch(1)
+
+        # Thin Vertical Divider 2
+        toolbar_layout.addSpacing(16)
+        self.divider2 = self._create_divider()
+        toolbar_layout.addWidget(self.divider2)
+        toolbar_layout.addSpacing(16)
+
+        # 3. Right Group: Zoom + Rotate + Markup + Search + Info + Theme
         self.zoom_segmented = QWidget()
         self.zoom_segmented.setObjectName("zoomSegmented")
-        self.zoom_segmented.setFixedSize(56, 28)
+        self.zoom_segmented.setFixedSize(64, 32)
         zoom_layout = QHBoxLayout(self.zoom_segmented)
         zoom_layout.setContentsMargins(0, 0, 0, 0)
         zoom_layout.setSpacing(0)
 
         self.zoom_out_btn = QToolButton()
         self.zoom_out_btn.setObjectName("zoomOutBtn")
-        self.zoom_out_btn.setFixedSize(28, 28)
+        self.zoom_out_btn.setFixedSize(32, 32)
         self.zoom_out_btn.setToolTip("Zoom Out (Ctrl+-) - Learn more (F1)")
+        self.zoom_out_btn.setAccessibleName("Zoom Out")
         self.zoom_out_btn.clicked.connect(self.canvas.zoom_out)
         zoom_layout.addWidget(self.zoom_out_btn)
 
         self.zoom_in_btn = QToolButton()
         self.zoom_in_btn.setObjectName("zoomInBtn")
-        self.zoom_in_btn.setFixedSize(28, 28)
+        self.zoom_in_btn.setFixedSize(32, 32)
         self.zoom_in_btn.setToolTip("Zoom In (Ctrl++) - Learn more (F1)")
+        self.zoom_in_btn.setAccessibleName("Zoom In")
         self.zoom_in_btn.clicked.connect(self.canvas.zoom_in)
         zoom_layout.addWidget(self.zoom_in_btn)
 
@@ -691,37 +780,51 @@ class MacMainWindow(QMainWindow):
 
         toolbar_layout.addSpacing(6)
 
-        # 7. Rotate as a single button
+        # Full Screen mode button (32x32)
+        self.fullscreen_btn = QToolButton()
+        self.fullscreen_btn.setObjectName("fullscreenBtn")
+        self.fullscreen_btn.setFixedSize(32, 32)
+        self.fullscreen_btn.setToolTip("Full Screen (F11)")
+        self.fullscreen_btn.setAccessibleName("Toggle Full Screen")
+        self.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
+        toolbar_layout.addWidget(self.fullscreen_btn)
+
+        toolbar_layout.addSpacing(8)
+
+        # Rotate button (32x32)
         self.rotate_btn = QToolButton()
         self.rotate_btn.setObjectName("rotateBtn")
-        self.rotate_btn.setFixedSize(28, 28)
+        self.rotate_btn.setFixedSize(32, 32)
         self.rotate_btn.setToolTip("Rotate (Ctrl+R) - Learn more (F1)")
+        self.rotate_btn.setAccessibleName("Rotate Clockwise")
         self.rotate_btn.clicked.connect(self._rotate_right)
         self.rotate_right_btn = self.rotate_btn
         self.rotate_left_btn = self.rotate_btn
         toolbar_layout.addWidget(self.rotate_btn)
 
-        toolbar_layout.addSpacing(6)
+        toolbar_layout.addSpacing(8)
 
-        # 8. Markup as a pill button
+        # Markup primary button (32px tall)
         self.markup_toggle_btn = QToolButton()
         self.markup_toggle_btn.setObjectName("markupPillBtn")
         self.markup_toggle_btn.setCheckable(True)
         self.markup_toggle_btn.setText("Markup")
-        self.markup_toggle_btn.setFixedHeight(28)
+        self.markup_toggle_btn.setFixedHeight(32)
         self.markup_toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.markup_toggle_btn.setToolTip("Show/Hide Markup Toolbar (Ctrl+Shift+A) - Learn more (F1)")
+        self.markup_toggle_btn.setAccessibleName("Markup Tools")
         self.markup_toggle_btn.clicked.connect(self._toggle_markup_bar)
         toolbar_layout.addWidget(self.markup_toggle_btn)
 
-        toolbar_layout.addSpacing(6)
+        toolbar_layout.addSpacing(8)
 
-        # 9. Search Bar (rounded with magnifier inside and accent focus ring)
+        # Search Bar
         self.search_edit = QLineEdit()
         self.search_edit.setObjectName("macSearchField")
         self.search_edit.setPlaceholderText("Search")
-        self.search_edit.setFixedHeight(28)
+        self.search_edit.setFixedHeight(32)
         self.search_edit.setFixedWidth(130)
+        self.search_edit.setAccessibleName("Search Document")
         self.search_edit.returnPressed.connect(self._on_search)
         self.search_action = self.search_edit.addAction(
             MacIconFactory.create_icon("search", "#8e8e93", 14),
@@ -729,22 +832,26 @@ class MacMainWindow(QMainWindow):
         )
         toolbar_layout.addWidget(self.search_edit)
 
-        toolbar_layout.addSpacing(4)
+        toolbar_layout.addSpacing(8)
 
-        # 10. Inspector button (icon-only, 28px high, 6px radius)
+        # Inspector button (32x32)
         self.inspector_btn = QToolButton()
         self.inspector_btn.setObjectName("inspectorBtn")
-        self.inspector_btn.setFixedSize(28, 28)
-        self.inspector_btn.setToolTip("Show Inspector (Ctrl+I) - Learn more (F1)")
-        self.inspector_btn.clicked.connect(self._show_inspector)
+        self.inspector_btn.setCheckable(True)
+        self.inspector_btn.setFixedSize(32, 32)
+        self.inspector_btn.setToolTip("Show/Hide Inspector Panel (Ctrl+I) - Learn more (F1)")
+        self.inspector_btn.setAccessibleName("Inspector Panel")
+        self.inspector_btn.clicked.connect(self._toggle_inspector_panel)
         toolbar_layout.addWidget(self.inspector_btn)
 
-        # 11. Theme toggle (Dark / Light, icon-only 28px)
+        toolbar_layout.addSpacing(8)
+
+        # Theme toggle (32x32)
         self.theme_btn = QToolButton()
         self.theme_btn.setObjectName("themeBtn")
-        self.theme_btn.setFixedSize(28, 28)
-        self.theme_btn.setText("☀️" if self.current_theme == MacTheme.DARK else "🌙")
+        self.theme_btn.setFixedSize(32, 32)
         self.theme_btn.setToolTip("Toggle Dark/Light Mode (Ctrl+T) - Learn more (F1)")
+        self.theme_btn.setAccessibleName("Toggle Theme")
         self.theme_btn.clicked.connect(self._toggle_theme)
         toolbar_layout.addWidget(self.theme_btn)
 
@@ -755,18 +862,35 @@ class MacMainWindow(QMainWindow):
 
     def _update_all_icons(self):
         col = self._get_icon_color()
-        self.sidebar_btn.setIcon(MacIconFactory.create_icon("sidebar", col, 16))
-        self.prev_btn.setIcon(MacIconFactory.create_icon("arrow_left", col, 14))
-        self.next_btn.setIcon(MacIconFactory.create_icon("arrow_right", col, 14))
-        self.open_btn.setIcon(MacIconFactory.create_icon("open", col, 16))
+        self.sidebar_btn.setIcon(MacIconFactory.create_icon("panel-left", col, 18))
+        self.prev_btn.setIcon(MacIconFactory.create_icon("chevron-left", col, 18))
+        self.next_btn.setIcon(MacIconFactory.create_icon("chevron-right", col, 18))
+        self.open_btn.setIcon(MacIconFactory.create_icon("folder-open", col, 18))
         if hasattr(self, "open_arrow_btn"):
-            self.open_arrow_btn.setIcon(MacIconFactory.create_icon("arrow_down", col, 10))
-        self.proxy_icon_label.setPixmap(MacIconFactory.create_icon("doc_proxy", col, 16).pixmap(16, 16))
-        self.zoom_out_btn.setIcon(MacIconFactory.create_icon("zoom_out", col, 15))
-        self.zoom_in_btn.setIcon(MacIconFactory.create_icon("zoom_in", col, 15))
-        self.rotate_btn.setIcon(MacIconFactory.create_icon("rotate_right", col, 16))
-        self.markup_toggle_btn.setIcon(MacIconFactory.create_icon("markup", "#ffffff" if self.markup_toggle_btn.isChecked() else col, 15))
-        self.inspector_btn.setIcon(MacIconFactory.create_icon("inspector", col, 16))
+            self.open_arrow_btn.setIcon(MacIconFactory.create_icon("chevron-down", col, 12))
+        self.proxy_icon_label.setPixmap(MacIconFactory.create_icon("file-text", col, 16).pixmap(16, 16))
+        self.zoom_out_btn.setIcon(MacIconFactory.create_icon("zoom-out", col, 18))
+        self.zoom_in_btn.setIcon(MacIconFactory.create_icon("zoom-in", col, 18))
+        self.rotate_btn.setIcon(MacIconFactory.create_icon("rotate-cw", col, 18))
+        if hasattr(self, "fullscreen_btn"):
+            fs_icon = "minimize" if self.isFullScreen() else "maximize"
+            self.fullscreen_btn.setIcon(MacIconFactory.create_icon(fs_icon, col, 18))
+        self.markup_toggle_btn.setIcon(MacIconFactory.create_icon("pen-tool", "#ffffff" if self.markup_toggle_btn.isChecked() else col, 20))
+        self.inspector_btn.setIcon(MacIconFactory.create_icon("info", "#ffffff" if self.inspector_btn.isChecked() else col, 18))
+
+        # Mode segmented icons
+        if hasattr(self, "mode_view_btn"):
+            self.mode_view_btn.setIcon(MacIconFactory.create_icon("eye", "#ffffff" if self.mode_view_btn.isChecked() else col, 16))
+        if hasattr(self, "mode_edit_btn"):
+            self.mode_edit_btn.setIcon(MacIconFactory.create_icon("pencil", "#ffffff" if self.mode_edit_btn.isChecked() else col, 16))
+        if hasattr(self, "mode_organize_btn"):
+            self.mode_organize_btn.setIcon(MacIconFactory.create_icon("layout-grid", "#ffffff" if self.mode_organize_btn.isChecked() else col, 16))
+
+        # Theme icon without emoji text
+        if hasattr(self, "theme_btn"):
+            theme_icon = "sun" if self.current_theme == MacTheme.DARK else "moon"
+            self.theme_btn.setIcon(MacIconFactory.create_icon(theme_icon, col, 18))
+            self.theme_btn.setText("")
 
         # Search field inside magnifier
         if hasattr(self, "search_action"):
@@ -774,6 +898,10 @@ class MacMainWindow(QMainWindow):
             self.search_action.setIcon(MacIconFactory.create_icon("search", search_col, 14))
 
         self.markup_bar.update_icons(col)
+        if hasattr(self, "organize_bar"):
+            self.organize_bar.update_icons(col)
+        if hasattr(self, "inspector_panel"):
+            self.inspector_panel.update_icons(col)
 
     def _connect_markup_bar(self):
         self.markup_bar.tool_changed.connect(self.canvas.set_active_tool)
@@ -789,9 +917,12 @@ class MacMainWindow(QMainWindow):
         self.markup_bar.adjust_color_requested.connect(self._open_adjust_color)
         self.markup_bar.adjust_size_requested.connect(self._open_adjust_size)
         self.markup_bar.rotate_requested.connect(self._rotate_left)
-        self.markup_bar.rotate_selection_requested.connect(lambda deg: self.canvas.rotate_selection(deg))
+        self.markup_bar.rotate_selection_requested.connect(self._rotate_right)
+        if hasattr(self.markup_bar, "rotate_right_requested"):
+            self.markup_bar.rotate_right_requested.connect(self._rotate_right)
         self.markup_bar.crop_requested.connect(self.canvas.apply_crop)
         self.markup_bar.signature_requested.connect(self._open_signature_dialog)
+        self.markup_bar.image_overlay_requested.connect(self._add_image_overlay)
         self.canvas.tool_deselected.connect(self.markup_bar.unselect_all)
 
     def _setup_menus(self):
@@ -959,9 +1090,14 @@ class MacMainWindow(QMainWindow):
         self.edit_menu.addSeparator()
 
         insert_page_act = QAction("Insert Page from File...", self)
-        insert_page_act.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        insert_page_act.setShortcut(QKeySequence("Ctrl+Alt+P"))
         insert_page_act.triggered.connect(self._insert_page_from_file_menu)
         self.edit_menu.addAction(insert_page_act)
+
+        overlay_act = QAction("Add Image Overlay...", self)
+        overlay_act.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        overlay_act.triggered.connect(self._add_image_overlay)
+        self.edit_menu.addAction(overlay_act)
 
         apply_redact_act = QAction("Apply Permanent Redactions", self)
         apply_redact_act.triggered.connect(self._apply_redactions_menu)
@@ -973,6 +1109,27 @@ class MacMainWindow(QMainWindow):
         toggle_sb.setShortcut(QKeySequence("Ctrl+B"))
         toggle_sb.triggered.connect(self._toggle_sidebar)
         self.view_menu.addAction(toggle_sb)
+
+        toggle_inspector_act = QAction("Toggle Inspector Panel", self)
+        toggle_inspector_act.setShortcut(QKeySequence("Ctrl+I"))
+        toggle_inspector_act.triggered.connect(self._toggle_inspector_panel)
+        self.view_menu.addAction(toggle_inspector_act)
+
+        workspace_menu = self.view_menu.addMenu("Workspace Mode")
+        act_view_mode = QAction("View Mode (Browsing)", self)
+        act_view_mode.setShortcut(QKeySequence("Alt+1"))
+        act_view_mode.triggered.connect(lambda: self.set_workspace_mode("View"))
+        workspace_menu.addAction(act_view_mode)
+
+        act_edit_mode = QAction("Edit Mode (Markup & Tools)", self)
+        act_edit_mode.setShortcut(QKeySequence("Alt+2"))
+        act_edit_mode.triggered.connect(lambda: self.set_workspace_mode("Edit"))
+        workspace_menu.addAction(act_edit_mode)
+
+        act_org_mode = QAction("Organize Mode (Pages & Documents)", self)
+        act_org_mode.setShortcut(QKeySequence("Alt+3"))
+        act_org_mode.triggered.connect(lambda: self.set_workspace_mode("Organize"))
+        workspace_menu.addAction(act_org_mode)
 
         toggle_mb_act = QAction("Show Menu Bar", self, checkable=True)
         toggle_mb_act.setShortcut(QKeySequence("Ctrl+Alt+M"))
@@ -1134,6 +1291,10 @@ class MacMainWindow(QMainWindow):
         batch_act.triggered.connect(self._open_batch_dialog)
         self.tools_menu.addAction(batch_act)
 
+        overlay_tool_act = QAction("Add Image Overlay...", self)
+        overlay_tool_act.triggered.connect(self._add_image_overlay)
+        self.tools_menu.addAction(overlay_tool_act)
+
         insp_act = QAction("Show Inspector", self)
         insp_act.setShortcut(QKeySequence("Ctrl+I"))
         insp_act.triggered.connect(self._show_inspector)
@@ -1241,11 +1402,11 @@ class MacMainWindow(QMainWindow):
         self._update_modified_ui()
 
     def _update_modified_ui(self):
-        """Updates window title ('— Edited'), traffic light dirty dot, and menu actions based on modification status."""
+        """Updates window title ('- Edited'), traffic light dirty dot, and menu actions based on modification status."""
         is_mod = self.is_document_modified()
         if hasattr(self, "document") and self.document:
             base_name = self.document.file_name or "Untitled"
-            title = f"{base_name} — Edited" if is_mod else base_name
+            title = f"{base_name} - Edited" if is_mod else base_name
             if hasattr(self, "title_label") and self.title_label:
                 self.title_label.setText(title)
             self.setWindowTitle(title)
@@ -1329,7 +1490,7 @@ class MacMainWindow(QMainWindow):
         else:
             self.sidebar.clear()
             if hasattr(self, "title_label") and self.title_label:
-                self.title_label.setText("Document Viewer")
+                self.title_label.setText("No document")
             if hasattr(self, "page_badge") and self.page_badge:
                 self.page_badge.setText("")
 
@@ -1973,50 +2134,117 @@ class MacMainWindow(QMainWindow):
         else:
             self._show_status("No selectable text in document.")
 
-    # --- Fullscreen Slideshow / Presentation Mode ---
-    def _toggle_slideshow(self):
-        if not hasattr(self, "_is_slideshow"):
+    # --- Fullscreen Document / Image Presentation Mode ---
+    def toggle_fullscreen(self, auto_advance: bool = False):
+        """Presents the document image in full screen display without window toolbars or sidebars."""
+        is_active = self.isFullScreen() or getattr(self, "_is_fullscreen_image", False) or getattr(self, "_is_slideshow", False)
+
+        if is_active:
+            self._is_fullscreen_image = False
             self._is_slideshow = False
-            self._slideshow_timer = QTimer(self)
-            self._slideshow_timer.setInterval(3500)
-            self._slideshow_timer.timeout.connect(self._slideshow_advance)
-
-        self._is_slideshow = not self._is_slideshow
-
-        if self._is_slideshow:
-            self._saved_maximized = self.isMaximized()
-            self._saved_menubar_vis = self.top_menubar.isVisible()
-            self._saved_sidebar_vis = self.sidebar.isVisible()
-            self._saved_statusbar_vis = self.status_bar.isVisible()
-            self._saved_toolbar_vis = self.toolbar_widget.isVisible()
-
-            self.top_menubar.hide()
-            self.sidebar.hide()
-            self.status_bar.hide()
-            self.toolbar_widget.hide()
-            self.showFullScreen()
-            self.canvas.zoom_to_fit()
-            self._show_slideshow_controls(True)
-            self._slideshow_timer.start()
-            self.slideshow_hud.set_playing(True)
-            self._show_status("Slideshow started (Press Esc to exit, Space to pause/resume)")
-        else:
             if hasattr(self, "_slideshow_timer"):
                 self._slideshow_timer.stop()
-            self._show_slideshow_controls(False)
+            if hasattr(self, "slideshow_hud"):
+                self.slideshow_hud.hide()
+
             self.showNormal()
             if getattr(self, "_saved_maximized", False):
                 self.showMaximized()
-            if getattr(self, "_saved_menubar_vis", True):
-                self.top_menubar.show()
+
+            # Restore original chrome visibility
+            self.toolbar_widget.show()
             if getattr(self, "_saved_sidebar_vis", True):
                 self.sidebar.show()
+            else:
+                self.sidebar.hide()
+
+            if getattr(self, "_saved_markup_vis", False):
+                self.markup_bar.show()
+            else:
+                self.markup_bar.hide()
+
+            if getattr(self, "_saved_organize_vis", False):
+                self.organize_bar.show()
+            else:
+                self.organize_bar.hide()
+
+            if hasattr(self, "inspector_panel"):
+                if getattr(self, "_saved_inspector_vis", False):
+                    self.inspector_panel.show()
+                else:
+                    self.inspector_panel.hide()
+
             if getattr(self, "_saved_statusbar_vis", True):
                 self.status_bar.show()
-            if getattr(self, "_saved_toolbar_vis", True):
-                self.toolbar_widget.show()
+
+            if hasattr(self, "_saved_splitter_sizes") and self._saved_splitter_sizes:
+                self.splitter.setSizes(self._saved_splitter_sizes)
+
             self.canvas.zoom_to_fit()
-            self._show_status("Exited slideshow mode.")
+            if hasattr(self, "fullscreen_btn"):
+                self.fullscreen_btn.setToolTip("Full Screen (F11)")
+            self._show_status("Exited full screen mode.")
+        else:
+            self._is_fullscreen_image = True
+            self._is_slideshow = auto_advance
+
+            # Save existing layout states
+            self._saved_maximized = self.isMaximized()
+            self._saved_sidebar_vis = self.sidebar.isVisible()
+            self._saved_markup_vis = self.markup_bar.isVisible()
+            self._saved_organize_vis = self.organize_bar.isVisible()
+            self._saved_inspector_vis = hasattr(self, "inspector_panel") and self.inspector_panel.isVisible()
+            self._saved_statusbar_vis = self.status_bar.isVisible()
+            self._saved_splitter_sizes = self.splitter.sizes()
+
+            # Hide all chrome so ONLY the document/image fills the screen
+            self.toolbar_widget.hide()
+            self.sidebar.hide()
+            self.markup_bar.hide()
+            self.organize_bar.hide()
+            if hasattr(self, "inspector_panel"):
+                self.inspector_panel.hide()
+            self.status_bar.hide()
+
+            total_w = sum(self.splitter.sizes()) if sum(self.splitter.sizes()) > 0 else self.width()
+            self.splitter.setSizes([0, total_w, 0])
+
+            self.showFullScreen()
+            self.canvas.zoom_to_fit()
+
+            if hasattr(self, "slideshow_hud") and self.slideshow_hud:
+                if self.document:
+                    self.slideshow_hud.update_page_info(self.canvas.current_page + 1, self.document.page_count)
+                self.slideshow_hud.show()
+                self.slideshow_hud.raise_()
+                self.slideshow_hud._reposition()
+
+            if auto_advance:
+                if not hasattr(self, "_slideshow_timer"):
+                    self._slideshow_timer = QTimer(self)
+                    self._slideshow_timer.setInterval(3500)
+                    self._slideshow_timer.timeout.connect(self._slideshow_advance)
+                self._slideshow_timer.start()
+                self.slideshow_hud.set_playing(True)
+                self._show_status("Slideshow started (Press Esc to exit, Space to pause/resume)")
+            else:
+                if hasattr(self, "_slideshow_timer"):
+                    self._slideshow_timer.stop()
+                if hasattr(self, "slideshow_hud"):
+                    self.slideshow_hud.set_playing(False)
+                self._show_status("Full screen image mode (Press Esc or F11 to exit)")
+
+            if hasattr(self, "fullscreen_btn"):
+                self.fullscreen_btn.setToolTip("Full Screen (F11)")
+
+        self._update_all_icons()
+
+    def _toggle_slideshow(self):
+        is_active = getattr(self, "_is_slideshow", False) or getattr(self, "_is_fullscreen_image", False)
+        if is_active:
+            self.toggle_fullscreen(auto_advance=False)
+        else:
+            self.toggle_fullscreen(auto_advance=True)
 
     def _toggle_slideshow_timer(self):
         if not hasattr(self, "_slideshow_timer"):
@@ -2104,7 +2332,7 @@ class MacMainWindow(QMainWindow):
             self._sidebar_anim.finished.connect(on_done)
         else:
             self.sidebar.setVisible(True)
-            target_w = getattr(self, "_last_sidebar_width", 190)
+            target_w = getattr(self, "_last_sidebar_width", 240)
             self._sidebar_anim.setStartValue(0)
             self._sidebar_anim.setEndValue(target_w)
             def on_tick(w):
@@ -2114,15 +2342,196 @@ class MacMainWindow(QMainWindow):
 
         self._sidebar_anim.start()
 
-    def _toggle_markup_bar(self):
-        is_vis = not self.markup_bar.isVisible()
-        self.markup_bar.setVisible(is_vis)
-        self.markup_toggle_btn.setChecked(is_vis)
-        self.canvas.set_markup_enabled(is_vis)
-        if not is_vis:
-            # Unselect and reset active tool when markup bar is hidden
+    def set_sidebar_visible(self, visible: bool):
+        """Sets sidebar visibility with smooth transition."""
+        if not hasattr(self, "sidebar") or not hasattr(self, "splitter"):
+            return
+        is_open = self.sidebar.isVisible() and self.splitter.sizes()[0] > 10
+        if is_open != visible:
+            self._toggle_sidebar()
+
+    def set_workspace_mode(self, mode: str):
+        """Switches workspace between View, Edit, and Organize modes."""
+        self.current_workspace_mode = mode
+        
+        # Update mode segmented buttons
+        if hasattr(self, "mode_view_btn"):
+            self.mode_view_btn.setChecked(mode == "View")
+        if hasattr(self, "mode_edit_btn"):
+            self.mode_edit_btn.setChecked(mode == "Edit")
+        if hasattr(self, "mode_organize_btn"):
+            self.mode_organize_btn.setChecked(mode == "Organize")
+
+        if mode == "View":
+            self.markup_bar.setVisible(False)
+            self.organize_bar.setVisible(False)
+            self.markup_toggle_btn.setChecked(False)
+            self.canvas.set_markup_enabled(False)
             self.markup_bar.unselect_all()
             self.canvas.unselect_tools()
+            self.set_inspector_visible(False)
+            self._show_status("View Mode: Distraction-free reading")
+
+        elif mode == "Edit":
+            self.organize_bar.setVisible(False)
+            self.markup_bar.setVisible(True)
+            self.markup_toggle_btn.setChecked(True)
+            self.canvas.set_markup_enabled(True)
+            self.set_inspector_visible(True)
+            if hasattr(self, "markup_bar") and hasattr(self.markup_bar, "handle_resize"):
+                self.markup_bar.handle_resize(self.width())
+            if self.document:
+                self.inspector_panel.set_document(self.document, self.canvas.current_page)
+            self._show_status("Edit Mode: Annotation and markup tools active")
+
+        elif mode == "Organize":
+            self.markup_bar.setVisible(False)
+            self.markup_toggle_btn.setChecked(False)
+            self.canvas.set_markup_enabled(False)
+            self.markup_bar.unselect_all()
+            self.canvas.unselect_tools()
+            self.organize_bar.setVisible(True)
+            self.set_inspector_visible(False)
+            # Switch sidebar to Contact Sheet to present multi-page grid
+            if hasattr(self.sidebar, "set_view_mode"):
+                self.sidebar.set_view_mode("Contact Sheet")
+            # Widen sidebar splitter for better multi-page grid display
+            sizes = self.splitter.sizes()
+            total_w = sum(sizes) if sum(sizes) > 0 else self.width()
+            target_sb_w = min(420, max(320, int(total_w * 0.38)))
+            self.splitter.setSizes([target_sb_w, max(300, total_w - target_sb_w), 0])
+            self._show_status("Organize Mode: Page reordering, insertion, and document actions")
+
+        self._update_all_icons()
+
+    def _toggle_markup_bar(self):
+        is_vis = not self.markup_bar.isVisible()
+        self.set_markup_visible(is_vis)
+
+    def set_markup_visible(self, visible: bool):
+        """Shows or hides the markup toolbar by toggling the workspace mode."""
+        if visible:
+            self.set_workspace_mode("Edit")
+        else:
+            self.set_workspace_mode("View")
+
+    def _toggle_inspector_panel(self):
+        self.set_inspector_visible(not self.inspector_panel.isVisible(), animated=True)
+
+    def _show_inspector(self):
+        self._toggle_inspector_panel()
+
+    def set_inspector_visible(self, visible: bool, animated: bool = False):
+        if not hasattr(self, "inspector_panel"):
+            return
+        if hasattr(self, "inspector_btn"):
+            self.inspector_btn.setChecked(visible)
+
+        if hasattr(self, "_inspector_anim") and self._inspector_anim and self._inspector_anim.state() == QVariantAnimation.State.Running:
+            self._inspector_anim.stop()
+
+        sizes = self.splitter.sizes()
+        total_w = sum(sizes) if sum(sizes) > 0 else self.width()
+        sb_w = sizes[0] if len(sizes) > 0 else 240
+        current_insp_w = sizes[2] if len(sizes) > 2 else 0
+        target_w = 280 if visible else 0
+
+        if not animated or not self.isVisible():
+            self.inspector_panel.setVisible(visible)
+            if visible and self.document:
+                self.inspector_panel.set_document(self.document, self.canvas.current_page)
+            canvas_w = max(200, total_w - sb_w - target_w)
+            self.splitter.setSizes([sb_w, canvas_w, target_w])
+            self._update_all_icons()
+            return
+
+        if visible:
+            self.inspector_panel.setVisible(True)
+            if self.document:
+                self.inspector_panel.set_document(self.document, self.canvas.current_page)
+
+        self._inspector_anim = QVariantAnimation(self)
+        self._inspector_anim.setDuration(160)
+        self._inspector_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._inspector_anim.setStartValue(current_insp_w)
+        self._inspector_anim.setEndValue(target_w)
+
+        def on_tick(w):
+            w_int = int(w)
+            cw = max(200, total_w - sb_w - w_int)
+            self.splitter.setSizes([sb_w, cw, w_int])
+
+        def on_done():
+            if not visible:
+                self.inspector_panel.setVisible(False)
+            self.canvas.zoom_to_fit()
+            self._update_all_icons()
+
+        self._inspector_anim.valueChanged.connect(on_tick)
+        self._inspector_anim.finished.connect(on_done)
+        self._inspector_anim.start()
+
+    def _connect_organize_bar(self):
+        self.organize_bar.rotate_left_requested.connect(self._rotate_left)
+        self.organize_bar.rotate_right_requested.connect(self._rotate_right)
+        self.organize_bar.duplicate_page_requested.connect(lambda: self.sidebar._duplicate_page(self.canvas.current_page))
+        self.organize_bar.insert_blank_requested.connect(lambda: self.sidebar._insert_blank_page(self.canvas.current_page))
+        self.organize_bar.insert_file_requested.connect(lambda: self.sidebar._insert_page_from_file(self.canvas.current_page))
+        self.organize_bar.delete_page_requested.connect(lambda: self.sidebar._confirm_and_delete_page(self.canvas.current_page))
+        self.organize_bar.merge_requested.connect(self._merge_pdfs)
+        self.organize_bar.split_requested.connect(self._split_pdf)
+        self.organize_bar.export_requested.connect(self._export_file)
+
+    def _connect_inspector_panel(self):
+        self.inspector_panel.close_requested.connect(lambda: self.set_inspector_visible(False))
+        self.inspector_panel.annotation_updated.connect(self._on_inspector_annotation_updated)
+        self.inspector_panel.delete_annotation_requested.connect(self._on_inspector_delete_annotation)
+        self.inspector_panel.apply_redaction_requested.connect(self._apply_redactions_menu)
+        self.inspector_panel.color_adjusted.connect(self._on_inspector_color_adjusted)
+        self.inspector_panel.color_reset_requested.connect(self._on_inspector_color_reset)
+
+    def _on_annotation_selected(self, annot):
+        self.markup_bar.set_selected_annotation(annot)
+        if hasattr(self, "inspector_panel"):
+            self.inspector_panel.set_selected_annotation(annot)
+            if annot is not None and not self.inspector_panel.isVisible():
+                self.set_inspector_visible(True)
+
+    def _on_document_or_annotations_modified(self):
+        self._update_modified_ui()
+        if hasattr(self, "inspector_panel") and self.inspector_panel.isVisible():
+            self.inspector_panel.refresh_annotations_list()
+
+    def _on_inspector_annotation_updated(self, annot=None):
+        self.canvas.update()
+        self.canvas.document_modified.emit(True)
+        self._update_modified_ui()
+
+    def _on_inspector_delete_annotation(self, annot):
+        if not self.document:
+            return
+        annots = self.canvas.annotations.get(self.canvas.current_page, [])
+        if annot in annots:
+            annots.remove(annot)
+        if getattr(self.canvas, "_selected_annotation", None) == annot:
+            self.canvas._selected_annotation = None
+        self.canvas.update()
+        self.markup_bar.set_selected_annotation(None)
+        self.inspector_panel.set_selected_annotation(None)
+        self.inspector_panel.refresh_annotations_list()
+        self.canvas.document_modified.emit(True)
+        self._update_modified_ui()
+
+    def _on_inspector_color_adjusted(self, new_img):
+        if self.document and not self.document.is_pdf:
+            self.document.update_image(new_img, self.canvas.current_page)
+            self.canvas.update()
+            self.canvas.document_modified.emit(True)
+            self._update_modified_ui()
+
+    def _on_inspector_color_reset(self):
+        if hasattr(self.inspector_panel, "_original_image") and self.inspector_panel._original_image:
+            self._on_inspector_color_adjusted(self.inspector_panel._original_image.copy())
 
     def _toggle_maximize(self):
         if self.isMaximized():
@@ -2248,12 +2657,15 @@ class MacMainWindow(QMainWindow):
         if self.current_theme != resolved:
             self.current_theme = resolved
             if hasattr(self, 'theme_btn'):
-                self.theme_btn.setText("☀️" if self.current_theme == MacTheme.DARK else "🌙")
+                self.theme_btn.setText("")
             self._apply_theme(self.current_theme, animate=True)
 
     def _toggle_theme(self):
         new_mode = MacTheme.LIGHT if self.current_theme == MacTheme.DARK else MacTheme.DARK
         self._set_appearance_mode(new_mode)
+
+    def apply_theme(self, theme_name: str, animate: bool = False):
+        self._apply_theme(theme_name, animate=animate)
 
     def _apply_theme(self, theme_name: str, animate: bool = False):
         self.current_theme = theme_name
@@ -2311,8 +2723,11 @@ class MacMainWindow(QMainWindow):
 
     def _rotate_right(self):
         if self.canvas and (self.canvas.crop_box or self.canvas._selected_annotation):
-            self.canvas.rotate_selection(90)
-            return
+            if self.document and self.document.is_pdf and self.canvas.crop_box and not self.canvas._selected_annotation:
+                pass
+            else:
+                self.canvas.rotate_selection(90)
+                return
         if self.document:
             page = self.canvas.current_page
             self.document.rotate_page(page, 90)
@@ -2401,7 +2816,13 @@ class MacMainWindow(QMainWindow):
 
         page = self.canvas.current_page
         old_img = self.document._pil_image.copy()
-        dialog = AdjustSizeDialog(self.document._pil_image, self.document.metadata.get("file_size", 0), self)
+        file_sz = self.document.metadata.get("file_size", 0)
+        if file_sz <= 0 and getattr(self.document, "file_path", None) and os.path.isfile(self.document.file_path):
+            try:
+                file_sz = os.path.getsize(self.document.file_path)
+            except OSError:
+                file_sz = 0
+        dialog = AdjustSizeDialog(self.document._pil_image, file_sz, self)
         
         def on_size(resized):
             self.document.update_image(resized, page)
@@ -2434,6 +2855,30 @@ class MacMainWindow(QMainWindow):
         self.canvas.set_active_tool(AnnotationType.SIGNATURE)
         self._show_status("Click anywhere on the document to stamp your signature.")
 
+    def _add_image_overlay(self):
+        """Opens a file dialog to select an image overlay to place on the document, like Canva."""
+        if not self.document:
+            self._show_status("Open an image or PDF document first to add an image overlay.")
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Add Image Overlay",
+            "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.webp *.svg *.gif);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        pixmap = QPixmap(file_path)
+        if pixmap.isNull():
+            self._show_status("Failed to load image for overlay.")
+            return
+
+        self.set_markup_visible(True)
+        self.canvas.add_image_overlay(pixmap)
+        self._show_status("Image overlay added. Drag to reposition, resize with corner handles.")
+
     def _show_inspector(self):
         if not self.document:
             return
@@ -2465,7 +2910,7 @@ class MacMainWindow(QMainWindow):
             w, h = self.document.get_page_size(self.canvas.current_page)
             curr = self.canvas.current_page + 1
             tot = self.document.page_count
-            p_text = f"Page {curr} of {tot} — {int(w)} × {int(h)} pt"
+            p_text = f"Page {curr} of {tot} - {int(w)} × {int(h)} pt"
             self.page_status_label.setText(p_text)
             self.page_badge.setText(f"{curr} of {tot}")
             self.page_badge.setVisible(tot > 1)
@@ -2484,8 +2929,11 @@ class MacMainWindow(QMainWindow):
             self.page_badge.setVisible(False)
             self.toolbar_widget.update_title_geometry()
 
+        if hasattr(self, "inspector_panel") and self.inspector_panel.isVisible():
+            self.inspector_panel.set_document(self.document, self.canvas.current_page if self.document else 0)
+
     def _show_status(self, msg: str, timeout: int = 4000):
-        self.status_bar.showMessage(msg, timeout)
+        self.page_status_label.setText(msg)
         if hasattr(self, "floating_pill") and self.floating_pill:
             self.floating_pill.show_status(msg)
 
@@ -2514,9 +2962,23 @@ class MacMainWindow(QMainWindow):
             self._show_help()
             event.accept()
             return
-        if getattr(self, "_is_slideshow", False):
-            if event.key() == Qt.Key.Key_Escape:
-                self._toggle_slideshow()
+
+        if (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+            if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) and event.key() == Qt.Key.Key_I:
+                self._add_image_overlay()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_V and not (hasattr(self, "search_edit") and self.search_edit.hasFocus()):
+                clipboard = QApplication.clipboard()
+                pixmap = clipboard.pixmap()
+                if not pixmap.isNull():
+                    self.set_markup_visible(True)
+                    self.canvas.add_image_overlay(pixmap)
+                    event.accept()
+                    return
+        if getattr(self, "_is_fullscreen_image", False) or getattr(self, "_is_slideshow", False) or self.isFullScreen():
+            if event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_F11):
+                self.toggle_fullscreen(auto_advance=False)
                 event.accept()
                 return
             elif event.key() == Qt.Key.Key_Space:
@@ -2531,12 +2993,55 @@ class MacMainWindow(QMainWindow):
                 self.prev_page()
                 event.accept()
                 return
+        if event.key() == Qt.Key.Key_F11:
+            self.toggle_fullscreen(auto_advance=False)
+            event.accept()
+            return
         super().keyPressEvent(event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        w = event.size().width()
         if hasattr(self, "slideshow_hud") and self.slideshow_hud and self.slideshow_hud.isVisible():
             self.slideshow_hud._reposition()
+            if getattr(self, "_is_fullscreen_image", False):
+                self.canvas.zoom_to_fit()
+        if hasattr(self, "inspector_panel") and self.inspector_panel.isVisible():
+            if w < 860:
+                self.set_inspector_visible(False)
+        if hasattr(self, "markup_bar") and hasattr(self.markup_bar, "handle_resize"):
+            self.markup_bar.handle_resize(w)
+
+        # Responsive toolbar adaptation: collapse buttons to icon-only when narrow (< 1060px)
+        if hasattr(self, "mode_view_btn") and hasattr(self, "mode_edit_btn") and hasattr(self, "mode_organize_btn"):
+            if w < 1060:
+                self.mode_view_btn.setText("")
+                self.mode_edit_btn.setText("")
+                self.mode_organize_btn.setText("")
+                self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            else:
+                self.mode_view_btn.setText("View")
+                self.mode_edit_btn.setText("Edit")
+                self.mode_organize_btn.setText("Organize")
+                self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+
+        if hasattr(self, "search_edit"):
+            self.search_edit.setFixedWidth(90 if w < 1024 else 130)
+
+        if hasattr(self, "open_btn"):
+            if w < 960:
+                self.open_btn.setText("")
+                self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            else:
+                self.open_btn.setText("Open")
+                self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+
+        if w < 820 and hasattr(self, "sidebar") and self.sidebar.isVisible():
+            self.set_sidebar_visible(False)
 
     # --- Drag and Drop ---
     def dragEnterEvent(self, event: QDragEnterEvent):

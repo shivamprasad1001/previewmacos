@@ -87,6 +87,7 @@ class AdjustSizeDialog(QDialog):
         # Checkboxes
         self.proportional_check = QCheckBox("Scale proportionally")
         self.proportional_check.setChecked(True)
+        self.proportional_check.toggled.connect(self._on_proportional_toggled)
         layout.addWidget(self.proportional_check)
 
         self.resample_check = QCheckBox("Resample image")
@@ -94,9 +95,11 @@ class AdjustSizeDialog(QDialog):
         layout.addWidget(self.resample_check)
 
         # Resulting size calculation
-        self.size_summary_label = QLabel(f"Resulting size: {self._format_bytes(self.orig_file_size)}")
+        self.size_summary_label = QLabel()
         self.size_summary_label.setStyleSheet("color: #8e8e93; font-size: 11px;")
         layout.addWidget(self.size_summary_label)
+
+        self._update_resulting_size()
 
         layout.addStretch()
 
@@ -113,30 +116,30 @@ class AdjustSizeDialog(QDialog):
         layout.addLayout(btn_row)
 
     def _on_width_edited(self, text: str):
-        if not self.proportional_check.isChecked():
-            return
-        try:
-            val = float(text)
-            if self.unit_combo.currentText() == "pixels":
-                h_val = int(val / self.aspect_ratio)
-                self.height_edit.setText(str(max(1, h_val)))
-            elif self.unit_combo.currentText() == "percent":
-                self.height_edit.setText(str(val))
-        except ValueError:
-            pass
+        if self.proportional_check.isChecked():
+            try:
+                val = float(text)
+                if self.unit_combo.currentText() == "pixels":
+                    h_val = int(round(val / self.aspect_ratio))
+                    self.height_edit.setText(str(max(1, h_val)))
+                elif self.unit_combo.currentText() == "percent":
+                    self.height_edit.setText(str(val))
+            except ValueError:
+                pass
+        self._update_resulting_size()
 
     def _on_height_edited(self, text: str):
-        if not self.proportional_check.isChecked():
-            return
-        try:
-            val = float(text)
-            if self.unit_combo.currentText() == "pixels":
-                w_val = int(val * self.aspect_ratio)
-                self.width_edit.setText(str(max(1, w_val)))
-            elif self.unit_combo.currentText() == "percent":
-                self.width_edit.setText(str(val))
-        except ValueError:
-            pass
+        if self.proportional_check.isChecked():
+            try:
+                val = float(text)
+                if self.unit_combo.currentText() == "pixels":
+                    w_val = int(round(val * self.aspect_ratio))
+                    self.width_edit.setText(str(max(1, w_val)))
+                elif self.unit_combo.currentText() == "percent":
+                    self.width_edit.setText(str(val))
+            except ValueError:
+                pass
+        self._update_resulting_size()
 
     def _on_preset_selected(self, index: int):
         presets = {
@@ -152,6 +155,7 @@ class AdjustSizeDialog(QDialog):
             self.unit_combo.setCurrentText("pixels")
             self.width_edit.setText(str(pw))
             self.height_edit.setText(str(ph))
+            self._update_resulting_size()
 
     def _on_unit_changed(self, index: int):
         unit = self.unit_combo.currentText()
@@ -162,6 +166,55 @@ class AdjustSizeDialog(QDialog):
         else:
             self.width_edit.setText(str(self.orig_w))
             self.height_edit.setText(str(self.orig_h))
+        self._update_resulting_size()
+
+    def _on_proportional_toggled(self, checked: bool):
+        if checked:
+            try:
+                val = float(self.width_edit.text())
+                if self.unit_combo.currentText() == "pixels":
+                    h_val = int(round(val / self.aspect_ratio))
+                    self.height_edit.setText(str(max(1, h_val)))
+                elif self.unit_combo.currentText() == "percent":
+                    self.height_edit.setText(str(val))
+            except ValueError:
+                pass
+        self._update_resulting_size()
+
+    def _update_resulting_size(self):
+        try:
+            unit = self.unit_combo.currentText()
+            w_text = self.width_edit.text().strip()
+            h_text = self.height_edit.text().strip()
+            if not w_text or not h_text:
+                return
+
+            if unit == "pixels":
+                target_w = max(1, int(round(float(w_text))))
+                target_h = max(1, int(round(float(h_text))))
+            else:
+                pct_w = float(w_text) / 100.0
+                pct_h = float(h_text) / 100.0
+                target_w = max(1, int(round(self.orig_w * pct_w)))
+                target_h = max(1, int(round(self.orig_h * pct_h)))
+
+            ratio = (target_w * target_h) / max(1.0, float(self.orig_w * self.orig_h))
+            if self.orig_file_size > 0:
+                est_bytes = int(self.orig_file_size * ratio)
+                orig_str = self._format_bytes(self.orig_file_size)
+                new_str = self._format_bytes(est_bytes)
+                self.size_summary_label.setText(
+                    f"Resulting size: {target_w} × {target_h} pixels ({new_str}, was {orig_str})"
+                )
+            else:
+                channels = len(self.image.getbands()) if hasattr(self.image, "getbands") else 3
+                est_bytes = int(target_w * target_h * channels)
+                new_str = self._format_bytes(est_bytes)
+                self.size_summary_label.setText(
+                    f"Resulting size: {target_w} × {target_h} pixels ({new_str})"
+                )
+        except (ValueError, ZeroDivisionError):
+            pass
 
     def _on_apply(self):
         try:

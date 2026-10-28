@@ -143,46 +143,70 @@ class MacSidebar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Header bar with small view dropdown
+        # Header bar with segmented control tabs: [ Thumbnails | Outline | Contact Sheet ]
         header = QWidget()
-        header.setFixedHeight(36)
+        header.setFixedHeight(42)
         header.setObjectName("sidebarHeader")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 4, 10, 4)
-        header_layout.setSpacing(6)
+        header_layout.setContentsMargins(8, 6, 8, 6)
+        header_layout.setSpacing(4)
         
-        # Small Dropdown offering: Thumbnails, Contact Sheet, Table of Contents
-        self.view_dropdown = QToolButton()
-        self.view_dropdown.setObjectName("sidebarDropdown")
-        self.view_dropdown.setText("Thumbnails")
-        self.view_dropdown.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.view_dropdown.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.view_dropdown.setFixedHeight(26)
-        self.view_dropdown.setIcon(MacIconFactory.create_icon("thumbnails", "#0a84ff", 14))
+        self.seg_container = QWidget()
+        self.seg_container.setObjectName("sidebarSegmented")
+        self.seg_container.setFixedHeight(30)
+        seg_layout = QHBoxLayout(self.seg_container)
+        seg_layout.setContentsMargins(2, 2, 2, 2)
+        seg_layout.setSpacing(2)
 
+        self.tab_thumbs_btn = QToolButton()
+        self.tab_thumbs_btn.setText("Thumbnails")
+        self.tab_thumbs_btn.setCheckable(True)
+        self.tab_thumbs_btn.setChecked(True)
+        self.tab_thumbs_btn.setFixedHeight(26)
+        self.tab_thumbs_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.tab_thumbs_btn.setToolTip("Thumbnails View")
+        self.tab_thumbs_btn.setAccessibleName("Thumbnails View")
+        self.tab_thumbs_btn.clicked.connect(lambda: self.set_view_mode("Thumbnails"))
+        seg_layout.addWidget(self.tab_thumbs_btn, 1)
+
+        self.tab_outline_btn = QToolButton()
+        self.tab_outline_btn.setText("Outline")
+        self.tab_outline_btn.setCheckable(True)
+        self.tab_outline_btn.setFixedHeight(26)
+        self.tab_outline_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.tab_outline_btn.setToolTip("Table of Contents / Outline")
+        self.tab_outline_btn.setAccessibleName("Table of Contents Outline")
+        self.tab_outline_btn.clicked.connect(lambda: self.set_view_mode("Table of Contents"))
+        seg_layout.addWidget(self.tab_outline_btn, 1)
+
+        self.tab_contact_btn = QToolButton()
+        self.tab_contact_btn.setText("Contact Sheet")
+        self.tab_contact_btn.setCheckable(True)
+        self.tab_contact_btn.setFixedHeight(26)
+        self.tab_contact_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.tab_contact_btn.setToolTip("Contact Sheet Grid")
+        self.tab_contact_btn.setAccessibleName("Contact Sheet Grid")
+        self.tab_contact_btn.clicked.connect(lambda: self.set_view_mode("Contact Sheet"))
+        seg_layout.addWidget(self.tab_contact_btn, 1)
+
+        header_layout.addWidget(self.seg_container, 1)
+
+        # Retain view_dropdown and actions for backward compatibility
+        self.view_dropdown = self.tab_thumbs_btn
+        self.view_btn = self.tab_thumbs_btn
         self.view_menu = QMenu(self)
-        self.view_menu.setObjectName("sidebarViewMenu")
-
         self.act_thumbs = QAction("Thumbnails", self)
         self.act_thumbs.triggered.connect(lambda: self.set_view_mode("Thumbnails"))
-        self.view_menu.addAction(self.act_thumbs)
-
         self.act_contact = QAction("Contact Sheet", self)
         self.act_contact.triggered.connect(lambda: self.set_view_mode("Contact Sheet"))
-        self.view_menu.addAction(self.act_contact)
-
         self.act_toc = QAction("Table of Contents", self)
         self.act_toc.triggered.connect(lambda: self.set_view_mode("Table of Contents"))
+        self.view_menu.addAction(self.act_thumbs)
+        self.view_menu.addAction(self.act_contact)
         self.view_menu.addAction(self.act_toc)
-
-        self.view_dropdown.setMenu(self.view_menu)
-        self.view_btn = self.view_dropdown  # Alias for compatibility
-        header_layout.addWidget(self.view_dropdown)
 
         self.page_count_label = QLabel("")
         self.page_count_label.setStyleSheet("color: #8e8e93; font-size: 11px;")
-        header_layout.addStretch()
-        header_layout.addWidget(self.page_count_label)
         
         layout.addWidget(header)
 
@@ -367,15 +391,22 @@ class MacSidebar(QWidget):
 
     def set_view_mode(self, mode_name: str):
         self.current_view_mode = mode_name
-        self.view_dropdown.setText(mode_name)
+        if hasattr(self, "tab_thumbs_btn"):
+            self.tab_thumbs_btn.setChecked(mode_name == "Thumbnails")
+            self.tab_thumbs_btn.setIcon(MacIconFactory.create_icon("thumbnails", "#0a84ff" if mode_name == "Thumbnails" else "#98989d", 14))
+        if hasattr(self, "tab_outline_btn"):
+            self.tab_outline_btn.setChecked(mode_name in ("Table of Contents", "Outline"))
+            self.tab_outline_btn.setIcon(MacIconFactory.create_icon("outline", "#0a84ff" if mode_name in ("Table of Contents", "Outline") else "#98989d", 14))
+        if hasattr(self, "tab_contact_btn"):
+            self.tab_contact_btn.setChecked(mode_name == "Contact Sheet")
+            self.tab_contact_btn.setIcon(MacIconFactory.create_icon("contact_sheet", "#0a84ff" if mode_name == "Contact Sheet" else "#98989d", 14))
+
         if mode_name == "Thumbnails":
             self.stack.setCurrentIndex(0)
-            self.view_dropdown.setIcon(MacIconFactory.create_icon("thumbnails", "#0a84ff", 14))
             self.footer.setVisible(True)
             self._apply_thumbnail_layout()
         elif mode_name == "Contact Sheet":
             self.stack.setCurrentIndex(0)
-            self.view_dropdown.setIcon(MacIconFactory.create_icon("thumbnails", "#0a84ff", 14))
             self.footer.setVisible(True)
             if self.window():
                 splitter = getattr(self.window(), "splitter", None)
@@ -387,9 +418,8 @@ class MacSidebar(QWidget):
                         sizes[1] = max(200, sizes[1] - diff)
                         splitter.setSizes(sizes)
             self._apply_thumbnail_layout()
-        elif mode_name == "Table of Contents":
+        elif mode_name in ("Table of Contents", "Outline"):
             self.stack.setCurrentIndex(1)
-            self.view_dropdown.setIcon(MacIconFactory.create_icon("doc_proxy", "#0a84ff", 14))
             self.footer.setVisible(False)
 
     def _toggle_view_mode(self):
@@ -491,7 +521,7 @@ class MacSidebar(QWidget):
             self.reload_thumbnails()
 
     def eventFilter(self, source, event):
-        if source == self.thumb_list and event.type() == QEvent.Type.KeyPress:
+        if hasattr(self, "thumb_list") and source == self.thumb_list and event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
                 row = self.thumb_list.currentRow()
                 if row >= 0:

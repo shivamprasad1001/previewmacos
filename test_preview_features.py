@@ -141,7 +141,7 @@ class TestPreviewParity(unittest.TestCase):
 
     def test_08_main_window_layout_and_toolbar_height(self):
         win = MacMainWindow(initial_file=self.test_img_path)
-        self.assertEqual(win.toolbar_widget.height(), 52)
+        self.assertEqual(win.toolbar_widget.height(), 48)
         self.assertFalse(win.toolbar_widget.height() > 60)
         self.assertEqual(win.sidebar.thumb_list.count(), 1)
         win.close()
@@ -1052,7 +1052,7 @@ class TestPreviewParity(unittest.TestCase):
         self.assertEqual(dlg.result_code, MacSaveConfirmationDialog.CANCEL)
 
     def test_43_unsaved_changes_prompt_and_save_options(self):
-        """Verifies full window dirty detection, window title '— Edited', replace, copy, and revert workflows."""
+        """Verifies full window dirty detection, window title '- Edited', replace, copy, and revert workflows."""
         import tempfile
         import shutil
 
@@ -1064,7 +1064,7 @@ class TestPreviewParity(unittest.TestCase):
         try:
             win = MacMainWindow(initial_file=orig_img)
             self.assertFalse(win.is_document_modified())
-            self.assertNotIn("— Edited", win.windowTitle())
+            self.assertNotIn("- Edited", win.windowTitle())
             self.assertFalse(win.traffic_cluster.btn_close._modified)
 
             # 1. Modify document by adding an annotation
@@ -1075,7 +1075,7 @@ class TestPreviewParity(unittest.TestCase):
 
             # Verify dirty state is detected and displayed
             self.assertTrue(win.is_document_modified())
-            self.assertIn("— Edited", win.windowTitle())
+            self.assertIn("- Edited", win.windowTitle())
             self.assertTrue(win.traffic_cluster.btn_close._modified)
             self.assertTrue(win.revert_act.isEnabled())
 
@@ -1092,18 +1092,18 @@ class TestPreviewParity(unittest.TestCase):
             win.set_modified(False)
             win.open_file(orig_img)
             self.assertFalse(win.is_document_modified())
-            self.assertNotIn("— Edited", win.windowTitle())
+            self.assertNotIn("- Edited", win.windowTitle())
             self.assertFalse(win.traffic_cluster.btn_close._modified)
 
             # 4. Modify again and test 'Replace Original'
             win.set_modified(True)
             self.assertTrue(win.is_document_modified())
-            self.assertIn("— Edited", win.windowTitle())
+            self.assertIn("- Edited", win.windowTitle())
 
             save_ok = win._save_file_direct()
             self.assertTrue(save_ok)
             self.assertFalse(win.is_document_modified())
-            self.assertNotIn("— Edited", win.windowTitle())
+            self.assertNotIn("- Edited", win.windowTitle())
             self.assertFalse(win.traffic_cluster.btn_close._modified)
 
             # 5. Test closeEvent ignoring when cancelled

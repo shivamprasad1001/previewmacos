@@ -46,6 +46,24 @@ class MacTheme:
     TRAFFIC_GREEN = "#28c840"
     TRAFFIC_GREEN_BORDER = "#1aab29"
 
+    # Design Tokens - Spacing Scale (4/8/12/16/24)
+    SPACE_4 = 4
+    SPACE_8 = 8
+    SPACE_12 = 12
+    SPACE_16 = 16
+    SPACE_24 = 24
+
+    # Design Tokens - Radii Scale (6/8/12)
+    RADIUS_SM = 6
+    RADIUS_MD = 8
+    RADIUS_LG = 12
+
+    # Design Tokens - Dimensions
+    HEADER_HEIGHT = 48
+    TOOLBAR_HEIGHT = 44
+    BTN_SIZE = 32
+    FONT_SIZE_BASE = 13
+
     @classmethod
     def get_stylesheet(cls, mode: str = "dark") -> str:
         if mode == cls.LIGHT:
@@ -101,25 +119,38 @@ class MacTheme:
             background-color: rgba(255, 255, 255, 0.12);
         }}
 
-        /* Unified macOS Toolbar (52px tall, subtle 1px border, 10px top radius) */
+        /* Unified macOS Header Bar (48px tall, 1px bottom border) */
         #macToolbar {{
             background-color: {cls.DARK_BG_TOOLBAR};
             border: none;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
-            padding: 0px 12px;
+            padding: 0px 16px;
+            min-height: 48px;
+            max-height: 48px;
+            height: 48px;
+        }}
+
+        #toolbarDivider {{
+            background-color: rgba(255, 255, 255, 0.12);
+            width: 1px;
+            min-width: 1px;
+            max-width: 1px;
+            height: 20px;
+            min-height: 20px;
+            max-height: 20px;
         }}
         
         #windowTitleLabel {{
-            font-family: "Inter", -apple-system, sans-serif;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 550;
             color: {cls.DARK_TEXT_PRIMARY};
         }}
 
         #pageBadge {{
-            font-family: "Inter", -apple-system, sans-serif;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 11px;
             font-weight: 500;
             color: #98989d;
@@ -128,42 +159,124 @@ class MacTheme:
             padding: 1px 6px;
         }}
 
-        #markupToolbar {{
+        #markupToolbar, #organizeActionBar {{
             background-color: {cls.DARK_BG_SIDEBAR};
             border: none;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 2px 10px;
-            max-height: 38px;
-            min-height: 38px;
+            padding: 0px 12px;
+            min-height: 44px;
+            max-height: 44px;
+            height: 44px;
         }}
 
-        #markupToolbar QToolButton {{
+        #primaryStrip {{
+            background: transparent;
+            min-height: 44px;
+            max-height: 44px;
+            height: 44px;
+        }}
+
+        #markupGroup {{
+            background-color: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 6px;
+            padding: 1px;
+            min-height: 34px;
+            max-height: 34px;
+        }}
+
+        #markupGroupSeparator {{
+            background-color: rgba(255, 255, 255, 0.12);
+            width: 1px;
+            min-width: 1px;
+            max-width: 1px;
+            height: 18px;
+        }}
+
+        #markupGroup QToolButton {{
             background-color: transparent;
             border: 1px solid transparent;
             border-radius: 6px;
             color: {cls.DARK_TEXT_PRIMARY};
             padding: 2px;
-            min-height: 28px;
-            max-height: 28px;
-            min-width: 28px;
-            max-width: 44px;
+            min-height: 32px;
+            max-height: 32px;
+            min-width: 32px;
+            max-width: 32px;
         }}
 
-        #markupToolbar QToolButton:hover {{
+        #markupGroup QToolButton#selectBtn,
+        #markupGroup QToolButton#shapesBtn,
+        #overflowBtn {{
+            min-width: 40px;
+            max-width: 44px;
+            min-height: 32px;
+            max-height: 32px;
+        }}
+
+        #markupGroup QToolButton:hover, #overflowBtn:hover {{
             background-color: rgba(255, 255, 255, 0.08);
             border-color: transparent;
         }}
 
-        #markupToolbar QToolButton:pressed {{
+        #markupGroup QToolButton:pressed, #overflowBtn:pressed {{
             background-color: rgba(255, 255, 255, 0.14);
             border-color: transparent;
         }}
 
-        #markupToolbar QToolButton:checked {{
+        #markupGroup QToolButton:checked {{
             background-color: {cls.DARK_ACCENT};
             border: 1px solid {cls.DARK_ACCENT};
             border-radius: 6px;
             color: #ffffff;
+        }}
+
+        #markupGroup QToolButton:focus, #overflowBtn:focus, QToolButton:focus, QPushButton:focus {{
+            outline: 2px solid {cls.DARK_ACCENT};
+            outline-offset: 1px;
+        }}
+
+        #markupGroup QToolButton:disabled, #overflowBtn:disabled {{
+            color: #555558;
+            opacity: 0.35;
+        }}
+
+        #contextFormattingBar {{
+            background: transparent;
+            border: none;
+            padding: 0px 4px;
+            min-height: 32px;
+            max-height: 32px;
+        }}
+
+        #contextFormattingBar QToolButton {{
+            background-color: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            color: {cls.DARK_TEXT_PRIMARY};
+            padding: 3px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            min-height: 28px;
+            max-height: 28px;
+            min-width: 28px;
+            max-width: none;
+        }}
+
+        #contextFormattingBar QToolButton:hover {{
+            background-color: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.14);
+        }}
+
+        #contextFormattingBar QToolButton:pressed {{
+            background-color: rgba(255, 255, 255, 0.18);
+        }}
+
+        #contextFormattingBar QToolButton:checked {{
+            background-color: {cls.DARK_ACCENT};
+            border-color: {cls.DARK_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
         }}
 
         /* Icon-only Buttons & Standard Buttons (28px height, 6px radius, flat 8% hover / 14% pressed) */
@@ -253,28 +366,99 @@ class MacTheme:
             background-color: rgba(255, 255, 255, 0.14);
         }}
 
-        /* Markup Pill Button (rounded 14px pill) */
+        /* Markup Pill Button (Primary Button) */
         #markupPillBtn {{
-            border-radius: 14px;
-            padding: 0px 12px;
-            font-size: 12px;
-            font-weight: 500;
-            background-color: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            padding: 0px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            background-color: rgba(10, 132, 255, 0.16);
+            border: 1px solid rgba(10, 132, 255, 0.45);
+            color: #0a84ff;
+            min-height: 32px;
+            max-height: 32px;
         }}
 
         #markupPillBtn:hover {{
-            background-color: rgba(255, 255, 255, 0.08);
+            background-color: rgba(10, 132, 255, 0.26);
+            border-color: #0a84ff;
         }}
 
         #markupPillBtn:pressed {{
-            background-color: rgba(255, 255, 255, 0.14);
+            background-color: #0071e3;
+            color: #ffffff;
         }}
 
         #markupPillBtn:checked {{
             background-color: {cls.DARK_ACCENT};
             border-color: {cls.DARK_ACCENT};
             color: #ffffff;
+        }}
+
+        /* Sidebar Segmented Control Tabs */
+        #sidebarSegmented {{
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 2px;
+            margin: 6px 8px;
+        }}
+        #sidebarSegmented QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 5px;
+            color: #98989d;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 6px;
+            min-height: 24px;
+            max-height: 24px;
+        }}
+        #sidebarSegmented QToolButton:hover {{
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.06);
+        }}
+        #sidebarSegmented QToolButton:checked {{
+            background-color: {cls.DARK_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+
+        /* Empty State in Canvas */
+        #emptyStateOverlay {{
+            background: transparent;
+        }}
+        #emptyStateCard {{
+            background-color: {cls.DARK_BG_CARD};
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 36px 44px;
+        }}
+        #emptyStateCard[dragHover="true"] {{
+            border: 2px dashed {cls.DARK_ACCENT};
+            background-color: rgba(10, 132, 255, 0.08);
+        }}
+        #emptyStateTitle {{
+            font-size: 16px;
+            font-weight: 600;
+            color: {cls.DARK_TEXT_PRIMARY};
+        }}
+        #emptyStateHint {{
+            font-size: 12px;
+            color: {cls.DARK_TEXT_SECONDARY};
+        }}
+        #emptyStateOpenBtn {{
+            background-color: {cls.DARK_ACCENT};
+            border: 1px solid {cls.DARK_ACCENT};
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 18px;
+            min-height: 32px;
+        }}
+        #emptyStateOpenBtn:hover {{
+            background-color: #0071e3;
         }}
 
         /* Search Field with Magnifier and Focus Ring in Accent Color */
@@ -633,6 +817,123 @@ class MacTheme:
             font-weight: 500;
             background: transparent;
         }}
+
+        /* Workspace Mode Switcher Segmented Control */
+        #modeSegmented {{
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 1px;
+        }}
+        #modeSegmented QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 5px;
+            color: #98989d;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 8px;
+            min-height: 24px;
+            max-height: 24px;
+        }}
+        #modeSegmented QToolButton:hover {{
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.06);
+        }}
+        #modeSegmented QToolButton:checked {{
+            background-color: {cls.DARK_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+
+        /* Context Formatting Bar */
+        #contextFormattingBar {{
+            background-color: #1a1a1c;
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 2px 10px;
+        }}
+
+        /* Organize Action Bar */
+        #organizeActionBar {{
+            background-color: {cls.DARK_BG_SIDEBAR};
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 2px 10px;
+        }}
+
+        /* Collapsible Right Inspector Panel */
+        #macInspectorPanel {{
+            background-color: {cls.DARK_BG_SIDEBAR};
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+        }}
+        #macInspectorPanel QScrollArea,
+        #macInspectorPanel QScrollArea > QWidget > QWidget {{
+            background: transparent;
+            border: none;
+        }}
+        #inspectorHeader {{
+            background-color: {cls.DARK_BG_TOOLBAR};
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }}
+        #inspectorSegmented {{
+            background-color: rgba(255, 255, 255, 0.08);
+            border-radius: 5px;
+            padding: 1px;
+        }}
+        #inspectorSegmented QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: #98989d;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 6px;
+        }}
+        #inspectorSegmented QToolButton:hover {{
+            color: #ffffff;
+        }}
+        #inspectorSegmented QToolButton:checked {{
+            background-color: {cls.DARK_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+        #inspectorCloseBtn {{
+            background: transparent;
+            border: none;
+            color: #98989d;
+            font-size: 14px;
+            font-weight: 600;
+        }}
+        #inspectorCloseBtn:hover {{
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+        }}
+        #inspectorCard {{
+            background-color: {cls.DARK_BG_CARD};
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }}
+        #inspectorAnnotList {{
+            background-color: {cls.DARK_BG_WINDOW};
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            color: {cls.DARK_TEXT_PRIMARY};
+            font-size: 12px;
+            outline: none;
+        }}
+        #inspectorAnnotList::item {{
+            padding: 6px 8px;
+            border-radius: 4px;
+        }}
+        #inspectorAnnotList::item:hover {{
+            background-color: rgba(255, 255, 255, 0.06);
+        }}
+        #inspectorAnnotList::item:selected {{
+            background-color: {cls.DARK_ACCENT};
+            color: #ffffff;
+        }}
         """
 
     @classmethod
@@ -684,25 +985,38 @@ class MacTheme:
             background-color: rgba(0, 0, 0, 0.08);
         }}
 
-        /* Unified macOS Toolbar (52px tall, subtle 1px border, 10px top radius) */
+        /* Unified macOS Header Bar (48px tall, 1px bottom border) */
         #macToolbar {{
             background-color: {cls.LIGHT_BG_TOOLBAR};
             border: none;
             border-bottom: 1px solid rgba(0, 0, 0, 0.12);
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
-            padding: 0px 12px;
+            padding: 0px 16px;
+            min-height: 48px;
+            max-height: 48px;
+            height: 48px;
+        }}
+
+        #toolbarDivider {{
+            background-color: rgba(0, 0, 0, 0.12);
+            width: 1px;
+            min-width: 1px;
+            max-width: 1px;
+            height: 20px;
+            min-height: 20px;
+            max-height: 20px;
         }}
         
         #windowTitleLabel {{
-            font-family: "Inter", -apple-system, sans-serif;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 550;
             color: {cls.LIGHT_TEXT_PRIMARY};
         }}
 
         #pageBadge {{
-            font-family: "Inter", -apple-system, sans-serif;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 11px;
             font-weight: 500;
             color: #6e6e73;
@@ -711,42 +1025,219 @@ class MacTheme:
             padding: 1px 6px;
         }}
 
-        #markupToolbar {{
+        #markupToolbar, #organizeActionBar {{
             background-color: {cls.LIGHT_BG_SIDEBAR};
             border: none;
             border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-            padding: 2px 10px;
-            max-height: 38px;
-            min-height: 38px;
+            padding: 0px 12px;
+            min-height: 44px;
+            max-height: 44px;
+            height: 44px;
         }}
 
-        #markupToolbar QToolButton {{
+        #primaryStrip {{
+            background: transparent;
+            min-height: 44px;
+            max-height: 44px;
+            height: 44px;
+        }}
+
+        #markupGroup {{
+            background-color: rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            border-radius: 6px;
+            padding: 1px;
+            min-height: 34px;
+            max-height: 34px;
+        }}
+
+        #markupGroupSeparator {{
+            background-color: rgba(0, 0, 0, 0.10);
+            width: 1px;
+            min-width: 1px;
+            max-width: 1px;
+            height: 18px;
+        }}
+
+        #markupGroup QToolButton {{
             background-color: transparent;
             border: 1px solid transparent;
             border-radius: 6px;
             color: {cls.LIGHT_TEXT_PRIMARY};
             padding: 2px;
-            min-height: 28px;
-            max-height: 28px;
-            min-width: 28px;
+            min-height: 32px;
+            max-height: 32px;
+            min-width: 32px;
+            max-width: 32px;
+        }}
+
+        #markupGroup QToolButton#selectBtn,
+        #markupGroup QToolButton#shapesBtn,
+        #overflowBtn {{
+            min-width: 40px;
             max-width: 44px;
+            min-height: 32px;
+            max-height: 32px;
         }}
 
-        #markupToolbar QToolButton:hover {{
-            background-color: rgba(0, 0, 0, 0.08);
+        #markupGroup QToolButton:hover, #overflowBtn:hover {{
+            background-color: rgba(0, 0, 0, 0.06);
             border-color: transparent;
         }}
 
-        #markupToolbar QToolButton:pressed {{
-            background-color: rgba(0, 0, 0, 0.14);
+        #markupGroup QToolButton:pressed, #overflowBtn:pressed {{
+            background-color: rgba(0, 0, 0, 0.12);
             border-color: transparent;
         }}
 
-        #markupToolbar QToolButton:checked {{
+        #markupGroup QToolButton:checked {{
             background-color: {cls.LIGHT_ACCENT};
             border: 1px solid {cls.LIGHT_ACCENT};
             border-radius: 6px;
             color: #ffffff;
+        }}
+
+        #markupGroup QToolButton:focus, #overflowBtn:focus, QToolButton:focus, QPushButton:focus {{
+            outline: 2px solid {cls.LIGHT_ACCENT};
+            outline-offset: 1px;
+        }}
+
+        #markupGroup QToolButton:disabled, #overflowBtn:disabled {{
+            color: #8e8e93;
+            opacity: 0.35;
+        }}
+
+        #contextFormattingBar {{
+            background: transparent;
+            border: none;
+            padding: 0px 4px;
+            min-height: 32px;
+            max-height: 32px;
+        }}
+
+        #contextFormattingBar QToolButton {{
+            background-color: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 6px;
+            color: {cls.LIGHT_TEXT_PRIMARY};
+            padding: 3px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            min-height: 28px;
+            max-height: 28px;
+            min-width: 28px;
+            max-width: none;
+        }}
+
+        #contextFormattingBar QToolButton:hover {{
+            background-color: rgba(0, 0, 0, 0.08);
+            border-color: rgba(0, 0, 0, 0.12);
+        }}
+
+        #contextFormattingBar QToolButton:pressed {{
+            background-color: rgba(0, 0, 0, 0.14);
+        }}
+
+        #contextFormattingBar QToolButton:checked {{
+            background-color: {cls.LIGHT_ACCENT};
+            border-color: {cls.LIGHT_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+
+        /* Markup Pill Button (Primary Button) */
+        #markupPillBtn {{
+            border-radius: 6px;
+            padding: 0px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            background-color: rgba(10, 132, 255, 0.12);
+            border: 1px solid rgba(10, 132, 255, 0.38);
+            color: #0a84ff;
+            min-height: 32px;
+            max-height: 32px;
+        }}
+
+        #markupPillBtn:hover {{
+            background-color: rgba(10, 132, 255, 0.20);
+            border-color: #0a84ff;
+        }}
+
+        #markupPillBtn:pressed {{
+            background-color: #0071e3;
+            color: #ffffff;
+        }}
+
+        #markupPillBtn:checked {{
+            background-color: {cls.LIGHT_ACCENT};
+            border-color: {cls.LIGHT_ACCENT};
+            color: #ffffff;
+        }}
+
+        /* Sidebar Segmented Control Tabs */
+        #sidebarSegmented {{
+            background-color: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 6px;
+            padding: 2px;
+            margin: 6px 8px;
+        }}
+        #sidebarSegmented QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 5px;
+            color: #6e6e73;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 6px;
+            min-height: 24px;
+            max-height: 24px;
+        }}
+        #sidebarSegmented QToolButton:hover {{
+            color: {cls.LIGHT_TEXT_PRIMARY};
+            background-color: rgba(0, 0, 0, 0.04);
+        }}
+        #sidebarSegmented QToolButton:checked {{
+            background-color: {cls.LIGHT_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+
+        /* Empty State in Canvas */
+        #emptyStateOverlay {{
+            background: transparent;
+        }}
+        #emptyStateCard {{
+            background-color: {cls.LIGHT_BG_CARD};
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            padding: 36px 44px;
+        }}
+        #emptyStateCard[dragHover="true"] {{
+            border: 2px dashed {cls.LIGHT_ACCENT};
+            background-color: rgba(10, 132, 255, 0.06);
+        }}
+        #emptyStateTitle {{
+            font-size: 16px;
+            font-weight: 600;
+            color: {cls.LIGHT_TEXT_PRIMARY};
+        }}
+        #emptyStateHint {{
+            font-size: 12px;
+            color: {cls.LIGHT_TEXT_SECONDARY};
+        }}
+        #emptyStateOpenBtn {{
+            background-color: {cls.LIGHT_ACCENT};
+            border: 1px solid {cls.LIGHT_ACCENT};
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 18px;
+            min-height: 32px;
+        }}
+        #emptyStateOpenBtn:hover {{
+            background-color: #0071e3;
         }}
 
         /* Icon-only Buttons & Standard Buttons (28px height, 6px radius, flat 8% hover / 14% pressed) */
@@ -1215,6 +1706,123 @@ class MacTheme:
             font-size: 11px;
             font-weight: 500;
             background: transparent;
+        }}
+
+        /* Workspace Mode Switcher Segmented Control */
+        #modeSegmented {{
+            background-color: rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 6px;
+            padding: 1px;
+        }}
+        #modeSegmented QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 5px;
+            color: #6e6e73;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 8px;
+            min-height: 24px;
+            max-height: 24px;
+        }}
+        #modeSegmented QToolButton:hover {{
+            color: #000000;
+            background-color: rgba(0, 0, 0, 0.04);
+        }}
+        #modeSegmented QToolButton:checked {{
+            background-color: {cls.LIGHT_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+
+        /* Context Formatting Bar */
+        #contextFormattingBar {{
+            background-color: #f7f7f9;
+            border: none;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 2px 10px;
+        }}
+
+        /* Organize Action Bar */
+        #organizeActionBar {{
+            background-color: {cls.LIGHT_BG_SIDEBAR};
+            border: none;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 2px 10px;
+        }}
+
+        /* Collapsible Right Inspector Panel */
+        #macInspectorPanel {{
+            background-color: {cls.LIGHT_BG_SIDEBAR};
+            border-left: 1px solid rgba(0, 0, 0, 0.08);
+        }}
+        #macInspectorPanel QScrollArea,
+        #macInspectorPanel QScrollArea > QWidget > QWidget {{
+            background: transparent;
+            border: none;
+        }}
+        #inspectorHeader {{
+            background-color: {cls.LIGHT_BG_TOOLBAR};
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }}
+        #inspectorSegmented {{
+            background-color: rgba(0, 0, 0, 0.06);
+            border-radius: 5px;
+            padding: 1px;
+        }}
+        #inspectorSegmented QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: #6e6e73;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 6px;
+        }}
+        #inspectorSegmented QToolButton:hover {{
+            color: #000000;
+        }}
+        #inspectorSegmented QToolButton:checked {{
+            background-color: {cls.LIGHT_ACCENT};
+            color: #ffffff;
+            font-weight: 600;
+        }}
+        #inspectorCloseBtn {{
+            background: transparent;
+            border: none;
+            color: #6e6e73;
+            font-size: 14px;
+            font-weight: 600;
+        }}
+        #inspectorCloseBtn:hover {{
+            color: #000000;
+            background-color: rgba(0, 0, 0, 0.10);
+            border-radius: 4px;
+        }}
+        #inspectorCard {{
+            background-color: {cls.LIGHT_BG_CARD};
+            border-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }}
+        #inspectorAnnotList {{
+            background-color: {cls.LIGHT_BG_WINDOW};
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 6px;
+            color: {cls.LIGHT_TEXT_PRIMARY};
+            font-size: 12px;
+            outline: none;
+        }}
+        #inspectorAnnotList::item {{
+            padding: 6px 8px;
+            border-radius: 4px;
+        }}
+        #inspectorAnnotList::item:hover {{
+            background-color: rgba(0, 0, 0, 0.04);
+        }}
+        #inspectorAnnotList::item:selected {{
+            background-color: {cls.LIGHT_ACCENT};
+            color: #ffffff;
         }}
         """
 

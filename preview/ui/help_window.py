@@ -1,5 +1,5 @@
 """
-Preview Help Window — Authentic Apple Support / macOS User Guide documentation system.
+Preview Help Window - Authentic Apple Support / macOS User Guide documentation system.
 Features:
 - Left navigation tree with top search filter.
 - Clean right-hand content pane (max 720px width).

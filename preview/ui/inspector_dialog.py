@@ -37,7 +37,7 @@ class InspectorDialog(QDialog):
             ("Format:", str(self.metadata.get("format", "Unknown"))),
             ("File Size:", self._format_bytes(self.metadata.get("file_size", 0))),
             ("Pages:", str(self.metadata.get("page_count", 1))),
-            ("Dimensions:", str(self.metadata.get("dimensions", "—"))),
+            ("Dimensions:", str(self.metadata.get("dimensions", "-"))),
             ("DPI / Resolution:", str(self.metadata.get("dpi", 72))),
             ("Color Mode:", str(self.metadata.get("mode", "RGB"))),
         ]
@@ -59,11 +59,11 @@ class InspectorDialog(QDialog):
             p_layout.setSpacing(10)
 
             pdf_rows = [
-                ("Author:", str(self.metadata.get("author", "—"))),
-                ("Subject:", str(self.metadata.get("subject", "—"))),
-                ("Keywords:", str(self.metadata.get("keywords", "—"))),
-                ("Producer:", str(self.metadata.get("producer", "—"))),
-                ("Creator:", str(self.metadata.get("creator", "—"))),
+                ("Author:", str(self.metadata.get("author", "-"))),
+                ("Subject:", str(self.metadata.get("subject", "-"))),
+                ("Keywords:", str(self.metadata.get("keywords", "-"))),
+                ("Producer:", str(self.metadata.get("producer", "-"))),
+                ("Creator:", str(self.metadata.get("creator", "-"))),
             ]
 
             for i, (label, val) in enumerate(pdf_rows):

@@ -1,3 +1,30 @@
+# Preview macOS v1.7.0 Release Notes
+
+Welcome to **Preview macOS v1.7.0**! This major milestone delivers a complete UI layout redesign with authentic macOS Big Sur / Sonoma chrome, Canva-style Image Overlays with live dimension badges, grouped segmented toolbars with unified Lucide vector icons, three distinct Workspace Modes (View, Edit, Organize), mouse wheel zoom centered at cursor, real-time proportional resize calculations, and protected PDF reading modes.
+
+---
+
+### 🌟 What's New in v1.7.0
+
+#### 🎨 Complete UI & Layout Redesign (macOS Big Sur / Sonoma Authentic Chrome)
+* **Unified Lucide Icon System:** Replaced inconsistent glyphs with a single, authentic Lucide vector icon set (ISC license) across all toolbars, menus, dialogs, and inspector panels.
+* **48px Unified Header & 44px Fixed Tool Bar:** Two-row zero-clipping architecture with macOS segmented pill groupings (`32x32px` buttons, `6px` corner radii, authentic hover and checked states).
+* **Workspace Modes:** Seamless switching between **View Mode** (clean reading), **Edit Mode** (markup tools and format bar), and **Organize Mode** (page reordering and insertion).
+* **Inspector Panel:** Collapsible 280px Pro Inspector with smooth animations, document metadata, annotation layer hierarchy, and quick actions.
+
+#### 🖼️ Canva-Style Image Overlays
+* **Add Image Overlay:** Overlay external logos, photos, stickers, and graphics onto any active document page via the Markup Toolbar button, the Edit/Tools menu (`Ctrl+Shift+I`), or direct clipboard paste (`Ctrl+V`).
+* **Interactive Handle Resizing & Hit-Testing:** 8-point macOS bounding box with real-time resizing and repositioning.
+* **Live Dimension Badge:** Dark floating badge showing exact pixel dimensions (`e.g. 320 × 240 px`) while dragging or selecting.
+* **Full Undo/Redo & Vector Export:** Full history stack support and automatic flattening/baking into saved images and exported PDF documents.
+
+#### 🖱️ Enhanced Interactions & Navigation
+* **Cursor-Centered Zoom:** Scrolling the mouse wheel on image documents zooms smoothly in and out centered at the mouse cursor position without requiring Ctrl.
+* **Live Proportional Size Preview:** Adjust Size dialog displays real-time resulting pixel dimensions dynamically as width, height, or scale values are edited.
+* **Protected PDF Text Selection:** PDF word selection is active only during Edit mode, preserving clean scrolling and click navigation in View mode.
+
+---
+
 # Preview macOS v1.6.0 Release Notes
 
 Welcome to **Preview macOS v1.6.0**! This major milestone delivers six high-priority features: native macOS-style Multi-Tab document interface, interactive Magnifier Loupe and Callout bubble annotations, bounded LRU cache with background page prefetching for 500+ page documents, multithreaded batch image resizing and format conversion, system dark/light theme auto-detection, and the 'Reduce File Size' Quartz PDF compression filter.

@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QPointF, QRectF, QSizeF
 
 class AnnotationType(Enum):
     NONE = auto()
+    HAND = auto()
     PEN = auto()
     HIGHLIGHTER = auto()
     RECTANGLE = auto()
@@ -28,6 +29,9 @@ class AnnotationType(Enum):
     REDACT = auto()
     LOUPE = auto()
     CALLOUT = auto()
+    UNDERLINE = auto()
+    STRIKETHROUGH = auto()
+    IMAGE_OVERLAY = auto()
 
 class Handle(Enum):
     NONE = 0
@@ -58,6 +62,8 @@ class AnnotationItem:
         self.font_size: int = 16
         self.font_family: str = "-apple-system"
         self.signature_pixmap: Optional[QPixmap] = None
+        self.overlay_pixmap: Optional[QPixmap] = None
+        self.opacity: float = 1.0
         self.is_selected: bool = False
         self.is_bold: bool = False
         self.is_italic: bool = False
@@ -213,6 +219,7 @@ class AnnotationItem:
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(scaled_rect)
             self._draw_resize_handles(painter, scaled_rect)
+            self._draw_size_badge(painter, scaled_rect)
 
         elif self.item_type == AnnotationType.CROP_OVAL:
             scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
@@ -223,6 +230,7 @@ class AnnotationItem:
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(scaled_rect)
             self._draw_resize_handles(painter, scaled_rect)
+            self._draw_size_badge(painter, scaled_rect)
 
         elif self.item_type == AnnotationType.CROP_LASSO:
             if len(self.points) > 1:
@@ -341,6 +349,36 @@ class AnnotationItem:
                 align = int(getattr(self, "alignment", Qt.AlignmentFlag.AlignCenter)) | int(Qt.TextFlag.TextWordWrap)
                 painter.drawText(text_rect, align, self.text)
 
+        elif self.item_type == AnnotationType.UNDERLINE:
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
+                                 self.rect.width() * zoom, self.rect.height() * zoom)
+            pen = QPen(self.stroke_color, max(2.0, self.stroke_width * zoom))
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            painter.drawLine(QPointF(scaled_rect.left(), scaled_rect.bottom()),
+                             QPointF(scaled_rect.right(), scaled_rect.bottom()))
+
+        elif self.item_type == AnnotationType.STRIKETHROUGH:
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
+                                 self.rect.width() * zoom, self.rect.height() * zoom)
+            pen = QPen(self.stroke_color, max(2.0, self.stroke_width * zoom))
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            painter.drawLine(QPointF(scaled_rect.left(), scaled_rect.center().y()),
+                             QPointF(scaled_rect.right(), scaled_rect.center().y()))
+
+        elif self.item_type == AnnotationType.IMAGE_OVERLAY and self.overlay_pixmap and not self.overlay_pixmap.isNull():
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
+                                 self.rect.width() * zoom, self.rect.height() * zoom)
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            op = getattr(self, "opacity", 1.0)
+            if op < 1.0:
+                painter.setOpacity(max(0.0, min(1.0, op)))
+            painter.drawPixmap(scaled_rect.toRect(), self.overlay_pixmap)
+            painter.restore()
+
         # Draw selection border and handles if selected
         if self.is_selected and self.item_type not in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, AnnotationType.CROP_LASSO):
             doc_b = self.get_bounds()
@@ -351,6 +389,8 @@ class AnnotationItem:
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(bounds.adjusted(-4, -4, 4, 4))
             self._draw_resize_handles(painter, bounds.adjusted(-4, -4, 4, 4), zoom=zoom)
+            if self.item_type == AnnotationType.IMAGE_OVERLAY:
+                self._draw_size_badge(painter, bounds.adjusted(-4, -4, 4, 4))
 
         painter.restore()
 
@@ -381,6 +421,37 @@ class AnnotationItem:
                 painter.setBrush(QBrush(QColor("#ffffff")))
                 painter.setPen(QPen(QColor("#0a84ff"), 1.5))
                 painter.drawRect(QRectF(pt.x() * zoom - h_sz/2, pt.y() * zoom - h_sz/2, h_sz, h_sz))
+
+    def _draw_size_badge(self, painter: QPainter, scaled_rect: QRectF):
+        """Draws a sleek macOS dimension badge (e.g. '800 × 600') on the selection box."""
+        w_px = int(round(abs(self.rect.width())))
+        h_px = int(round(abs(self.rect.height())))
+        if w_px < 6 or h_px < 6:
+            return
+
+        text = f"{w_px} × {h_px} px"
+        font = QFont("-apple-system", 9)
+        font.setStyleHint(QFont.StyleHint.SansSerif)
+        font.setWeight(QFont.Weight.Medium)
+        painter.setFont(font)
+
+        fm = painter.fontMetrics()
+        tw = fm.horizontalAdvance(text) + 12
+        th = fm.height() + 4
+
+        bx = scaled_rect.center().x() - tw / 2.0
+        by = scaled_rect.bottom() + 6
+        badge_rect = QRectF(bx, by, tw, th)
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(QColor(20, 20, 24, 215)))
+        painter.drawRoundedRect(badge_rect, 4, 4)
+
+        painter.setPen(QPen(QColor("#f5f5f7")))
+        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, text)
+        painter.restore()
 
     def get_handles_positions(self, zoom: float = 1.0) -> dict:
         """Returns dictionary of {Handle: QPointF} in document coordinates."""
@@ -493,7 +564,8 @@ class AnnotationItem:
                               AnnotationType.ELLIPSE, AnnotationType.TEXT, 
                               AnnotationType.NOTE, AnnotationType.SIGNATURE, 
                               AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, 
-                              AnnotationType.REDACT, AnnotationType.LOUPE, AnnotationType.CALLOUT):
+                              AnnotationType.REDACT, AnnotationType.LOUPE, AnnotationType.CALLOUT,
+                              AnnotationType.IMAGE_OVERLAY):
             self.rect = new_rect
 
         elif self.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER, AnnotationType.CROP_LASSO) and orig_points and orig_bounds.isValid():
@@ -513,7 +585,8 @@ class AnnotationItem:
                               AnnotationType.ELLIPSE, AnnotationType.TEXT, 
                               AnnotationType.NOTE, AnnotationType.SIGNATURE, 
                               AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, 
-                              AnnotationType.REDACT, AnnotationType.LOUPE):
+                              AnnotationType.REDACT, AnnotationType.LOUPE,
+                              AnnotationType.IMAGE_OVERLAY):
             return self.rect.normalized()
         elif self.item_type == AnnotationType.CALLOUT:
             b = self.rect.normalized()
