@@ -19,13 +19,13 @@ DIST_DIR="$SCRIPT_DIR/dist"
 
 echo "==> [1/5] Building standalone binary with PyInstaller..."
 rm -rf "$DIST_DIR/preview-app"
-pyinstaller --noconfirm --onedir --windowed \
-    --name="preview-app" \
-    --add-data "preview/assets:preview/assets" \
-    --collect-all pymupdf \
-    --hidden-import fitz \
-    --hidden-import pymupdf \
-    main.py
+pyinstaller --noconfirm preview-app.spec
+
+# Safeguard against GLIBC conflicts (Issue #9): Remove bundled host glib if present
+find "$DIST_DIR/preview-app" -type f -name "libglib-2.0.so*" -delete || true
+find "$DIST_DIR/preview-app" -type f -name "libgobject-2.0.so*" -delete || true
+find "$DIST_DIR/preview-app" -type f -name "libgio-2.0.so*" -delete || true
+find "$DIST_DIR/preview-app" -type f -name "libgmodule-2.0.so*" -delete || true
 
 
 echo "==> [2/5] Creating Debian package structure..."
@@ -74,6 +74,7 @@ Version: $VERSION
 Section: graphics
 Priority: optional
 Architecture: $ARCH
+Depends: libc6 (>= 2.35), libglib2.0-0, libgl1, libegl1
 Installed-Size: $INSTALLED_SIZE
 Maintainer: Shivam Prasad <info@trivilabs.in>
 Homepage: https://trivilabs.in
