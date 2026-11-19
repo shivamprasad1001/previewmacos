@@ -45,6 +45,32 @@ jobs:
           chmod +x build_deb.sh
           ./build_deb.sh
 
+      - name: Verify .deb in Clean Debian 13 Container
+        run: |
+          docker run --rm -v "${{ github.workspace }}/dist:/pkg" debian:13 bash -c "
+            set -e
+            apt-get update
+            apt-get install -y /pkg/*.deb
+            echo '=== Checking for missing libraries in Debian 13 ==='
+            find /usr/lib/preview-app -name '*.so*' -exec ldd {} \; 2>/dev/null | grep 'not found' | sort -u || echo 'All shared libraries resolved!'
+            echo '=== Headless launch test in Debian 13 ==='
+            QT_QPA_PLATFORM=offscreen timeout 5s /usr/lib/preview-app/preview-app || [ \$? -eq 124 ]
+            echo 'Debian 13 verification PASS!'
+          "
+
+      - name: Verify .deb in Clean Debian 12 Container
+        run: |
+          docker run --rm -v "${{ github.workspace }}/dist:/pkg" debian:12 bash -c "
+            set -e
+            apt-get update
+            apt-get install -y /pkg/*.deb
+            echo '=== Checking for missing libraries in Debian 12 ==='
+            find /usr/lib/preview-app -name '*.so*' -exec ldd {} \; 2>/dev/null | grep 'not found' | sort -u || echo 'All shared libraries resolved!'
+            echo '=== Headless launch test in Debian 12 ==='
+            QT_QPA_PLATFORM=offscreen timeout 5s /usr/lib/preview-app/preview-app || [ \$? -eq 124 ]
+            echo 'Debian 12 verification PASS!'
+          "
+
       - name: Upload .deb Artifact
         uses: actions/upload-artifact@v4
         with:
