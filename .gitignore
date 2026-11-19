@@ -14,6 +14,9 @@ env/
 venv/
 ENV/
 
+# Node dependencies
+node_modules/
+
 # System / IDE
 .DS_Store
 Thumbs.db

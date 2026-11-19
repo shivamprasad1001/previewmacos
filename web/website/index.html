@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preview (macOS Edition) - Native PDF &amp; Image Viewer for Linux and Windows</title>
+  <meta name="description" content="Native macOS Preview reconstruction for Linux and Windows. Fast PDF and image viewer with markup, redaction, signing, and color lab. MIT licensed." />
+  <meta name="author" content="Shivam Prasad" />
+  <meta name="theme-color" content="#007AFF" />
+  <link rel="canonical" href="https://preview.trivilabs.in/" />
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/icon.png" />
+  <link rel="apple-touch-icon" href="assets/icon.png" />
+  <link rel="preload" as="image" href="assets/preview_main_dark.png" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Preview (macOS Edition)" />
+  <meta property="og:title" content="Preview (macOS Edition) - Native PDF &amp; Image Viewer for Linux and Windows" />
+  <meta property="og:description" content="Fast, native PDF and image viewer with annotation, signing, redaction, and color adjustments for Linux and Windows. Built with Python and PyQt6." />
+  <meta property="og:image" content="assets/preview_main_dark.png" />
+  <meta property="og:url" content="https://preview.trivilabs.in/" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Preview (macOS Edition) - Native PDF &amp; Image Viewer for Linux and Windows" />
+  <meta name="twitter:description" content="Fast, native PDF and image viewer with annotation, signing, redaction, and color adjustments for Linux and Windows." />
+  <meta name="twitter:image" content="assets/preview_main_dark.png" />
+
+  <!-- Prevent theme flash before first paint -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('preview-theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = saved === 'light' || saved === 'dark' ? saved : (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Preview (macOS Edition)",
+    "operatingSystem": "Linux, Windows",
+    "applicationCategory": "UtilitiesApplication",
+    "softwareVersion": "1.7.0",
+    "license": "https://opensource.org/licenses/MIT",
+    "description": "A pixel-faithful reconstruction of Apple's macOS Preview app for Linux and Windows. Native desktop PDF and image viewer and annotator built with Python, PyQt6, PyMuPDF, and Pillow.",
+    "url": "https://github.com/shivamprasad1001/previewmacos",
+    "author": {
+      "@type": "Person",
+      "name": "Shivam Prasad"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <!-- 1. Sticky Navbar -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#top" class="brand" aria-label="Preview (macOS Edition) home">
+        <img src="assets/icon-64.png" alt="Preview app icon" width="28" height="28" class="brand-icon" />
+        <span class="brand-name">Preview</span>
+      </a>
+
+      <nav class="main-nav" aria-label="Primary navigation">
+        <a href="#features">Features</a>
+        <a href="#gallery">Gallery</a>
+        <a href="#compare">Compare</a>
+        <a href="#install">Install</a>
+        <a href="#shortcuts">Shortcuts</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+
+      <div class="header-actions">
+        <a
+          href="https://github.com/shivamprasad1001/previewmacos"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn-gh-star"
+          title="Star Preview on GitHub"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          <span>Star<span class="sr-only"> Preview on GitHub</span></span>
+          <span class="star-count" id="github-star-count" hidden></span>
+        </a>
+
+        <button
+          type="button"
+          class="theme-toggle"
+          id="theme-toggle"
+          aria-label="Toggle color theme"
+          aria-pressed="false"
+        >
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
+          </svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="mobile-menu-toggle"
+          id="mobile-menu-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded="false"
+          aria-controls="mobile-nav"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="4" y1="7" x2="20" y2="7"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="17" x2="20" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" hidden>
+      <a href="#features">Features</a>
+      <a href="#gallery">Gallery</a>
+      <a href="#compare">Compare</a>
+      <a href="#install">Install</a>
+      <a href="#shortcuts">Shortcuts</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/shivamprasad1001/previewmacos" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <!-- 2. Hero -->
+    <section class="hero reveal revealed" id="top">
+      <div class="container">
+        <div class="hero-copy">
+          <p class="hero-kicker">Preview (macOS Edition)</p>
+          <h1 class="hero-title">macOS Preview, on Linux and Windows.</h1>
+          <p class="hero-subtitle">
+            Fast, native PDF and image viewer with annotation, signing, redaction, and color adjustments.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="#install" id="hero-download-btn" class="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="hero-download-label">Download</span>
+            </a>
+            <a
+              href="https://github.com/shivamprasad1001/previewmacos"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-secondary"
+            >
+              View on GitHub
+            </a>
+          </div>
+
+          <ul class="hero-badges" aria-label="Project specifications">
+            <li class="spec-badge">Latest release: <strong id="hero-version">v1.7.0</strong></li>
+            <li class="spec-badge">MIT License</li>
+            <li class="spec-badge">Python 3.10+</li>
+            <li class="spec-badge">PyQt6</li>
+          </ul>
+        </div>
+
+        <div class="hero-showcase">
+          <div class="macos-window">
+            <div class="macos-titlebar" aria-hidden="true">
+              <div class="traffic-lights">
+                <span class="dot dot-close"></span>
+                <span class="dot dot-min"></span>
+                <span class="dot dot-max"></span>
+              </div>
+              <span class="window-title">Preview - macOS Sequoia Dark Mode</span>
+              <span class="titlebar-spacer"></span>
+            </div>
+            <div class="macos-window-body">
+              <img
+                src="assets/preview_main_dark.png"
+                alt="Preview (macOS Edition) running in dark mode with traffic-light controls, thumbnail sidebar, and PDF viewer canvas"
+                width="1180"
+                height="780"
+                fetchpriority="high"
+                decoding="async"
+                class="hero-screenshot"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Download -->
+    <section class="section section-alt reveal" id="install">
+      <div class="container">
+        <div class="section-header">
+          <h2>Download &amp; Install</h2>
+          <p class="section-lead">
+            Native installers for Debian-based Linux and Windows, or run directly from Python source on any desktop.
+            <span class="release-note-inline">Current release: <strong id="release-version-text">v1.7.0</strong></span>
+          </p>
+        </div>
+
+        <div class="download-grid">
+          <!-- Linux .deb Card -->
+          <article class="card download-card reveal">
+            <div class="download-card-head">
+              <h3>Ubuntu / Debian / Kali / Mint</h3>
+              <p class="card-subtitle">Official 64-bit <code>.deb</code> package</p>
+            </div>
+            <p class="download-filename">
+              <code id="deb-filename">preview-app_1.7.0_amd64.deb</code>
+            </p>
+            <a
+              id="deb-download-link"
+              href="https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.0/preview-app_1.7.0_amd64.deb"
+              class="btn btn-primary btn-full"
+            >
+              Download .deb Package
+            </a>
+            <div class="code-block-wrap">
+              <div class="code-block-header">
+                <span>Terminal install</span>
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="cmd-deb"
+                  aria-label="Copy Debian install command"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre><code id="cmd-deb">wget https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.0/preview-app_1.7.0_amd64.deb &amp;&amp; sudo dpkg -i preview-app_1.7.0_amd64.deb || sudo apt-get install -f -y</code></pre>
+            </div>
+          </article>
+
+          <!-- Windows .exe Card -->
+          <article class="card download-card reveal">
+            <div class="download-card-head">
+              <h3>Windows 10 / 11</h3>
+              <p class="card-subtitle">Standalone Inno Setup installer</p>
+            </div>
+            <p class="download-filename">
+              <code id="exe-filename">Preview-Setup-v1.7.0.exe</code>
+            </p>
+            <a
+              id="exe-download-link"
+              href="https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.0/Preview-Setup-v1.7.0.exe"
+              class="btn btn-primary btn-full"
+            >
+              Download Windows Installer
+            </a>
+            <div class="install-steps">
+              <ol>
+                <li>Download and run the setup wizard.</li>
+                <li>Launch <strong>Preview</strong> from the Start Menu or Desktop shortcut.</li>
+                <li>Future releases can update in-app via the Sparkle-style updater.</li>
+              </ol>
+            </div>
+          </article>
+
+          <!-- Source Card -->
+          <article class="card download-card reveal">
+            <div class="download-card-head">
+              <h3>From Source (Any OS)</h3>
+              <p class="card-subtitle">Python 3.10+ with virtual environment</p>
+            </div>
+            <p class="download-filename">
+              <code>github.com/shivamprasad1001/previewmacos</code>
+            </p>
+            <div class="code-block-wrap">
+              <div class="code-block-header">
+                <span>Clone, install, and launch</span>
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="cmd-source"
+                  aria-label="Copy source installation commands"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre><code id="cmd-source">git clone https://github.com/shivamprasad1001/previewmacos.git
+cd previewmacos
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+./run.sh</code></pre>
+            </div>
+            <div class="code-block-wrap code-block-secondary">
+              <div class="code-block-header">
+                <span>Build .deb from source</span>
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="cmd-build-deb"
+                  aria-label="Copy build Debian package commands"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre><code id="cmd-build-deb">chmod +x build_deb.sh &amp;&amp; ./build_deb.sh
+sudo dpkg -i dist/preview-app_*.deb</code></pre>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Features -->
+    <section class="section reveal" id="features">
+      <div class="container">
+        <div class="section-header">
+          <h2>Everything Preview does, rebuilt natively.</h2>
+          <p class="section-lead">
+            Zero Electron overhead. Built directly on Qt6, PyMuPDF, and Pillow for instant launch and responsive panning.
+          </p>
+        </div>
+
+        <div class="feature-groups">
+          <!-- Group 1 -->
+          <div class="feature-group reveal">
+            <h3 class="feature-group-title">Universal Document &amp; Image Engine</h3>
+            <div class="feature-grid">
+              <article class="feature-card">
+                <h4>Crisp Multi-Page PDF Rendering</h4>
+                <p>High-DPI anti-aliased vector rendering powered by PyMuPDF with smooth page navigation and sub-pixel text clarity.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Universal Image Formats</h4>
+                <p>Fast loading for PNG, JPEG, WebP, GIF, BMP, TIFF, and ICO files via Pillow.</p>
+              </article>
+              <article class="feature-card">
+                <h4>10% to 1000% Zoom</h4>
+                <p>Continuous scaling with aspect ratio preservation, fit-to-window shortcuts, and smooth panning.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Collapsible Thumbnail Sidebar</h4>
+                <p>Page preview drawer with badge counters plus drag-free page reordering, duplication, rotation, and deletion.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Live PDF Text Search</h4>
+                <p>Search bar with instant jump-to-result navigation across every page of multi-page PDF documents.</p>
+              </article>
+            </div>
+          </div>
+
+          <!-- Group 2 -->
+          <div class="feature-group reveal">
+            <h3 class="feature-group-title">Markup &amp; Annotation Suite</h3>
+            <div class="feature-grid">
+              <article class="feature-card">
+                <h4>Redaction (Blackout) Tool</h4>
+                <p>Blackout marker for sanitizing private text and regions before saving or exporting PDFs.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Freehand Pen &amp; Highlighter</h4>
+                <p>Smooth stylus strokes with customizable line widths, calibrated colors, and semi-translucent highlighting.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Vector Shapes</h4>
+                <p>Editable rectangles, rounded rectangles, ovals, straight lines, and directional arrows with arrowheads.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Text Boxes &amp; Sticky Notes</h4>
+                <p>Place formatted text overlays or signature yellow sticky notes with folded corners and expandable comments.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Digital Signature Pad</h4>
+                <p>Capture signatures using mouse or trackpad and store them in a reusable signature library for fast stamping.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Marquee Select &amp; Crop</h4>
+                <p>Drag-to-select bounding box with 8-handle resizing and instant cropping via Ctrl + K.</p>
+              </article>
+            </div>
+          </div>
+
+          <!-- Group 3 -->
+          <div class="feature-group reveal">
+            <h3 class="feature-group-title">Precision Productivity Tools</h3>
+            <div class="feature-grid">
+              <article class="feature-card">
+                <h4>Loupe &amp; Magnifier Lens</h4>
+                <p>Toggle a circular magnifying glass with a calibrated crosshair reticle using the ~ or ` key.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Fullscreen Slideshow</h4>
+                <p>Distraction-free F11 presentation mode with a borderless dark backdrop and floating control HUD.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Live Text Extraction</h4>
+                <p>Copy all selectable text from the current PDF page directly to the system clipboard with Ctrl + Shift + C.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Native Print &amp; Print Preview</h4>
+                <p>High-resolution print engine supporting full page layout, orientation, and margin controls.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Advanced Export Sheet</h4>
+                <p>Convert images to PDF or export pages with custom DPI, quality, and PNG, JPEG, WebP, or TIFF formats.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Inspector Window</h4>
+                <p>Inspect document dimensions, DPI resolution, color space, author, creator, and timestamps with Ctrl + I.</p>
+              </article>
+            </div>
+          </div>
+
+          <!-- Group 4 -->
+          <div class="feature-group reveal">
+            <h3 class="feature-group-title">Pro Image Adjustment Lab</h3>
+            <div class="feature-grid feature-grid-two">
+              <article class="feature-card">
+                <h4>Adjust Color Panel</h4>
+                <p>Live RGB histogram paired with Exposure, Contrast, Highlights, Shadows, Saturation, Temperature, Tint, Sharpness, Sepia, and one-click Auto Levels.</p>
+              </article>
+              <article class="feature-card">
+                <h4>Adjust Size Panel</h4>
+                <p>Preset resolutions (Full HD, 4K, 1024x768), proportional aspect-ratio lock, pixel or percentage units, and live file size estimation.</p>
+              </article>
+            </div>
+          </div>
+
+          <!-- Updater Highlight Card -->
+          <aside class="updater-callout reveal" aria-label="In-app software updater">
+            <div class="updater-callout-text">
+              <h3>Sparkle-Style In-App Updater</h3>
+              <p>
+                Checks GitHub Releases in the background on startup or manually from the menu, shows a live download progress sheet with release notes, and invokes native package installers for one-click reinstall and relaunch.
+              </p>
+            </div>
+            <a href="#gallery" class="btn btn-secondary updater-link">See updater screenshot</a>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Visual Tour / Gallery -->
+    <section class="section section-alt reveal" id="gallery">
+      <div class="container">
+        <div class="section-header">
+          <h2>Visual Tour</h2>
+          <p class="section-lead">
+            Explore the interface across dark mode, light mode, markup tools, color adjustments, and the software updater. Click any view to enlarge.
+          </p>
+        </div>
+
+        <div class="gallery-shell reveal">
+          <div class="gallery-tabs" role="tablist" aria-label="Application screenshots">
+            <button type="button" class="gallery-tab is-active" role="tab" aria-selected="true" data-slide="0">Dark Mode</button>
+            <button type="button" class="gallery-tab" role="tab" aria-selected="false" data-slide="1">Light Mode</button>
+            <button type="button" class="gallery-tab" role="tab" aria-selected="false" data-slide="2">Markup Suite</button>
+            <button type="button" class="gallery-tab" role="tab" aria-selected="false" data-slide="3">Adjust Color</button>
+            <button type="button" class="gallery-tab" role="tab" aria-selected="false" data-slide="4">In-App Updater</button>
+          </div>
+
+          <div class="macos-window gallery-stage-window">
+            <div class="macos-titlebar" aria-hidden="true">
+              <div class="traffic-lights">
+                <span class="dot dot-close"></span>
+                <span class="dot dot-min"></span>
+                <span class="dot dot-max"></span>
+              </div>
+              <span class="window-title" id="gallery-window-title">preview_main_dark.png</span>
+              <span class="titlebar-spacer"></span>
+            </div>
+
+            <div class="gallery-stage">
+              <button
+                type="button"
+                class="gallery-nav-btn gallery-prev"
+                id="gallery-prev"
+                aria-label="Previous screenshot"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                class="gallery-image-trigger"
+                id="gallery-open-lightbox"
+                aria-label="Open enlarged screenshot in lightbox"
+              >
+                <img
+                  id="gallery-main-img"
+                  src="assets/preview_main_dark.png"
+                  alt="macOS Sequoia dark mode with traffic-light controls and thumbnail sidebar"
+                  width="1180"
+                  height="780"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </button>
+
+              <button
+                type="button"
+                class="gallery-nav-btn gallery-next"
+                id="gallery-next"
+                aria-label="Next screenshot"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="gallery-caption-bar">
+              <p id="gallery-caption">macOS Sequoia dark mode with traffic-light controls and thumbnail sidebar.</p>
+              <button type="button" class="btn-text" id="gallery-expand-btn">Expand view</button>
+            </div>
+          </div>
+
+          <div class="gallery-thumbs" aria-label="Screenshot thumbnails">
+            <button type="button" class="gallery-thumb is-active" data-slide="0" aria-label="Show Dark Mode screenshot">
+              <img src="assets/preview_main_dark.png" alt="Dark mode thumbnail" width="1180" height="780" loading="lazy" decoding="async" />
+              <span>Dark Mode</span>
+            </button>
+            <button type="button" class="gallery-thumb" data-slide="1" aria-label="Show Light Mode screenshot">
+              <img src="assets/preview_main_light.png" alt="Light mode thumbnail" width="1180" height="780" loading="lazy" decoding="async" />
+              <span>Light Mode</span>
+            </button>
+            <button type="button" class="gallery-thumb" data-slide="2" aria-label="Show Markup Suite screenshot">
+              <img src="assets/preview_markup_showcase.png" alt="Markup tools thumbnail" width="1180" height="780" loading="lazy" decoding="async" />
+              <span>Markup Suite</span>
+            </button>
+            <button type="button" class="gallery-thumb" data-slide="3" aria-label="Show Adjust Color screenshot">
+              <img src="assets/preview_adjust_color.png" alt="Adjust color panel thumbnail" width="320" height="480" loading="lazy" decoding="async" />
+              <span>Adjust Color</span>
+            </button>
+            <button type="button" class="gallery-thumb" data-slide="4" aria-label="Show In-App Updater screenshot">
+              <img src="assets/preview_updater.png" alt="In-app updater thumbnail" width="540" height="500" loading="lazy" decoding="async" />
+              <span>In-App Updater</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Comparison Table -->
+    <section class="section reveal" id="compare">
+      <div class="container">
+        <div class="section-header">
+          <h2>How it compares</h2>
+          <p class="section-lead">
+            Feature parity with Apple's macOS Preview, compared against common open-source Linux viewers.
+          </p>
+        </div>
+
+        <div class="table-scroll reveal" role="region" aria-label="Feature comparison table" tabindex="0">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th scope="col">Feature</th>
+                <th scope="col">macOS Preview</th>
+                <th scope="col" class="col-highlight">Preview (This App)</th>
+                <th scope="col">Evince</th>
+                <th scope="col">Okular</th>
+                <th scope="col">Eye of GNOME</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">macOS Sequoia unified UI</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Multi-page PDF and image support</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-muted">PDF only</span></td>
+                <td><span class="cell-muted">Mixed</span></td>
+                <td><span class="cell-muted">Images only</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Redaction tool</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Signature pad</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Loupe / magnifier lens</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Live RGB histogram</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Proportional resize presets</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Sticky notes and vector annotations</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-muted">Basic</span></td>
+                <td><span class="cell-muted">Complex</span></td>
+                <td><span class="cell-no">No</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Fullscreen slideshow</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-muted">Presentation</span></td>
+                <td><span class="cell-muted">Presentation</span></td>
+                <td><span class="cell-muted">Slideshow</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Auto updater</th>
+                <td><span class="cell-yes">Yes</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-muted">System only</span></td>
+                <td><span class="cell-muted">System only</span></td>
+                <td><span class="cell-muted">System only</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Cross-platform (Linux &amp; Windows)</th>
+                <td><span class="cell-no">No (macOS only)</span></td>
+                <td class="col-highlight"><span class="cell-yes">Yes</span></td>
+                <td><span class="cell-muted">Linux only</span></td>
+                <td><span class="cell-muted">Complex</span></td>
+                <td><span class="cell-muted">Linux only</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Keyboard Shortcuts -->
+    <section class="section section-alt reveal" id="shortcuts">
+      <div class="container">
+        <div class="section-header">
+          <h2>Keyboard Shortcuts</h2>
+          <p class="section-lead">
+            Navigate, annotate, adjust color, and export without lifting your hands from the keyboard.
+          </p>
+        </div>
+
+        <div class="shortcuts-controls reveal">
+          <div class="shortcut-tabs" role="tablist" aria-label="Shortcut categories">
+            <button type="button" class="shortcut-tab is-active" role="tab" aria-selected="true" data-category="file">File &amp; Export</button>
+            <button type="button" class="shortcut-tab" role="tab" aria-selected="false" data-category="view">Viewing &amp; Navigation</button>
+            <button type="button" class="shortcut-tab" role="tab" aria-selected="false" data-category="markup">Markup &amp; Image Adjustments</button>
+          </div>
+
+          <div class="shortcut-search-wrap">
+            <label for="shortcut-search" class="sr-only">Filter keyboard shortcuts</label>
+            <input
+              type="search"
+              id="shortcut-search"
+              class="shortcut-search"
+              placeholder="Search shortcuts (e.g. export, loupe, Ctrl + K)..."
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <p class="shortcut-status" id="shortcut-status" aria-live="polite"></p>
+
+        <div class="shortcut-table-wrap reveal">
+          <table class="shortcut-table">
+            <thead>
+              <tr>
+                <th scope="col">Shortcut</th>
+                <th scope="col">Action</th>
+                <th scope="col">Category</th>
+              </tr>
+            </thead>
+            <tbody id="shortcut-tbody">
+              <!-- File & Export -->
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>O</kbd></td>
+                <td>Open Document or Image</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>O</kbd></td>
+                <td>Open Directory of Photos as Gallery</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+                <td>Save Current Document</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></td>
+                <td>Save As</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd></td>
+                <td>Quick Export as PDF</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>E</kbd></td>
+                <td>Advanced Export Sheet (Format, DPI, Quality)</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>P</kbd></td>
+                <td>Native Print Document</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd></td>
+                <td>Print Preview Sheet</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd></td>
+                <td>Copy Current Page Text to Clipboard</td>
+                <td>File &amp; Export</td>
+              </tr>
+              <tr data-cat="file">
+                <td><kbd>Ctrl</kbd> + <kbd>Q</kbd></td>
+                <td>Quit Application</td>
+                <td>File &amp; Export</td>
+              </tr>
+
+              <!-- Viewing & Navigation -->
+              <tr data-cat="view">
+                <td><kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>Ctrl</kbd> + <kbd>=</kbd></td>
+                <td>Zoom In</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Ctrl</kbd> + <kbd>-</kbd></td>
+                <td>Zoom Out</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Ctrl</kbd> + <kbd>0</kbd></td>
+                <td>Actual Size (100% Zoom)</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Ctrl</kbd> + <kbd>9</kbd></td>
+                <td>Zoom to Fit Window</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Ctrl</kbd> + <kbd>B</kbd></td>
+                <td>Toggle Thumbnail Sidebar</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>F11</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd></td>
+                <td>Toggle Fullscreen Slideshow</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>~</kbd> / <kbd>`</kbd></td>
+                <td>Toggle Loupe / Magnifier Lens</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Space</kbd> + Drag</td>
+                <td>Pan Document (Hand Tool)</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Ctrl</kbd> + <kbd>L</kbd> / <kbd>Ctrl</kbd> + <kbd>R</kbd></td>
+                <td>Rotate Left / Right 90 degrees</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+              <tr data-cat="view">
+                <td><kbd>Left</kbd> / <kbd>Right</kbd> Arrow</td>
+                <td>Previous / Next Page</td>
+                <td>Viewing &amp; Navigation</td>
+              </tr>
+
+              <!-- Markup & Image Adjustments -->
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd></td>
+                <td>Show / Hide Markup Toolbar</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>K</kbd></td>
+                <td>Crop Selected Marquee Rectangle</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>C</kbd></td>
+                <td>Open Adjust Color Panel &amp; Histogram</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>S</kbd></td>
+                <td>Open Adjust Size Panel</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>I</kbd></td>
+                <td>Open Document &amp; PDF Inspector</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td>
+                <td>Undo Last Edit</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td>
+                <td>Redo Edit</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+              <tr data-cat="markup">
+                <td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td>
+                <td>Delete Selected Annotation or Page</td>
+                <td>Markup &amp; Image Adjustments</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="shortcut-empty" id="shortcut-empty" hidden>No shortcuts match your filter. Try a different key or keyword.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. Under the Hood -->
+    <section class="section reveal" id="architecture">
+      <div class="container">
+        <div class="section-header">
+          <h2>Under the Hood</h2>
+          <p class="section-lead">
+            A modular Python codebase separating document rendering, annotation geometry, and color math from the PyQt6 interface.
+          </p>
+        </div>
+
+        <ul class="tech-strip reveal" aria-label="Core technology stack">
+          <li><strong>Python 3.10+</strong><span>Runtime</span></li>
+          <li><strong>PyQt6</strong><span>Native desktop UI</span></li>
+          <li><strong>PyMuPDF</strong><span>PDF raster &amp; redaction</span></li>
+          <li><strong>Pillow</strong><span>Image I/O &amp; filters</span></li>
+          <li><strong>NumPy</strong><span>RGB histogram math</span></li>
+        </ul>
+
+        <div class="arch-grid reveal">
+          <div class="arch-box">
+            <div class="arch-box-header">
+              <span class="arch-path">preview/core/</span>
+              <span class="arch-role">Engine &amp; State</span>
+            </div>
+            <ul class="arch-list">
+              <li><code>document.py</code><span>Unified PDF and image dual-engine model</span></li>
+              <li><code>annotations.py</code><span>Vector shapes, hit-testing, and serialization</span></li>
+              <li><code>color_adjust.py</code><span>Real-time RGB histogram and Pillow filters</span></li>
+              <li><code>updater.py</code><span>Sparkle GitHub API checker and background downloader</span></li>
+              <li><code>history.py</code><span>Command-pattern undo and redo stack</span></li>
+            </ul>
+          </div>
+
+          <div class="arch-box">
+            <div class="arch-box-header">
+              <span class="arch-path">preview/ui/</span>
+              <span class="arch-role">macOS Sequoia Interface</span>
+            </div>
+            <ul class="arch-list">
+              <li><code>main_window.py</code><span>Unified toolbar, traffic lights, and window host</span></li>
+              <li><code>mac_sidebar.py</code><span>Asynchronous thumbnails and outline drawer</span></li>
+              <li><code>canvas.py</code><span>High-DPI rasterization and interactive markup canvas</span></li>
+              <li><code>markup_toolbar.py</code><span>Secondary Apple markup and style control bar</span></li>
+              <li><code>dialogs</code><span>Adjust Color, Adjust Size, Signature, Export, Inspector, Updater</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="test-suite-note reveal">
+          <p>
+            <strong>25-test headless suite:</strong> <code>python3 test_preview_features.py</code> validates image decoding, PDF rasterization, undo/redo history, color engines, and updater logic in offscreen mode in under one second.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. FAQ -->
+    <section class="section section-alt reveal" id="faq">
+      <div class="container container-narrow">
+        <div class="section-header">
+          <h2>Frequently Asked Questions</h2>
+        </div>
+
+        <div class="faq-list reveal">
+          <details class="faq-item">
+            <summary>Is it free?</summary>
+            <div class="faq-answer">
+              <p>Yes. Preview (macOS Edition) is free and open-source software released under the MIT License.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>Does it edit PDFs permanently?</summary>
+            <div class="faq-answer">
+              <p>Yes, when you save or export. Saving writes annotations (pen, highlighter, shapes, text, sticky notes, signatures, and redactions) and page rotations or reorderings into the output file. Use Save As (Ctrl + Shift + S) if you want to keep an unmodified copy.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>Does it work offline?</summary>
+            <div class="faq-answer">
+              <p>Yes. All PDF rendering, image loading, markup, signing, redaction, color adjustments, and exporting run locally on your machine. Network access is only used when checking GitHub Releases for app updates.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>Is redaction secure?</summary>
+            <div class="faq-answer">
+              <p>For PDF documents, Preview uses PyMuPDF's permanent redaction engine (<code>apply_redactions()</code>) to strip underlying text and graphics inside the redacted area before saving. Always verify the exported output when handling sensitive files.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>Which Linux distros are supported?</summary>
+            <div class="faq-answer">
+              <p>Prebuilt <code>.deb</code> packages target Ubuntu, Debian, Kali Linux, Linux Mint, and other Debian derivatives on <code>amd64</code>. Any other Linux distribution can run the app from source with Python 3.10+.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>How do I update?</summary>
+            <div class="faq-answer">
+              <p>Preview includes a Sparkle-style in-app updater that checks GitHub Releases automatically or from the application menu, downloads the new package, and runs the native installer (<code>dpkg</code> via <code>pkexec</code> on Linux, silent installer on Windows). You can also download the latest release manually from GitHub.</p>
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>How do I report a bug?</summary>
+            <div class="faq-answer">
+              <p>Open an issue using the <a href="https://github.com/shivamprasad1001/previewmacos/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer">Bug Report template</a> on GitHub. For security vulnerabilities, follow <a href="https://github.com/shivamprasad1001/previewmacos/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">SECURITY.md</a> instead of opening a public issue.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. Contributing & Open Source -->
+    <section class="section reveal" id="contributing">
+      <div class="container">
+        <div class="section-header">
+          <h2>Contributing &amp; Open Source</h2>
+          <p class="section-lead">
+            Contributions, bug reports, and feature ideas are welcome on GitHub. Run the headless test suite before submitting a pull request.
+          </p>
+        </div>
+
+        <div class="contrib-grid reveal">
+          <a href="https://github.com/shivamprasad1001/previewmacos/issues" target="_blank" rel="noopener noreferrer" class="contrib-card">
+            <h3>GitHub Issues</h3>
+            <p>Browse open tasks, active discussions, and known issues.</p>
+          </a>
+          <a href="https://github.com/shivamprasad1001/previewmacos/issues/new?template=bug_report.md" target="_blank" rel="noopener noreferrer" class="contrib-card">
+            <h3>Report a Bug</h3>
+            <p>File a structured bug report with steps to reproduce and OS details.</p>
+          </a>
+          <a href="https://github.com/shivamprasad1001/previewmacos/issues/new?template=feature_request.md" target="_blank" rel="noopener noreferrer" class="contrib-card">
+            <h3>Request a Feature</h3>
+            <p>Propose new Preview parity tools or workflow improvements.</p>
+          </a>
+          <a href="https://github.com/shivamprasad1001/previewmacos/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" class="contrib-card">
+            <h3>CONTRIBUTING.md</h3>
+            <p>Read repository guidelines, coding conventions, and PR checklists.</p>
+          </a>
+          <a href="https://github.com/shivamprasad1001/previewmacos/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" class="contrib-card">
+            <h3>SECURITY.md</h3>
+            <p>Responsible disclosure instructions for security vulnerabilities.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 11. Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <img src="assets/icon-64.png" alt="Preview app icon" width="24" height="24" loading="lazy" />
+          <span>Preview (macOS Edition)</span>
+        </div>
+        <ul class="footer-links">
+          <li><a href="https://github.com/shivamprasad1001/previewmacos" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/shivamprasad1001/previewmacos/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a></li>
+          <li><a href="https://trivilabs.in" target="_blank" rel="noopener noreferrer">TriviLabs.in</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-meta">
+        <p>Built by Shivam Prasad | Powered by <a href="https://trivilabs.in" target="_blank" rel="noopener noreferrer">TriviLabs.in</a> | MIT License | Privacy-friendly: no trackers, no cookies.</p>
+        <p class="footer-disclaimer">macOS and Preview are trademarks of Apple Inc. This project is independent and not affiliated with Apple.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Lightbox Modal -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-caption" hidden>
+    <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
+    <div class="lightbox-dialog">
+      <div class="lightbox-bar">
+        <span id="lightbox-counter" class="lightbox-counter">1 / 5</span>
+        <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close lightbox">Close</button>
+      </div>
+      <div class="lightbox-stage">
+        <button type="button" class="lightbox-arrow" id="lightbox-prev" aria-label="Previous image">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <img id="lightbox-img" src="assets/preview_main_dark.png" alt="Enlarged application screenshot" width="1180" height="780" loading="lazy" />
+        <button type="button" class="lightbox-arrow" id="lightbox-next" aria-label="Next image">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+      <p id="lightbox-caption" class="lightbox-caption"></p>
+    </div>
+  </div>
+
+  <script src="script.js" defer></script>
+</body>
+</html>

@@ -434,7 +434,8 @@ class MacMainWindow(QMainWindow):
         self._apply_theme(self.current_theme, animate=False)
 
         # Background update check on startup (delayed 2.5s)
-        QTimer.singleShot(2500, self._check_for_updates_startup)
+        if not (os.environ.get("CI") or os.environ.get("PREVIEW_TESTING")):
+            QTimer.singleShot(2500, self._check_for_updates_startup)
 
         target = initial_target or initial_file
         if target:
@@ -1638,6 +1639,9 @@ class MacMainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent):
         """Intercepts window close to prompt for unsaved edits across all tabs."""
+        if getattr(self, "_update_worker", None) and self._update_worker.isRunning():
+            self._update_worker.quit()
+            self._update_worker.wait(500)
         for i in range(len(getattr(self, "tabs", []))):
             tab = self.tabs[i]
             if tab.is_modified or (i == self.active_tab_index and self.is_document_modified()):
@@ -3079,6 +3083,8 @@ class MacMainWindow(QMainWindow):
     # --- Software Update Checks ---
     def _check_for_updates_startup(self):
         """Non-blocking background check for new versions on launch."""
+        if os.environ.get("CI") or os.environ.get("PREVIEW_TESTING"):
+            return
         settings = QSettings("TriviLabs", "PreviewMacOS")
         auto_check = settings.value("check_updates_on_startup", True, type=bool)
         if not auto_check:
