@@ -1,3 +1,20 @@
+# Preview macOS v1.7.1 Release Notes
+
+Welcome to **Preview macOS v1.7.1**! This maintenance release resolves a critical packaging compatibility crash on Linux distributions with newer GLIBC versions (Debian 13 Trixie, Pop!_OS, and modern Ubuntu/Kali installations).
+
+---
+
+### 🛠️ Fixes and Improvements in v1.7.1
+
+#### 🐧 Linux Packaging and Compatibility Fix (Issue #9)
+* **Resolved GLIBC Compatibility Crash:** Fixed a critical issue where the `.deb` package crashed on launch with `version 'GLIBC_2.43' not found (required by bundled libglib-2.0.so.0)` on Debian 13 / Pop!_OS.
+* **Ubuntu 22.04 Build Baseline:** Linux `.deb` release builds are now produced on Ubuntu 22.04 (GLIBC 2.35 baseline), providing backward and forward compatibility across modern Linux distributions.
+* **Excluded Bundled Host Libraries:** PyInstaller build configuration now explicitly strips bundled host C/glib libraries (`libglib-2.0.so*`, `libgobject-2.0.so*`, `libgio-2.0.so*`, `libgmodule-2.0.so*`) from the package, allowing the application to link directly against system libraries.
+* **Minimum Supported GLIBC:** The minimum supported GLIBC version is now `2.35` (e.g. Ubuntu 22.04+, Debian 12+, Debian 13+, Pop!_OS 22.04+).
+* **Automated Clean Container Verification:** Added CI test steps verifying clean installation and headless launch in pristine `debian:13` and `debian:12` container environments.
+
+---
+
 # Preview macOS v1.7.0 Release Notes
 
 Welcome to **Preview macOS v1.7.0**! This major milestone delivers a complete UI layout redesign with authentic macOS Big Sur / Sonoma chrome, Canva-style Image Overlays with live dimension badges, grouped segmented toolbars with unified Lucide vector icons, three distinct Workspace Modes (View, Edit, Organize), mouse wheel zoom centered at cursor, real-time proportional resize calculations, and protected PDF reading modes.

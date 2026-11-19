@@ -67,8 +67,8 @@ test('all img tags specify alt, width, height, and valid local asset paths', () 
 test('contains all required sections, shortcuts, FAQ questions, and trademark disclaimer', () => {
   const requiredFragments = [
     'macOS Preview, on Linux and Windows.',
-    'preview-app_1.7.0_amd64.deb',
-    'Preview-Setup-v1.7.0.exe',
+    'preview-app_1.7.1_amd64.deb',
+    'Preview-Setup-v1.7.1.exe',
     'Universal Document &amp; Image Engine',
     'Markup &amp; Annotation Suite',
     'Precision Productivity Tools',
