@@ -1,0 +1,6 @@
+{
+  "name": "Preview (macOS Edition)",
+  "description": "A pixel-faithful, high-performance reconstruction of Apple's macOS Preview app for Linux and Windows. Built with Python, PyQt6, PyMuPDF, and Pillow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

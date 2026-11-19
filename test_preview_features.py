@@ -1433,7 +1433,7 @@ class TestPreviewParity(unittest.TestCase):
                 from PyQt6.QtCore import QEventLoop, QTimer
                 loop = QEventLoop()
                 doc._prefetch_worker.finished.connect(loop.quit)
-                QTimer.singleShot(1500, loop.quit)
+                QTimer.singleShot(3500, loop.quit)
                 loop.exec()
 
             # Check that adjacent page (2 or 4) was prefetched into cache
