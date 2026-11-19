@@ -14,7 +14,7 @@ from PyQt6.QtGui import QColor
 
 from preview.core.document import Document
 from preview.core.history import HistoryManager
-from preview.theme import MacTheme
+from preview.theme import MacTheme, StudioTheme
 
 
 
@@ -55,27 +55,29 @@ class MacTabBar(QTabBar):
     def _apply_style(self):
         is_dark = (self._theme == "dark")
         if is_dark:
-            bg_bar = "#1c1c1e"
-            border_bottom = "rgba(255, 255, 255, 0.12)"
+            bg_bar = StudioTheme.DARK_BG_WINDOW
+            border_bottom = StudioTheme.DARK_BORDER_SUBTLE
             tab_bg = "transparent"
-            tab_color = "#98989d"
-            tab_sel_bg = "#2c2c2e"
-            tab_sel_color = "#f5f5f7"
-            tab_sel_border = "rgba(255, 255, 255, 0.16)"
-            tab_hover_bg = "rgba(255, 255, 255, 0.08)"
+            tab_color = StudioTheme.DARK_TEXT_SECONDARY
+            tab_sel_bg = StudioTheme.DARK_BG_CARD
+            tab_sel_color = StudioTheme.DARK_TEXT_PRIMARY
+            tab_sel_border = StudioTheme.DARK_BORDER
+            tab_hover_bg = StudioTheme.DARK_BG_HOVER
             tab_hover_color = "#ffffff"
-            close_hover = "rgba(255, 255, 255, 0.20)"
+            close_hover = StudioTheme.DARK_DANGER_SUBTLE
+            accent = StudioTheme.DARK_ACCENT
         else:
-            bg_bar = "#e5e5ea"
-            border_bottom = "rgba(0, 0, 0, 0.14)"
+            bg_bar = StudioTheme.LIGHT_BG_WINDOW
+            border_bottom = StudioTheme.LIGHT_BORDER_SUBTLE
             tab_bg = "transparent"
-            tab_color = "#636366"
-            tab_sel_bg = "#ffffff"
-            tab_sel_color = "#1c1c1e"
-            tab_sel_border = "rgba(0, 0, 0, 0.12)"
-            tab_hover_bg = "rgba(0, 0, 0, 0.06)"
+            tab_color = StudioTheme.LIGHT_TEXT_SECONDARY
+            tab_sel_bg = StudioTheme.LIGHT_BG_CARD
+            tab_sel_color = StudioTheme.LIGHT_TEXT_PRIMARY
+            tab_sel_border = StudioTheme.LIGHT_BORDER
+            tab_hover_bg = StudioTheme.LIGHT_BG_HOVER
             tab_hover_color = "#000000"
-            close_hover = "rgba(0, 0, 0, 0.15)"
+            close_hover = "rgba(239, 68, 68, 0.15)"
+            accent = StudioTheme.LIGHT_ACCENT
 
         self.setStyleSheet(f"""
             QTabBar#macTabBar {{
@@ -88,8 +90,8 @@ class MacTabBar(QTabBar):
                 background-color: {tab_bg};
                 color: {tab_color};
                 font-size: 12px;
-                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-                font-weight: 450;
+                font-family: {StudioTheme.FONT_FAMILY};
+                font-weight: 500;
                 border: 1px solid transparent;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
@@ -102,8 +104,9 @@ class MacTabBar(QTabBar):
             QTabBar#macTabBar::tab:selected {{
                 background-color: {tab_sel_bg};
                 color: {tab_sel_color};
-                font-weight: 550;
+                font-weight: 600;
                 border: 1px solid {tab_sel_border};
+                border-top: 2px solid {accent};
                 border-bottom: none;
             }}
             QTabBar#macTabBar::tab:hover:!selected {{
@@ -114,7 +117,7 @@ class MacTabBar(QTabBar):
                 subcontrol-position: right;
                 subcontrol-origin: padding;
                 margin-left: 6px;
-                border-radius: 7px;
+                border-radius: 4px;
                 padding: 2px;
             }}
             QTabBar#macTabBar::close-button:hover {{
@@ -156,10 +159,10 @@ class MacTabBarContainer(QWidget):
     def update_theme(self, theme_name: str):
         self.tab_bar.update_theme(theme_name)
         is_dark = (theme_name == "dark")
-        bg_bar = "#1c1c1e" if is_dark else "#e5e5ea"
-        border_b = "rgba(255, 255, 255, 0.12)" if is_dark else "rgba(0, 0, 0, 0.14)"
-        btn_hover = "rgba(255, 255, 255, 0.15)" if is_dark else "rgba(0, 0, 0, 0.10)"
-        btn_col = "#c7c7cc" if is_dark else "#3a3a3c"
+        bg_bar = StudioTheme.DARK_BG_WINDOW if is_dark else StudioTheme.LIGHT_BG_WINDOW
+        border_b = StudioTheme.DARK_BORDER_SUBTLE if is_dark else StudioTheme.LIGHT_BORDER_SUBTLE
+        btn_hover = StudioTheme.DARK_BG_HOVER if is_dark else StudioTheme.LIGHT_BG_HOVER
+        btn_col = StudioTheme.DARK_TEXT_SECONDARY if is_dark else StudioTheme.LIGHT_TEXT_SECONDARY
 
         self.setStyleSheet(f"""
             #macTabBarContainer {{

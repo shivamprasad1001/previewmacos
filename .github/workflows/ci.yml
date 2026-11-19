@@ -1,0 +1,40 @@
+name: Studio UI & Integration CI
+
+on:
+  push:
+    branches: [ main, 'feat/**' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-ui:
+    name: Run Studio Pro UI & Icon Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Run Studio UI & Icon Tests (Headless)
+        env:
+          QT_QPA_PLATFORM: offscreen
+          CI: "true"
+          PREVIEW_TESTING: "true"
+        run: |
+          python -m unittest test_studio_ui.py test_icons.py
