@@ -40,4 +40,4 @@ jobs:
           CI: "true"
           PREVIEW_TESTING: "true"
         run: |
-          python -m unittest test_studio_ui.py test_icons.py
+          pytest test_studio_ui.py test_icons.py -p no:typeguard
