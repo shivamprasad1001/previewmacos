@@ -110,7 +110,7 @@ class MarkupToolbar(QWidget):
 
         # --- Group 2: Text Markup & Notes ---
         self.text_btn = self._create_tool_button("text", "Text Box (T)", AnnotationType.TEXT)
-        self.highlighter_btn = self._create_tool_button("highlighter", "Highlighter (Shift+H)", AnnotationType.HIGHLIGHTER)
+        self.highlighter_btn = self._create_tool_button("chisel_highlighter", "Highlighter (Shift+H)", AnnotationType.HIGHLIGHTER)
         self.underline_tool_btn = self._create_tool_button("underline", "Underline Text Markup (U)", AnnotationType.UNDERLINE)
         self.strikethrough_tool_btn = self._create_tool_button("strikethrough", "Strikethrough Text Markup (S)", AnnotationType.STRIKETHROUGH)
         self.strikethrough_btn = self.strikethrough_tool_btn
@@ -125,13 +125,13 @@ class MarkupToolbar(QWidget):
         self.strip_layout.addWidget(self.sep_2)
 
         # --- Group 3: Drawing ---
-        self.pen_btn = self._create_tool_button("pen", "Sketch / Pen (P)", AnnotationType.PEN)
+        self.pen_btn = self._create_tool_button("fountain_pen", "Sketch / Pen (P)", AnnotationType.PEN)
         self.group_drawing = self._create_tool_group([self.pen_btn])
         self.strip_layout.addWidget(self.group_drawing)
         self.sep_3 = self._create_divider()
         self.strip_layout.addWidget(self.sep_3)
 
-        # --- Group 4: Shapes ---
+        # --- Group 4: Shapes & Loupe ---
         self.shapes_btn = QToolButton()
         self.shapes_btn.setObjectName("shapesBtn")
         self.shapes_btn.setFixedSize(40, 32)
@@ -156,8 +156,9 @@ class MarkupToolbar(QWidget):
         self.sign_btn.setIconSize(QSize(20, 20))
         self.sign_btn.setToolTip("Sign Document (K)")
         self.sign_btn.setAccessibleName("Sign Document (K)")
-        self.sign_btn.setAccessibleDescription("Sign Document")
+        self.sign_btn.setAccessibleDescription("Sign / Stamp Document")
         self.sign_btn.clicked.connect(self.signature_requested.emit)
+        self.stamp_btn = self.sign_btn  # Realistic physical stamp tool reference
 
         self.image_overlay_btn = QToolButton()
         self.image_overlay_btn.setFixedSize(32, 32)
@@ -192,6 +193,10 @@ class MarkupToolbar(QWidget):
         self.crop_btn.setAccessibleName("Crop Selection (Ctrl+K)")
         self.crop_btn.setEnabled(False)
         self.crop_btn.clicked.connect(self.crop_requested.emit)
+
+        # Loupe / Magnifier tool reference
+        self.loupe_btn = self._create_tool_button("loupe", "Magnifier (Loupe)", AnnotationType.LOUPE)
+
 
         self.rotate_btn = QToolButton()
         self.rotate_btn.setFixedSize(32, 32)
@@ -907,16 +912,16 @@ class MarkupToolbar(QWidget):
         self.hand_btn.setIcon(MacIconFactory.create_icon("hand", col, 18))
         self.select_btn.setIcon(MacIconFactory.create_dropdown_tool_icon(self._current_select_icon, col, 36, 22))
         self.shapes_btn.setIcon(MacIconFactory.create_dropdown_tool_icon("shapes", col, 36, 22))
-        self.pen_btn.setIcon(MacIconFactory.create_icon("pen", col, 18))
-        self.highlighter_btn.setIcon(MacIconFactory.create_icon("highlighter", col, 18))
+        self.pen_btn.setIcon(MacIconFactory.create_icon("fountain_pen", col, 18))
+        self.highlighter_btn.setIcon(MacIconFactory.create_icon("chisel_highlighter", col, 18))
         self.underline_tool_btn.setIcon(MacIconFactory.create_icon("underline", col, 18))
         self.strikethrough_tool_btn.setIcon(MacIconFactory.create_icon("strikethrough", col, 18))
         self.text_btn.setIcon(MacIconFactory.create_icon("text", col, 18))
         self.note_btn.setIcon(MacIconFactory.create_icon("note", col, 18))
         self.redact_btn.setIcon(MacIconFactory.create_icon("redact", col, 18))
-        self.sign_btn.setIcon(MacIconFactory.create_icon("sign", col, 18))
+        self.sign_btn.setIcon(MacIconFactory.create_icon("rubber_stamp", col, 18))
         self.image_overlay_btn.setIcon(MacIconFactory.create_icon("image_overlay", col, 18))
-        self.crop_btn.setIcon(MacIconFactory.create_icon("crop", col, 18))
+        self.crop_btn.setIcon(MacIconFactory.create_icon("crop_shears", col, 18))
         self.rotate_btn.setIcon(MacIconFactory.create_icon("rotate_left", col, 18))
         self.rotate_selection_btn.setIcon(MacIconFactory.create_icon("rotate_right", col, 18))
         self.color_adjust_btn.setIcon(MacIconFactory.create_icon("color_adjust", col, 18))
@@ -926,6 +931,11 @@ class MarkupToolbar(QWidget):
         self.redo_btn.setIcon(MacIconFactory.create_icon("arrow_right", col, 18))
         self.text_options_btn.setIcon(MacIconFactory.create_dropdown_tool_icon("text", col, 32, 24))
         self.width_btn.setIcon(MacIconFactory.create_dropdown_tool_icon("line_style", col, 32, 24))
+
+        if hasattr(self, "loupe_btn"):
+            self.loupe_btn.setIcon(MacIconFactory.create_icon("loupe", col, 18))
+        if hasattr(self, "stamp_btn") and self.stamp_btn is not self.sign_btn:
+            self.stamp_btn.setIcon(MacIconFactory.create_icon("rubber_stamp", col, 18))
 
         if hasattr(self, "btn_adj_col"):
             self.btn_adj_col.setIcon(MacIconFactory.create_icon("color_adjust", col, 16))

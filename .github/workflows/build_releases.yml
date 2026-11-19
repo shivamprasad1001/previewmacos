@@ -33,8 +33,12 @@ jobs:
           python -m pip install -r requirements.txt pyinstaller
 
       - name: Run Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+          CI: "true"
+          PREVIEW_TESTING: "true"
         run: |
-          python test_preview_features.py
+          python -m unittest test_studio_ui.py test_icons.py test_preview_features.py
 
       - name: Build Debian Package (.deb)
         run: |

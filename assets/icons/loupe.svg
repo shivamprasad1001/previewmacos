@@ -1,0 +1,19 @@
+<!-- @license lucide-static v1.63.0 - ISC -->
+<svg
+  class="lucide lucide-loupe"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.75"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="10" cy="10" r="7.5" />
+  <circle cx="10" cy="10" r="5" stroke-width="1.2" opacity="0.6" />
+  <path d="M7 7.5a4 4 0 0 1 4.5-2" stroke-linecap="round" />
+  <path d="m15.5 15.5 2 2" stroke-width="2.5" />
+  <path d="m17.5 17.5 4 4" stroke-width="2.8" stroke-linecap="round" />
+</svg>

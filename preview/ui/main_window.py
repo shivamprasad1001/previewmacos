@@ -19,7 +19,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtCore import Qt, QPoint, QPointF, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
-from preview.theme import MacTheme, ThemeManager
+from preview.theme import MacTheme, StudioTheme, ThemeManager, apply_theme, get_stylesheet
 from preview.icons import MacIconFactory
 from preview.core.document import Document
 from preview.core.annotations import AnnotationType
@@ -238,34 +238,155 @@ class TrafficLightButton(QToolButton):
             is_dark = (win.current_theme == MacTheme.DARK)
 
         if not is_active:
-            # Grey circles when window is inactive
-            fill_col = "#727277" if is_dark else "#bcbcc2"
-            stroke_col = "#5a5a5e" if is_dark else "#9e9ea4"
+            # Subtle inactive studio controls
+            fill_col = "#22242a" if is_dark else "#e5e7eb"
+            stroke_col = "rgba(255, 255, 255, 0.08)" if is_dark else "rgba(0, 0, 0, 0.10)"
             p.setBrush(QBrush(QColor(fill_col)))
             p.setPen(QPen(QColor(stroke_col), 0.75))
-            p.drawEllipse(QRectF(0.5, 0.5, 11.0, 11.0))
+            p.drawRoundedRect(QRectF(0.5, 0.5, 11.0, 11.0), 3.0, 3.0)
             if self._modified and not self._hovered:
-                p.setBrush(QBrush(QColor("#454548" if is_dark else "#808085")))
+                p.setBrush(QBrush(QColor("#4b5563" if is_dark else "#9ca3af")))
                 p.setPen(Qt.PenStyle.NoPen)
-                p.drawEllipse(QRectF(3.75, 3.75, 4.5, 4.5))
+                p.drawRoundedRect(QRectF(3.5, 3.5, 5.0, 5.0), 1.5, 1.5)
         else:
-            p.setBrush(QBrush(QColor(self.color_bg)))
-            p.setPen(QPen(QColor(self.border_col), 0.75))
-            p.drawEllipse(QRectF(0.5, 0.5, 11.0, 11.0))
             if self._hovered:
-                p.setPen(QColor(self.glyph_col))
+                if self.symbol == "✕":
+                    bg = "#ef4444"
+                    border = "#dc2626"
+                elif self.symbol == "−":
+                    bg = "#f59e0b"
+                    border = "#d97706"
+                else:
+                    bg = "#10b981"
+                    border = "#059669"
+                p.setBrush(QBrush(QColor(bg)))
+                p.setPen(QPen(QColor(border), 0.75))
+                p.drawRoundedRect(QRectF(0.5, 0.5, 11.0, 11.0), 3.0, 3.0)
+                p.setPen(QColor("#ffffff"))
                 font = QFont("Inter", 7, QFont.Weight.Bold)
                 p.setFont(font)
                 p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.symbol)
-            elif self._modified:
-                # macOS dirty indicator dot (4.5px circle in center)
-                p.setBrush(QBrush(QColor(self.glyph_col)))
-                p.setPen(Qt.PenStyle.NoPen)
-                p.drawEllipse(QRectF(3.75, 3.75, 4.5, 4.5))
+            else:
+                fill = "#282a32" if is_dark else "#f3f4f6"
+                stroke = "rgba(255, 255, 255, 0.12)" if is_dark else "rgba(0, 0, 0, 0.14)"
+                p.setBrush(QBrush(QColor(fill)))
+                p.setPen(QPen(QColor(stroke), 0.75))
+                p.drawRoundedRect(QRectF(0.5, 0.5, 11.0, 11.0), 3.0, 3.0)
+                if self._modified:
+                    # Dirty indicator dot in crimson
+                    p.setBrush(QBrush(QColor("#ef4444")))
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.drawRoundedRect(QRectF(3.5, 3.5, 5.0, 5.0), 1.5, 1.5)
         p.end()
 
+class StudioCloseButton(QToolButton):
+    """
+    Modern Studio window close button (30x30) with dirty dot indicator
+    and high-contrast crimson hover state.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("windowCloseBtn")
+        self.setFixedSize(30, 30)
+        self.setIconSize(QSize(14, 14))
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._modified = False
+        self._active = True
+        self._hovered = False
+
+    def set_modified(self, modified: bool):
+        if self._modified != modified:
+            self._modified = modified
+            self.update()
+
+    def set_active(self, active: bool):
+        if self._active != active:
+            self._active = active
+            self.update()
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.setIcon(MacIconFactory.create_icon("window_close", "#ffffff", 14))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        win = self.window()
+        is_dark = getattr(win, "current_theme", MacTheme.DARK) == MacTheme.DARK
+        col = "#f5f5f7" if is_dark else "#2c2c2e"
+        self.setIcon(MacIconFactory.create_icon("window_close", col, 14))
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self._modified and not self._hovered:
+            p = QPainter(self)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setBrush(QBrush(QColor("#ef4444")))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(QRectF(self.width() - 8, 3, 5, 5))
+            p.end()
+
+
+class StudioWindowControls(QWidget):
+    """
+    Standard modern window controls: Minimize, Maximize/Restore, Close.
+    Cleanly positioned on the right side of the window header bar
+    without macOS traffic-light imitation.
+    """
+
+    def __init__(self, main_win: 'MacMainWindow'):
+        super().__init__(main_win)
+        self.main_win = main_win
+        self.setObjectName("studioWindowControls")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        self.btn_min = QToolButton(self)
+        self.btn_min.setObjectName("windowMinBtn")
+        self.btn_min.setFixedSize(30, 30)
+        self.btn_min.setIconSize(QSize(14, 14))
+        self.btn_min.setToolTip("Minimize (Ctrl+M)")
+        self.btn_min.setAccessibleName("Minimize Window")
+        self.btn_min.clicked.connect(main_win.showMinimized)
+
+        self.btn_max = QToolButton(self)
+        self.btn_max.setObjectName("windowMaxBtn")
+        self.btn_max.setFixedSize(30, 30)
+        self.btn_max.setIconSize(QSize(14, 14))
+        self.btn_max.setToolTip("Zoom / Maximize")
+        self.btn_max.setAccessibleName("Maximize Window")
+        self.btn_max.clicked.connect(main_win._toggle_maximize)
+
+        self.btn_close = StudioCloseButton(self)
+        self.btn_close.setObjectName("windowCloseBtn")
+        self.btn_close.setToolTip("Close (Ctrl+W)")
+        self.btn_close.setAccessibleName("Close Window")
+        self.btn_close.clicked.connect(main_win.close)
+
+        layout.addWidget(self.btn_min)
+        layout.addWidget(self.btn_max)
+        layout.addWidget(self.btn_close)
+
+    def set_active_state(self, active: bool):
+        self.btn_close.set_active(active)
+        self.update()
+
+    def update_icons(self, col: str):
+        self.btn_min.setIcon(MacIconFactory.create_icon("window_minimize", col, 14))
+        is_max = self.main_win.isMaximized()
+        max_icon = "window_restore" if is_max else "window_maximize"
+        self.btn_max.setIcon(MacIconFactory.create_icon(max_icon, col, 14))
+        self.btn_max.setToolTip("Zoom / Maximize")
+        if not self.btn_close._hovered:
+            self.btn_close.setIcon(MacIconFactory.create_icon("window_close", col, 14))
+
+
 class TrafficLightCluster(QWidget):
-    """Container for traffic lights spaced 8px apart."""
+    """Container for traffic lights spaced 8px apart (retained for backward compatibility)."""
 
     def __init__(self, main_win: 'MacMainWindow'):
         super().__init__(main_win)
@@ -274,15 +395,18 @@ class TrafficLightCluster(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        self.btn_close = TrafficLightButton("#ff5f56", "#e0443e", "✕", "#4d0000", self)
+        self.btn_close = TrafficLightButton("#ef4444", "#dc2626", "✕", "#ffffff", self)
+        self.btn_close.setObjectName("trafficClose")
         self.btn_close.setToolTip("Close (Ctrl+W)")
         self.btn_close.clicked.connect(main_win.close)
 
-        self.btn_min = TrafficLightButton("#ffbd2e", "#dea123", "−", "#613b00", self)
+        self.btn_min = TrafficLightButton("#f59e0b", "#d97706", "−", "#ffffff", self)
+        self.btn_min.setObjectName("trafficMinimize")
         self.btn_min.setToolTip("Minimize (Ctrl+M)")
         self.btn_min.clicked.connect(main_win.showMinimized)
 
-        self.btn_max = TrafficLightButton("#27c93f", "#1aab29", "+", "#004707", self)
+        self.btn_max = TrafficLightButton("#10b981", "#059669", "+", "#ffffff", self)
+        self.btn_max.setObjectName("trafficMaximize")
         self.btn_max.setToolTip("Zoom / Maximize")
         self.btn_max.clicked.connect(main_win._toggle_maximize)
 
@@ -306,6 +430,7 @@ class TrafficLightCluster(QWidget):
         self.btn_min.set_cluster_hovered(False)
         self.btn_max.set_cluster_hovered(False)
         super().leaveEvent(event)
+
 
 class DraggableToolbar(QWidget):
     """Unified header bar (52px) supporting window dragging, double-click maximize, and centered title."""
@@ -570,13 +695,7 @@ class MacMainWindow(QMainWindow):
         toolbar_layout.setContentsMargins(16, 0, 16, 0)
         toolbar_layout.setSpacing(0)
 
-        # 1. Left Group: Window Controls + Sidebar Toggle + Back/Forward + Open
-        self.traffic_cluster = TrafficLightCluster(self)
-        toolbar_layout.addWidget(self.traffic_cluster)
-        self.traffic_cluster.setVisible(self.is_frameless)
-        if self.is_frameless:
-            toolbar_layout.addSpacing(8)
-
+        # 1. Left Group: Sidebar Toggle + Back/Forward + Open
         # Sidebar toggle (32x32)
         self.sidebar_btn = QToolButton()
         self.sidebar_btn.setObjectName("sidebarBtn")
@@ -856,6 +975,28 @@ class MacMainWindow(QMainWindow):
         self.theme_btn.clicked.connect(self._toggle_theme)
         toolbar_layout.addWidget(self.theme_btn)
 
+        toolbar_layout.addSpacing(6)
+
+        # Settings gear button (32x32)
+        self.settings_btn = QToolButton()
+        self.settings_btn.setObjectName("settingsBtn")
+        self.settings_btn.setFixedSize(32, 32)
+        self.settings_btn.setToolTip("Preferences (Ctrl+,)")
+        self.settings_btn.setAccessibleName("Preferences")
+        self.settings_btn.clicked.connect(self.open_settings_dialog)
+        toolbar_layout.addWidget(self.settings_btn)
+
+        # Modern standard window controls on the right side
+        toolbar_layout.addSpacing(10)
+        self.divider3 = self._create_divider()
+        toolbar_layout.addWidget(self.divider3)
+        toolbar_layout.addSpacing(6)
+
+        self.window_controls = StudioWindowControls(self)
+        self.traffic_cluster = self.window_controls  # Fully backwards-compatible alias
+        self.window_controls.setVisible(self.is_frameless)
+        toolbar_layout.addWidget(self.window_controls)
+
         self._update_all_icons()
 
     def _get_icon_color(self) -> str:
@@ -878,6 +1019,10 @@ class MacMainWindow(QMainWindow):
             self.fullscreen_btn.setIcon(MacIconFactory.create_icon(fs_icon, col, 18))
         self.markup_toggle_btn.setIcon(MacIconFactory.create_icon("pen-tool", "#ffffff" if self.markup_toggle_btn.isChecked() else col, 20))
         self.inspector_btn.setIcon(MacIconFactory.create_icon("info", "#ffffff" if self.inspector_btn.isChecked() else col, 18))
+        if hasattr(self, "settings_btn"):
+            self.settings_btn.setIcon(MacIconFactory.create_icon("gear", col, 18))
+        if hasattr(self, "window_controls"):
+            self.window_controls.update_icons(col)
 
         # Mode segmented icons
         if hasattr(self, "mode_view_btn"):
@@ -960,7 +1105,7 @@ class MacMainWindow(QMainWindow):
 
         pref_act = QAction("Preferences...", self)
         pref_act.setShortcut(QKeySequence("Ctrl+,"))
-        pref_act.triggered.connect(self._show_about)
+        pref_act.triggered.connect(self.open_settings_dialog)
         self.logo_menu.addAction(pref_act)
 
         self.logo_menu.addSeparator()
@@ -1112,7 +1257,7 @@ class MacMainWindow(QMainWindow):
         self.view_menu.addAction(toggle_sb)
 
         toggle_inspector_act = QAction("Toggle Inspector Panel", self)
-        toggle_inspector_act.setShortcut(QKeySequence("Ctrl+I"))
+        toggle_inspector_act.setShortcuts([QKeySequence("Ctrl+I"), QKeySequence("Cmd+I")])
         toggle_inspector_act.triggered.connect(self._toggle_inspector_panel)
         self.view_menu.addAction(toggle_inspector_act)
 
@@ -1297,8 +1442,7 @@ class MacMainWindow(QMainWindow):
         self.tools_menu.addAction(overlay_tool_act)
 
         insp_act = QAction("Show Inspector", self)
-        insp_act.setShortcut(QKeySequence("Ctrl+I"))
-        insp_act.triggered.connect(self._show_inspector)
+        insp_act.triggered.connect(self._toggle_inspector_panel)
         self.tools_menu.addAction(insp_act)
 
         # 7. Window Menu
@@ -2553,6 +2697,9 @@ class MacMainWindow(QMainWindow):
             self.shadow_effect.setEnabled(not is_max)
         if hasattr(self, 'toolbar_widget'):
             self.toolbar_widget.update_title_geometry()
+        if hasattr(self, 'window_controls'):
+            col = self._get_icon_color()
+            self.window_controls.update_icons(col)
 
     def changeEvent(self, event: QEvent):
         if event.type() == QEvent.Type.ActivationChange:
@@ -2622,7 +2769,10 @@ class MacMainWindow(QMainWindow):
 
     def _toggle_frameless_mode(self, enabled: bool):
         self.is_frameless = enabled
-        self.traffic_cluster.setVisible(enabled)
+        if hasattr(self, 'window_controls'):
+            self.window_controls.setVisible(enabled)
+        elif hasattr(self, 'traffic_cluster'):
+            self.traffic_cluster.setVisible(enabled)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, enabled)
         self.show()
 
@@ -2944,6 +3094,41 @@ class MacMainWindow(QMainWindow):
     def _show_about(self):
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def open_settings_dialog(self):
+        """Opens the Studio Settings & Preferences multi-tab dialog."""
+        from preview.ui.settings_dialog import SettingsDialog
+        dlg = SettingsDialog(self)
+        dlg.settings_changed.connect(self._on_settings_applied)
+        dlg.exec()
+
+    def _on_settings_applied(self, cfg: dict):
+        """Applies configuration changes immediately across the main window."""
+        if "theme" in cfg:
+            theme_choice = str(cfg["theme"]).lower()
+            if theme_choice == "system":
+                theme_choice = "auto"
+            self._set_appearance_mode(theme_choice)
+
+        if "startup_mode" in cfg:
+            self.set_workspace_mode(str(cfg["startup_mode"]))
+
+        if "default_pen_width" in cfg and hasattr(self, "markup_bar"):
+            self.markup_bar.stroke_width = float(cfg["default_pen_width"])
+            self.canvas.stroke_width = float(cfg["default_pen_width"])
+
+        if "default_highlight_color" in cfg and hasattr(self, "markup_bar"):
+            self.markup_bar.stroke_color = QColor(str(cfg["default_highlight_color"]))
+
+        if "canvas_background_tone" in cfg and hasattr(self, "canvas"):
+            tone = str(cfg["canvas_background_tone"])
+            if tone == "Obsidian":
+                self.canvas.setStyleSheet("background-color: #141518;")
+            elif tone == "Charcoal":
+                self.canvas.setStyleSheet("background-color: #1e2026;")
+            elif tone == "Custom" and "custom_canvas_color" in cfg:
+                self.canvas.setStyleSheet(f"background-color: {cfg['custom_canvas_color']};")
+
 
     def _show_help(self, page_id: str = "what-is-preview"):
         if not hasattr(self, "_help_window") or self._help_window is None:

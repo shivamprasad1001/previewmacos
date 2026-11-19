@@ -10,3 +10,5 @@ from preview.ui.inspector_dialog import InspectorDialog
 from preview.ui.about_dialog import AboutDialog
 from preview.ui.export_dialog import MacExportDialog
 from preview.ui.help_window import HelpWindow
+from preview.ui.settings_dialog import SettingsDialog, StudioSettingsManager
+

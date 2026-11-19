@@ -229,11 +229,49 @@ class TestPreviewParity(unittest.TestCase):
         win.close()
 
     def test_12_theme_colors(self):
-        from preview.theme import MacTheme
+        from preview.theme import MacTheme, StudioTheme, get_stylesheet, apply_theme
         self.assertEqual(MacTheme.LIGHT_BG_CANVAS, "#ececf0")
         self.assertNotEqual(MacTheme.LIGHT_BG_CANVAS, "#525257")
         qss_light = MacTheme.get_stylesheet(MacTheme.LIGHT)
         self.assertIn("#ececf0", qss_light)
+
+        # StudioTheme tokens & palette
+        self.assertEqual(StudioTheme.DARK_BG_CANVAS, "#141518")
+        self.assertEqual(StudioTheme.DARK_BG_WINDOW, "#1a1b1f")
+        self.assertEqual(StudioTheme.DARK_BG_CARD, "#22242a")
+        self.assertEqual(StudioTheme.DARK_BG_ELEVATED, "#282a32")
+        self.assertEqual(StudioTheme.DARK_ACCENT, "#2563eb")
+        self.assertEqual(StudioTheme.DARK_SUCCESS, "#10b981")
+        self.assertEqual(StudioTheme.DARK_DANGER, "#ef4444")
+        self.assertEqual(StudioTheme.DARK_WARNING, "#f59e0b")
+
+        # Spacing tokens (4, 8, 12, 16, 20, 24px)
+        self.assertEqual(StudioTheme.SPACE_4, 4)
+        self.assertEqual(StudioTheme.SPACE_8, 8)
+        self.assertEqual(StudioTheme.SPACE_12, 12)
+        self.assertEqual(StudioTheme.SPACE_16, 16)
+        self.assertEqual(StudioTheme.SPACE_20, 20)
+        self.assertEqual(StudioTheme.SPACE_24, 24)
+
+        # Radii tokens (4, 8, 10px)
+        self.assertEqual(StudioTheme.RADIUS_XS, 4)
+        self.assertEqual(StudioTheme.RADIUS_SM, 4)
+        self.assertEqual(StudioTheme.RADIUS_MD, 8)
+        self.assertEqual(StudioTheme.RADIUS_LG, 10)
+
+        # Stylesheets & Helper methods
+        qss_studio_dark = StudioTheme.get_stylesheet("dark")
+        self.assertIn("#141518", qss_studio_dark)
+        self.assertIn("#1a1b1f", qss_studio_dark)
+        self.assertIn("#22242a", qss_studio_dark)
+        self.assertIn("#2563eb", qss_studio_dark)
+
+        # Top-level helper functions
+        self.assertEqual(get_stylesheet("dark"), qss_studio_dark)
+        from PyQt6.QtWidgets import QWidget
+        test_w = QWidget()
+        apply_theme(test_w, "dark")
+        self.assertEqual(test_w.styleSheet(), qss_studio_dark)
 
     def test_13_pdf_and_image_page_deletion(self):
         import tempfile
