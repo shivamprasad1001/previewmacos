@@ -136,6 +136,7 @@ class MacSidebar(QWidget):
         self.document: Optional[Document] = None
         self.current_view_mode = "Thumbnails"
         self.thumbnail_width: int = 110
+        self._last_thumbnail_sidebar_width: int = 180
         self._setup_ui()
 
     def minimumSizeHint(self) -> QSize:
@@ -277,8 +278,8 @@ class MacSidebar(QWidget):
             self.thumb_list.setWrapping(True)
             self.thumb_list.setResizeMode(QListWidget.ResizeMode.Adjust)
             self.thumb_list.setMovement(QListWidget.Movement.Static)
-            self.thumb_list.setSpacing(8)
-            grid_size = QSize(item_w + 12, item_h + 10)
+            self.thumb_list.setSpacing(10)
+            grid_size = QSize(item_w + 14, item_h + 12)
             self.thumb_list.setGridSize(grid_size)
         elif self.current_view_mode == "Thumbnails":
             self.thumb_list.setViewMode(QListWidget.ViewMode.ListMode)
@@ -317,7 +318,11 @@ class MacSidebar(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.current_view_mode == "Contact Sheet":
+        if self.current_view_mode == "Thumbnails":
+            w = self.width()
+            if 140 <= w <= 260:
+                self._last_thumbnail_sidebar_width = w
+        elif self.current_view_mode == "Contact Sheet":
             self.thumb_list.doItemsLayout()
 
     def set_document(self, doc: Optional[Document]):
@@ -397,6 +402,7 @@ class MacSidebar(QWidget):
             self.page_selected.emit(page_num)
 
     def set_view_mode(self, mode_name: str):
+        prev_mode = self.current_view_mode
         self.current_view_mode = mode_name
         if hasattr(self, "tab_thumbs_btn"):
             self.tab_thumbs_btn.setChecked(mode_name == "Thumbnails")
@@ -411,6 +417,18 @@ class MacSidebar(QWidget):
         if mode_name == "Thumbnails":
             self.stack.setCurrentIndex(0)
             self.footer.setVisible(True)
+            if self.window():
+                splitter = getattr(self.window(), "splitter", None)
+                if splitter:
+                    sizes = splitter.sizes()
+                    if len(sizes) >= 2:
+                        saved_w = getattr(self, "_last_thumbnail_sidebar_width", int(self.thumbnail_width + 54))
+                        target_w = max(140, min(saved_w, int(self.thumbnail_width + 64)))
+                        if sizes[0] > target_w:
+                            diff = sizes[0] - target_w
+                            sizes[0] = target_w
+                            sizes[1] = sizes[1] + diff
+                            splitter.setSizes(sizes)
             self._apply_thumbnail_layout()
         elif mode_name == "Contact Sheet":
             self.stack.setCurrentIndex(0)
@@ -419,10 +437,15 @@ class MacSidebar(QWidget):
                 splitter = getattr(self.window(), "splitter", None)
                 if splitter:
                     sizes = splitter.sizes()
+                    if len(sizes) >= 2 and sizes[0] > 0:
+                        if prev_mode == "Thumbnails" or not hasattr(self, "_last_thumbnail_sidebar_width"):
+                            self._last_thumbnail_sidebar_width = sizes[0]
                     total_w = sum(sizes)
                     if len(sizes) >= 2:
+                        col_w = int(self.thumbnail_width + 36)
+                        needed_w = (col_w * 2) + 24
                         max_sidebar = max(140, total_w - 250)
-                        target_w = min(max_sidebar, 380)
+                        target_w = min(max_sidebar, max(300, needed_w))
                         if target_w > sizes[0]:
                             diff = target_w - sizes[0]
                             sizes[0] = target_w
@@ -432,6 +455,17 @@ class MacSidebar(QWidget):
         elif mode_name in ("Table of Contents", "Outline"):
             self.stack.setCurrentIndex(1)
             self.footer.setVisible(False)
+            if self.window():
+                splitter = getattr(self.window(), "splitter", None)
+                if splitter:
+                    sizes = splitter.sizes()
+                    if len(sizes) >= 2 and sizes[0] > 260:
+                        saved_w = getattr(self, "_last_thumbnail_sidebar_width", 220)
+                        target_w = min(saved_w, 240)
+                        diff = sizes[0] - target_w
+                        sizes[0] = target_w
+                        sizes[1] = sizes[1] + diff
+                        splitter.setSizes(sizes)
 
     def _toggle_view_mode(self):
         if self.current_view_mode == "Thumbnails":
