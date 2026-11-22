@@ -442,10 +442,10 @@ class MacSidebar(QWidget):
                             self._last_thumbnail_sidebar_width = sizes[0]
                     total_w = sum(sizes)
                     if len(sizes) >= 2:
-                        col_w = int(self.thumbnail_width + 36)
-                        needed_w = (col_w * 2) + 24
+                        grid_w = int(self.thumbnail_width + 38)
+                        needed_w = max(375, (grid_w * 2) + 55)
                         max_sidebar = max(140, total_w - 250)
-                        target_w = min(max_sidebar, max(300, needed_w))
+                        target_w = min(max_sidebar, needed_w)
                         if target_w > sizes[0]:
                             diff = target_w - sizes[0]
                             sizes[0] = target_w
