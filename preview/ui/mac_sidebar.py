@@ -138,6 +138,9 @@ class MacSidebar(QWidget):
         self.thumbnail_width: int = 110
         self._setup_ui()
 
+    def minimumSizeHint(self) -> QSize:
+        return QSize(140, 200)
+
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -301,11 +304,15 @@ class MacSidebar(QWidget):
                 splitter = getattr(self.window(), "splitter", None)
                 if splitter:
                     sizes = splitter.sizes()
-                    if len(sizes) >= 2 and sizes[0] < needed_w:
-                        diff = needed_w - sizes[0]
-                        sizes[0] = min(650, needed_w)
-                        sizes[1] = max(200, sizes[1] - diff)
-                        splitter.setSizes(sizes)
+                    total_w = sum(sizes)
+                    if len(sizes) >= 2:
+                        max_sidebar = max(140, total_w - 250)
+                        target_w = min(max_sidebar, needed_w)
+                        if target_w > sizes[0]:
+                            diff = target_w - sizes[0]
+                            sizes[0] = target_w
+                            sizes[1] = max(200, sizes[1] - diff)
+                            splitter.setSizes(sizes)
         self._apply_thumbnail_layout()
 
     def resizeEvent(self, event):
@@ -412,11 +419,15 @@ class MacSidebar(QWidget):
                 splitter = getattr(self.window(), "splitter", None)
                 if splitter:
                     sizes = splitter.sizes()
-                    if len(sizes) >= 2 and sizes[0] < 380:
-                        diff = 380 - sizes[0]
-                        sizes[0] = 380
-                        sizes[1] = max(200, sizes[1] - diff)
-                        splitter.setSizes(sizes)
+                    total_w = sum(sizes)
+                    if len(sizes) >= 2:
+                        max_sidebar = max(140, total_w - 250)
+                        target_w = min(max_sidebar, 380)
+                        if target_w > sizes[0]:
+                            diff = target_w - sizes[0]
+                            sizes[0] = target_w
+                            sizes[1] = max(200, sizes[1] - diff)
+                            splitter.setSizes(sizes)
             self._apply_thumbnail_layout()
         elif mode_name in ("Table of Contents", "Outline"):
             self.stack.setCurrentIndex(1)

@@ -61,6 +61,9 @@ class MarkupToolbar(QWidget):
 
         self._setup_ui()
 
+    def minimumSizeHint(self) -> QSize:
+        return QSize(360, 44)
+
     def _setup_ui(self):
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)

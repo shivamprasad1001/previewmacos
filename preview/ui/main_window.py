@@ -444,6 +444,9 @@ class DraggableToolbar(QWidget):
         super().resizeEvent(event)
         self.update_title_geometry()
 
+    def minimumSizeHint(self) -> QSize:
+        return QSize(360, 48)
+
     def update_title_geometry(self):
         """Header bar layout with stretch items automatically centers the title container."""
         pass
@@ -522,6 +525,7 @@ class MacMainWindow(QMainWindow):
         self.setObjectName("DocumentViewer")
         self.setWindowTitle("Document Viewer")
         self.resize(1150, 780)
+        self.setMinimumSize(640, 480)
         self.setAcceptDrops(True)
 
         # Set window icon

@@ -6,7 +6,7 @@ Exposes page rotation, insertion, deletion, duplication, merging, and splitting.
 from typing import Optional, List
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QToolButton, QLabel, QFrame, QSizePolicy
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
 
 from preview.icons import MacIconFactory, Icon
 
@@ -31,6 +31,9 @@ class OrganizeActionBar(QWidget):
         self._theme_col: str = "#f5f5f7"
 
         self._setup_ui()
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(300, 44)
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)

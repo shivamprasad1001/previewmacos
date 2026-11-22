@@ -385,6 +385,35 @@ class TestStudioActionRibbonAndInspector(unittest.TestCase):
 
         win.close()
 
+    def test_14_sidebar_and_tabbar_minimum_size_and_thumbnail_selection(self):
+        """Verifies window does not expand or lock minimum width when clicking thumbnails or switching tabs."""
+        win = MacMainWindow(initial_file=self.test_img)
+        win.show()
+
+        # Check constrained minimum size hints
+        self.assertLessEqual(win.minimumSizeHint().width(), 500)
+        self.assertLessEqual(win.tab_container.minimumSizeHint().width(), 150)
+        self.assertLessEqual(win.sidebar.minimumSizeHint().width(), 160)
+
+        # Resizing to a compact 700x500 window should work smoothly
+        win.resize(700, 500)
+        self.assertLessEqual(win.width(), 750)
+
+        # Add second tab and switch
+        win.new_tab(self.test_img)
+        self.assertEqual(win.tab_container.tab_bar.count(), 2)
+        self.assertLessEqual(win.minimumSizeHint().width(), 500)
+
+        # Selecting thumbnails should not inflate window width
+        win.sidebar.thumb_list.setCurrentRow(0)
+        self.assertLessEqual(win.width(), 750)
+
+        # Switch to Contact Sheet mode
+        win.sidebar.set_view_mode("Contact Sheet")
+        self.assertLessEqual(win.width(), 750)
+
+        win.close()
+
 
 if __name__ == "__main__":
     unittest.main()

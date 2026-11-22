@@ -9,7 +9,7 @@ from typing import Optional, Dict, List, Any
 import uuid
 
 from PyQt6.QtWidgets import QWidget, QTabBar, QHBoxLayout, QToolButton, QSizePolicy
-from PyQt6.QtCore import Qt, pyqtSignal, QPointF
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QSize
 from PyQt6.QtGui import QColor
 
 from preview.core.document import Document
@@ -47,6 +47,9 @@ class MacTabBar(QTabBar):
         self.setDrawBase(False)
         self._theme: str = "dark"
         self._apply_style()
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(120, 30)
 
     def update_theme(self, theme_name: str):
         self._theme = theme_name
@@ -155,6 +158,9 @@ class MacTabBarContainer(QWidget):
         self.add_tab_btn.setToolTip("New Tab (Ctrl+T)")
         self.add_tab_btn.clicked.connect(self.new_tab_clicked.emit)
         layout.addWidget(self.add_tab_btn, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(120, 30)
 
     def update_theme(self, theme_name: str):
         self.tab_bar.update_theme(theme_name)
