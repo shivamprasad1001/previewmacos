@@ -137,6 +137,11 @@ jobs:
           name: preview-windows-setup
           path: release_assets/
 
+      - name: Generate Release Checksums
+        run: |
+          cd release_assets
+          sha256sum *.deb *.exe > SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

@@ -1,11 +1,12 @@
 ; Inno Setup Script for Preview (Document Viewer)
 ; Developer: Shivam Prasad
-; Powered by: TriviLabs.in
+; Repository: https://github.com/shivamprasad1001/previewmacos
 
 #define MyAppName "Preview"
-#define MyAppVersion "1.7.1"
-#define MyAppPublisher "TriviLabs"
-#define MyAppURL "https://trivilabs.in"
+#define MyAppVersion "1.7.2"
+#define MyAppNumericVersion "1.7.2.0"
+#define MyAppPublisher "Shivam Prasad"
+#define MyAppURL "https://github.com/shivamprasad1001/previewmacos"
 #define MyAppExeName "Preview.exe"
 
 [Setup]
@@ -24,6 +25,14 @@ SetupIconFile=..\preview\assets\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+VersionInfoVersion={#MyAppNumericVersion}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=macOS Preview Document and Image Viewer for Windows
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppNumericVersion}
+VersionInfoProductTextVersion={#MyAppVersion}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

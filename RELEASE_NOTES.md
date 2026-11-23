@@ -1,3 +1,23 @@
+# Preview macOS v1.7.2 Release Notes
+
+Welcome to **Preview macOS v1.7.2**! This maintenance release addresses UI layout stability, prevents window resizing on thumbnail selection, refines the sidebar Contact Sheet view, and provides checksums for release verification.
+
+---
+
+### 🛠️ Fixes and Improvements in v1.7.2
+
+#### 📐 Window Dimension Stability
+* **Constrain Minimum Size Hints:** Constrained `minimumSizeHint` across the tab bar, toolbars, and sidebar to prevent unexpected window expansion when clicking thumbnails or switching documents.
+
+#### 🗂️ Sidebar & Contact Sheet Layout
+* **Thumbnail Width Restoration:** Ensured thumbnail width and grid padding are properly restored when switching between Contact Sheet and standard thumbnail views.
+* **Two-Column Contact Sheet Defaults:** Adjusted the default Contact Sheet sidebar width to 350px to ensure a balanced two-column thumbnail grid renders immediately without horizontal clipping.
+
+#### 🛡️ Windows Installer & SmartScreen Note
+* **Unsigned Installer Notice:** The Windows installer is not yet code-signed. If Windows Defender SmartScreen appears, click "More info" and then "Run anyway", and verify the installer hash against `SHA256SUMS.txt` on the GitHub release page.
+
+---
+
 # Preview macOS v1.7.1 Release Notes
 
 Welcome to **Preview macOS v1.7.1**! This maintenance release resolves a critical packaging compatibility crash on Linux distributions with newer GLIBC versions (Debian 13 Trixie, Pop!_OS, and modern Ubuntu/Kali installations).
