@@ -66,7 +66,7 @@ function initOSDetection() {
   const isLinux = ua.indexOf('Linux') !== -1 || ua.indexOf('X11') !== -1;
 
   if (isWindows) {
-    heroDownloadBtn.href = 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.1/Preview-Setup-v1.7.1.exe';
+    heroDownloadBtn.href = 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/Preview-Setup-v1.7.2.exe';
     heroDownloadBtn.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.401H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.949-1.801"/>
@@ -74,7 +74,7 @@ function initOSDetection() {
       <span>Download for Windows (.exe)</span>
     `;
   } else if (isLinux) {
-    heroDownloadBtn.href = 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.1/preview-app_1.7.1_amd64.deb';
+    heroDownloadBtn.href = 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb';
     heroDownloadBtn.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -92,7 +92,7 @@ function initOSDetection() {
         <polyline points="7 10 12 15 17 10"></polyline>
         <line x1="12" y1="15" x2="12" y2="3"></line>
       </svg>
-      <span>Download v1.7.1</span>
+      <span>Download v1.7.2</span>
     `;
   }
 }
@@ -112,7 +112,7 @@ async function initGitHubRelease() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    const tagName = data.tag_name || 'v1.7.1';
+    const tagName = data.tag_name || 'v1.7.2';
     if (versionBadge) versionBadge.textContent = `${tagName} Release`;
 
     if (data.assets && Array.isArray(data.assets)) {
@@ -141,9 +141,9 @@ async function initGitHubRelease() {
       apiStatusNote.textContent = `Latest release ${tagName} verified via GitHub Releases.`;
     }
   } catch (err) {
-    // Graceful fallback to hardcoded v1.7.1 links
+    // Graceful fallback to hardcoded v1.7.2 links
     if (apiStatusNote) {
-      apiStatusNote.textContent = 'Version 1.7.1 production packages ready for download.';
+      apiStatusNote.textContent = 'Version 1.7.2 production packages ready for download.';
     }
   }
 }
