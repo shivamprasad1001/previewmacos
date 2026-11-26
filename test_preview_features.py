@@ -1169,7 +1169,9 @@ class TestPreviewParity(unittest.TestCase):
         from PyQt6.QtGui import QMouseEvent
         from PyQt6.QtCore import QPointF, QEvent
         win = MacMainWindow(initial_file=self.test_img_path)
+        win.resize(1150, 780)
         win.show()
+        QApplication.processEvents()
         canvas = win.canvas
 
         # By default markup bar is hidden -> canvas.markup_enabled is False
@@ -1180,6 +1182,7 @@ class TestPreviewParity(unittest.TestCase):
         canvas.set_active_tool(AnnotationType.RECTANGLE)
         # Simulate click
         click_pt = canvas.doc_to_view_coords(QPointF(50, 50))
+        self.assertTrue(canvas.rect().contains(click_pt.toPoint()))
         evt = QMouseEvent(QEvent.Type.MouseButtonPress, click_pt, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
         canvas.mousePressEvent(evt)
         # No annotation should have been added
@@ -1187,11 +1190,15 @@ class TestPreviewParity(unittest.TestCase):
 
         # 2. Toggle markup toolbar open -> canvas.markup_enabled becomes True
         win._toggle_markup_bar()
+        QApplication.processEvents()
         self.assertFalse(win.markup_bar.isHidden())
         self.assertTrue(canvas.markup_enabled)
 
-        # 3. Now drawing an annotation works
+        # 3. Now drawing an annotation works (recompute view coords after layout change)
         canvas.set_active_tool(AnnotationType.RECTANGLE)
+        click_pt = canvas.doc_to_view_coords(QPointF(50, 50))
+        self.assertTrue(canvas.rect().contains(click_pt.toPoint()))
+        evt = QMouseEvent(QEvent.Type.MouseButtonPress, click_pt, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
         canvas.mousePressEvent(evt)
         self.assertIsNotNone(canvas._active_annotation)
 
