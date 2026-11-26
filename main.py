@@ -11,6 +11,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
+# Silence benign desktop portal registration warnings on Linux
+if "QT_LOGGING_RULES" not in os.environ:
+    os.environ["QT_LOGGING_RULES"] = "qt.qpa.services=false"
+
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 

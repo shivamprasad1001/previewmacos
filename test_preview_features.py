@@ -912,10 +912,9 @@ class TestPreviewParity(unittest.TestCase):
         self.assertTrue(hasattr(win, "open_arrow_btn"))
         self.assertEqual(win.open_btn.text(), "Open")
         self.assertIsNotNone(win.open_arrow_btn.menu())
-        self.assertEqual(len(win.open_arrow_btn.menu().actions()), 3)
+        self.assertEqual(len(win.open_arrow_btn.menu().actions()), 2)
         self.assertEqual(win.open_arrow_btn.menu().actions()[0].text(), "Open File(s)...")
-        self.assertEqual(win.open_arrow_btn.menu().actions()[1].text(), "Open in New Tab...")
-        self.assertEqual(win.open_arrow_btn.menu().actions()[2].text(), "Open Folder of Images...")
+        self.assertEqual(win.open_arrow_btn.menu().actions()[1].text(), "Open Folder of Images...")
 
         # 2. Markup Toolbar Dropdown Tools
         mb = win.markup_bar
@@ -1833,10 +1832,11 @@ class TestPreviewParity(unittest.TestCase):
             win = MacMainWindow()
             win._skip_save_prompt = True
 
-            # 1. Verify toolbar and file menu have "Open in New Tab..."
+            # 1. Verify toolbar open menu and file menu actions
             open_menu = win.open_arrow_btn.menu()
             menu_action_texts = [a.text() for a in open_menu.actions()]
-            self.assertIn("Open in New Tab...", menu_action_texts)
+            self.assertIn("Open File(s)...", menu_action_texts)
+            self.assertIn("Open Folder of Images...", menu_action_texts)
 
             file_menu_texts = [a.text() for a in win.file_menu.actions()]
             self.assertIn("Open in New Tab...", file_menu_texts)

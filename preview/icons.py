@@ -23,6 +23,9 @@ ICON_MAP: Dict[str, str] = {
     # Header bar
     "sidebar": "panel-left",
     "panel-left": "panel-left",
+    "toolbar": "panel-top",
+    "panel-top": "panel-top",
+    "toggle-toolbar": "panel-top",
     "back": "chevron-left",
     "forward": "chevron-right",
     "arrow_left": "chevron-left",
@@ -253,6 +256,13 @@ ICON_MAP: Dict[str, str] = {
 # Built-in high-fidelity vector definitions for realistic physical tools and studio controls.
 # These provide standalone execution resilience even if filesystem assets are detached.
 BUILTIN_SVGS: Dict[str, str] = {
+    "panel-top": (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" '
+        'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">'
+        '<rect width="18" height="18" x="3" y="3" rx="2" />'
+        '<path d="M3 9h18" />'
+        '</svg>'
+    ),
     # 1. Chisel-Tip Highlighter: angled chisel nib with facet line, collar, and barrel
     "highlighter": (
         '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" '

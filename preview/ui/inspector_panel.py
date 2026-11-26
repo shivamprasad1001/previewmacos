@@ -1,7 +1,7 @@
 """
 macOS-styled Collapsible Right Inspector Panel for Preview on Linux.
 Provides context-aware document metadata, live annotation properties,
-annotation layer management, and embedded image color adjustments.
+and annotation layer management.
 """
 
 import os
@@ -19,18 +19,15 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize, QRectF, QPointF
 
 from preview.core.document import Document
 from preview.core.annotations import AnnotationItem, AnnotationType
-from preview.core.color_adjust import ColorAdjustEngine
 from preview.icons import MacIconFactory
 from preview.theme import MacTheme
-from preview.ui.adjust_color_dialog import HistogramWidget
 
 
 class MacInspectorPanel(QWidget):
     """
-    Collapsible 3-tab inspector panel:
+    Collapsible 2-tab inspector panel:
       Tab 0: Properties / Format (Context-aware for selected annotation or document info)
       Tab 1: Annotations List (Layer view of markups on active page)
-      Tab 2: Adjustments (Live RGB histogram and image enhancement sliders)
     """
 
     close_requested = pyqtSignal()
@@ -68,7 +65,7 @@ class MacInspectorPanel(QWidget):
         h_layout.setContentsMargins(12, 6, 10, 6)
         h_layout.setSpacing(8)
 
-        # Segmented Tab Buttons: [ Format | Layers | Adjust ] (Evenly Spaced)
+        # Segmented Tab Buttons: [ Format | Layers ] (Evenly Spaced)
         self.seg_container = QWidget()
         self.seg_container.setObjectName("inspectorSegmented")
         self.seg_container.setFixedHeight(30)
@@ -94,15 +91,6 @@ class MacInspectorPanel(QWidget):
         self.tab_annots_btn.setAccessibleName("Layers Tab")
         self.tab_annots_btn.clicked.connect(lambda: self.set_active_tab(1))
         seg_layout.addWidget(self.tab_annots_btn, 1)
-
-        self.tab_adjust_btn = QToolButton()
-        self.tab_adjust_btn.setText("Adjust")
-        self.tab_adjust_btn.setCheckable(True)
-        self.tab_adjust_btn.setFixedHeight(26)
-        self.tab_adjust_btn.setToolTip("Color Adjustments & Histogram")
-        self.tab_adjust_btn.setAccessibleName("Adjust Tab")
-        self.tab_adjust_btn.clicked.connect(lambda: self.set_active_tab(2))
-        seg_layout.addWidget(self.tab_adjust_btn, 1)
 
         h_layout.addWidget(self.seg_container, 1)
 
@@ -169,19 +157,6 @@ class MacInspectorPanel(QWidget):
 
         self.stack.addWidget(self.annots_container)
 
-        # Tab 2: Live Adjustments & Histogram
-        self.adjust_scroll = QScrollArea()
-        self.adjust_scroll.setWidgetResizable(True)
-        self.adjust_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.adjust_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.adjust_container = QWidget()
-        self.adjust_layout = QVBoxLayout(self.adjust_container)
-        self.adjust_layout.setContentsMargins(16, 16, 16, 16)
-        self.adjust_layout.setSpacing(12)
-        self._setup_adjustments_tab()
-        self.adjust_scroll.setWidget(self.adjust_container)
-        self.stack.addWidget(self.adjust_scroll)
-
         main_layout.addWidget(self.stack, 1)
 
         self._refresh_properties_view()
@@ -190,77 +165,20 @@ class MacInspectorPanel(QWidget):
         self.stack.setCurrentIndex(index)
         self.tab_info_btn.setChecked(index == 0)
         self.tab_annots_btn.setChecked(index == 1)
-        self.tab_adjust_btn.setChecked(index == 2)
         if index == 1:
             self.refresh_annotations_list()
 
-    def _setup_adjustments_tab(self):
-        # RGB Histogram Graph
-        hist_label = QLabel("RGB Histogram")
-        hist_label.setStyleSheet("font-weight: 600; font-size: 12px; color: #98989d;")
-        self.adjust_layout.addWidget(hist_label)
+    def update_histogram(self):
+        pass
 
-        self.histogram_widget = HistogramWidget(self)
-        self.histogram_widget.setFixedHeight(75)
-        self.hist_widget = self.histogram_widget
-        self.adjust_layout.addWidget(self.histogram_widget)
-
-        # Sliders Section
-        self.sliders: Dict[str, QSlider] = {}
-        slider_defs = [
-            ("Exposure", "exposure", -100, 100, 0),
-            ("Contrast", "contrast", -100, 100, 0),
-            ("Highlights", "highlights", -100, 100, 0),
-            ("Shadows", "shadows", -100, 100, 0),
-            ("Saturation", "saturation", -100, 100, 0),
-            ("Temperature", "temperature", -100, 100, 0),
-            ("Tint", "tint", -100, 100, 0),
-            ("Sharpness", "sharpness", -100, 100, 0),
-        ]
-
-        for label_text, key, min_v, max_v, def_v in slider_defs:
-            row = QWidget()
-            r_lay = QHBoxLayout(row)
-            r_lay.setContentsMargins(0, 0, 0, 0)
-            lbl = QLabel(label_text)
-            lbl.setFixedWidth(75)
-            lbl.setStyleSheet("font-size: 11px;")
-            r_lay.addWidget(lbl)
-
-            slider = QSlider(Qt.Orientation.Horizontal)
-            slider.setRange(min_v, max_v)
-            slider.setValue(def_v)
-            slider.valueChanged.connect(self._on_slider_adjusted)
-            self.sliders[key] = slider
-            r_lay.addWidget(slider, 1)
-
-            val_lbl = QLabel(f"{def_v}")
-            val_lbl.setFixedWidth(28)
-            val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            val_lbl.setStyleSheet("font-size: 11px; color: #98989d;")
-            slider.valueChanged.connect(lambda v, l=val_lbl: l.setText(f"{v}"))
-            r_lay.addWidget(val_lbl)
-
-            self.adjust_layout.addWidget(row)
-
-        btn_row = QHBoxLayout()
-        self.auto_btn = QPushButton("Auto Levels")
-        self.auto_btn.clicked.connect(self._auto_adjust)
-        btn_row.addWidget(self.auto_btn)
-
-        self.reset_btn = QPushButton("Reset")
-        self.reset_btn.clicked.connect(self.reset_adjustments)
-        btn_row.addWidget(self.reset_btn)
-        self.adjust_layout.addLayout(btn_row)
-
-        self.adjust_layout.addStretch()
+    def reset_adjustments(self):
+        pass
 
     def set_document(self, doc: Optional[Document], current_page: int = 0):
         self.document = doc
         self.current_page = current_page
         self._refresh_properties_view()
         self.refresh_annotations_list()
-        self.update_histogram()
 
     def set_selected_annotation(self, annot: Optional[AnnotationItem]):
         self.selected_annotation = annot
@@ -578,44 +496,6 @@ class MacInspectorPanel(QWidget):
                 canvas.update()
                 self.set_selected_annotation(None)
                 self.refresh_annotations_list()
-
-    def update_histogram(self):
-        if not self.document:
-            return
-        try:
-            pix = self.document.get_pixmap(self.current_page, dpi=72)
-            # Convert to PIL Image for histogram computation
-            img = Image.fromqpixmap(pix)
-            self.histogram_widget.update_histogram(img)
-        except Exception:
-            pass
-
-    def _on_slider_adjusted(self):
-        if not self.document:
-            return
-        settings = {k: s.value() for k, s in self.sliders.items()}
-        try:
-            pil_img = self.document.get_pil_image(self.current_page)
-            if pil_img:
-                adj = ColorAdjustEngine.apply_adjustments(pil_img, settings)
-                self.color_adjusted.emit(adj)
-                self.histogram_widget.update_histogram(adj)
-        except Exception:
-            pass
-
-    def _auto_adjust(self):
-        self.sliders["contrast"].setValue(15)
-        self.sliders["exposure"].setValue(5)
-        self.sliders["saturation"].setValue(10)
-        self.sliders["sharpness"].setValue(20)
-
-    def reset_adjustments(self):
-        for s in self.sliders.values():
-            s.blockSignals(True)
-            s.setValue(0)
-            s.blockSignals(False)
-        self.color_reset_requested.emit()
-        self.update_histogram()
 
     # --- Property Change Callbacks ---
     def _pick_color(self, target: str):

@@ -155,6 +155,8 @@ class CanvasView(QWidget):
         self.font_family: str = "-apple-system"
         self.text_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft
         self.active_signature_pixmap: Optional[QPixmap] = None
+        self._active_stroke_style = "solid"
+        self._active_fill_opacity = 1.0
 
         # Interaction state
         self._is_panning: bool = False
@@ -585,6 +587,46 @@ class CanvasView(QWidget):
             self._selected_annotation.stroke_width = width
             self.update()
 
+    def set_stroke_style(self, style: str) -> None:
+        """Set stroke style for the active/selected annotation, or as the default for new ones.
+
+        style ∈ {"solid", "dash", "dot", "dashdot"}.
+        """
+        self._active_stroke_style = style
+        target = self._active_annotation or self._selected_annotation
+        if target is not None:
+            try:
+                target.stroke_style = style
+            except AttributeError:
+                pass  # AnnotationItem doesn't have this field yet — no-op
+            self.document_modified.emit(True)
+            self.update()
+
+    def set_fill_opacity(self, opacity: float) -> None:
+        """Set fill opacity [0..1] on the active/selected annotation, or as the default."""
+        opacity = max(0.0, min(1.0, float(opacity)))
+        self._active_fill_opacity = opacity
+        target = self._active_annotation or self._selected_annotation
+        if target is not None:
+            try:
+                target.fill_opacity = opacity
+            except AttributeError:
+                pass
+            self.document_modified.emit(True)
+            self.update()
+
+
+    def set_strikethrough(self, on: bool) -> None:
+        """Toggle strikethrough on the active/selected text annotation."""
+        target = self._active_annotation or self._selected_annotation
+        if target is not None:
+            try:
+                target.is_strikethrough = bool(on)
+            except AttributeError:
+                pass
+            self.document_modified.emit(True)
+            self.update()
+
     def clamp_to_doc_bounds(self, pt: QPointF) -> QPointF:
         if not self.document:
             return pt
@@ -724,7 +766,19 @@ class CanvasView(QWidget):
                 item = AnnotationItem(self.active_tool)
                 item.stroke_color = QColor(self.stroke_color)
                 item.stroke_width = self.stroke_width
-                item.points = [doc_pt]
+                item.fill_color = QColor(self.fill_color)
+                # Inherit defaults from toolbar state
+                try:
+                    item.stroke_style = self._active_stroke_style
+                except AttributeError:
+                    pass
+                try:
+                    item.fill_opacity = self._active_fill_opacity
+                except AttributeError:
+                    pass
+                item.rect = QRectF(doc_pt, doc_pt)
+                item.points = [doc_pt, doc_pt]
+
                 self._active_annotation = item
                 self._get_current_annotations().append(item)
                 self.update()
@@ -739,8 +793,18 @@ class CanvasView(QWidget):
                 item.stroke_color = QColor(self.stroke_color)
                 item.stroke_width = self.stroke_width
                 item.fill_color = QColor(self.fill_color)
+                # Inherit defaults from toolbar state
+                try:
+                    item.stroke_style = self._active_stroke_style
+                except AttributeError:
+                    pass
+                try:
+                    item.fill_opacity = self._active_fill_opacity
+                except AttributeError:
+                    pass
                 item.rect = QRectF(doc_pt, doc_pt)
                 item.points = [doc_pt, doc_pt]
+                
                 self._active_annotation = item
                 self._get_current_annotations().append(item)
                 self.update()
@@ -786,6 +850,10 @@ class CanvasView(QWidget):
                     item.is_italic = getattr(self, "font_italic", False)
                     item.is_underline = getattr(self, "font_underline", False)
                     item.alignment = getattr(self, "text_alignment", Qt.AlignmentFlag.AlignLeft)
+                    try:
+                        item.is_strikethrough = False
+                    except AttributeError:
+                        pass
                     item.rect = QRectF(doc_pt.x(), doc_pt.y(), 180, 36)
                     self._get_current_annotations().append(item)
                     page = self.current_page
@@ -1170,7 +1238,13 @@ class CanvasView(QWidget):
                 self.crop_box.points.append(self.crop_box.points[0])
             self.crop_available.emit(True)
 
+        self._update_cursor()
         self.update()
+
+    def leaveEvent(self, event):
+        self._hovered_link = None
+        self._update_cursor()
+        super().leaveEvent(event)
 
     def undo(self):
         if self.history.undo():

@@ -2446,6 +2446,38 @@
         "text-box-tool",
         "inspector"
       ]
+    },
+    {
+      "id": "fill-opacity",
+      "name": "Fill opacity",
+      "letter": "F",
+      "meaning": "Controls the transparency percentage of shape and annotation fills.",
+      "where": "Markup Toolbar > Fill Opacity Control or Right Inspector Panel",
+      "steps": [
+        "Select a shape annotation or activate a shape tool.",
+        "Adjust the Fill opacity percentage to make the fill more transparent or opaque."
+      ],
+      "shortcut": "",
+      "related": [
+        "inspector",
+        "textformatting"
+      ]
+    },
+    {
+      "id": "hide-toolbar",
+      "name": "Hide Toolbar",
+      "letter": "H",
+      "meaning": "Toggles visibility of the main top toolbar to maximize document viewing space.",
+      "where": "View > Hide Toolbar or Window Controls > Toggle Toolbar Button",
+      "steps": [
+        "Select View > Hide Toolbar or press Ctrl + Alt + T.",
+        "Select View > Show Toolbar or press Ctrl + Alt + T again to restore it."
+      ],
+      "shortcut": "Ctrl + Alt + T",
+      "related": [
+        "frameless-window-mode",
+        "minimize-window"
+      ]
     }
   ]
 }
