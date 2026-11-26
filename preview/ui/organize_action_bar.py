@@ -360,6 +360,11 @@ class OrganizeActionBar(QWidget):
             page_count:   Number of pages in the document (0 if none).
             current_page: Index of the selected page (0-based).
         """
+        if not isinstance(page_count, int) or isinstance(page_count, bool):
+            page_count = 0
+        if not isinstance(current_page, int) or isinstance(current_page, bool):
+            current_page = 0
+
         has_pages    = has_document and page_count >= 1
         multi_page   = has_document and page_count >= 2
         at_first     = has_pages and current_page <= 0
