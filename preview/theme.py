@@ -310,7 +310,8 @@ class StudioTheme:
 
         /* Studio Titlebar Window Controls (Clean Modern Standalone - No Apple Traffic Lights) */
         #trafficClose, #trafficMinimize, #trafficMaximize,
-        #windowCloseBtn, #windowMinBtn, #windowMaxBtn {{
+        #windowCloseBtn, #windowMinBtn, #windowMaxBtn,
+        #windowToolbarToggleBtn {{
             background-color: {cls.DARK_BG_CARD};
             border: 1px solid {cls.DARK_BORDER};
             border-radius: {cls.RADIUS_SM}px;
@@ -320,6 +321,15 @@ class StudioTheme:
             max-height: 14px;
             padding: 0px;
             margin: 0px;
+        }}
+
+        #windowToolbarToggleBtn:hover {{
+            background-color: {cls.DARK_BG_HOVER};
+            border-color: {cls.DARK_BORDER_SUBTLE};
+        }}
+
+        #windowToolbarToggleBtn:pressed {{
+            background-color: {cls.DARK_BG_ACTIVE};
         }}
 
         #trafficClose:hover, #windowCloseBtn:hover {{
@@ -1347,7 +1357,8 @@ class StudioTheme:
 
         /* Studio Titlebar Window Controls (Light) */
         #trafficClose, #trafficMinimize, #trafficMaximize,
-        #windowCloseBtn, #windowMinBtn, #windowMaxBtn {{
+        #windowCloseBtn, #windowMinBtn, #windowMaxBtn,
+        #windowToolbarToggleBtn {{
             background-color: {cls.LIGHT_BG_SIDEBAR};
             border: 1px solid {cls.LIGHT_BORDER};
             border-radius: {cls.RADIUS_SM}px;
@@ -1357,6 +1368,15 @@ class StudioTheme:
             max-height: 14px;
             padding: 0px;
             margin: 0px;
+        }}
+
+        #windowToolbarToggleBtn:hover {{
+            background-color: {cls.LIGHT_BG_HOVER};
+            border-color: {cls.LIGHT_BORDER_SUBTLE};
+        }}
+
+        #windowToolbarToggleBtn:pressed {{
+            background-color: {cls.LIGHT_BG_ACTIVE};
         }}
 
         #trafficClose:hover, #windowCloseBtn:hover {{

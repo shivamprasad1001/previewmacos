@@ -1,32 +1,72 @@
 """
-macOS style secondary Markup Toolbar providing sketch, highlighter, shapes, 
+macOS-style secondary Markup Toolbar providing sketch, highlighter, shapes,
 text, note, signature, color palettes, context-aware formatting, and crop actions.
+
+Visual language matches macOS Sonoma/Sequoia Preview:
+  * Segmented pill groups with hairline dividers
+  * Context-aware formatting row (shape / text / selection / redaction / default)
+  * Responsive overflow when horizontal space is tight
+  * Full dark/light theme parity via update_theme()
 """
 
-from typing import Optional, List
+from enum import Enum
+from typing import List, Optional, Tuple
+
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QColorDialog, QMenu, 
-    QSpinBox, QComboBox, QFontComboBox, QLabel, QButtonGroup, QFrame, 
-    QStackedWidget, QSizePolicy
+    QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QColorDialog, QMenu,
+    QSpinBox, QComboBox, QFontComboBox, QLabel, QButtonGroup, QFrame,
+    QSizePolicy,
 )
-from PyQt6.QtGui import QColor, QAction, QIcon, QPixmap, QPainter, QBrush, QPen, QPolygonF, QFont
+from PyQt6.QtGui import (
+    QColor, QAction, QActionGroup, QIcon, QPixmap, QPainter, QBrush, QPen,
+    QPolygonF, QFont, QKeySequence,
+)
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QRectF, QPointF
 
 from preview.core.annotations import AnnotationItem, AnnotationType
 from preview.icons import MacIconFactory
+from preview.theme import StudioTheme
+
+
+class ThemeName(str, Enum):
+    DARK = "dark"
+    LIGHT = "light"
+
+
+def _resolve_theme(theme) -> str:
+    if isinstance(theme, ThemeName):
+        return theme.value
+    if isinstance(theme, str):
+        return theme
+    return getattr(theme, "value", "dark")
+
+
+def _safe_icon(name: str, color: str, size: int) -> QIcon:
+    try:
+        return MacIconFactory.create_icon(name, color, size)
+    except Exception:
+        return QIcon()
+
+
+def _safe_dropdown(name: str, color: str, w: int = 36, h: int = 22) -> QIcon:
+    try:
+        return MacIconFactory.create_dropdown_tool_icon(name, color, w, h)
+    except Exception:
+        try:
+            return MacIconFactory.create_icon(name, color, 18)
+        except Exception:
+            return QIcon()
 
 
 class MarkupToolbar(QWidget):
-    """
-    macOS-authentic professional editing and markup toolbar with
-    logically grouped segmented toolsets, responsive overflow support,
-    and a dynamic context-aware formatting bar.
-    """
+    """macOS-authentic markup toolbar with context-aware formatting row."""
 
     tool_changed = pyqtSignal(AnnotationType)
     stroke_color_changed = pyqtSignal(QColor)
     stroke_width_changed = pyqtSignal(float)
+    stroke_style_changed = pyqtSignal(str)   # "solid" | "dash" | "dot" | "dashdot"
     fill_color_changed = pyqtSignal(QColor)
+    fill_opacity_changed = pyqtSignal(int)   # 0-100
     font_size_changed = pyqtSignal(int)
     font_family_changed = pyqtSignal(str)
     font_bold_changed = pyqtSignal(bool)
@@ -46,34 +86,44 @@ class MarkupToolbar(QWidget):
     undo_requested = pyqtSignal()
     redo_requested = pyqtSignal()
 
+    _COMPACT_BREAKPOINT = 940
+    _TIGHT_BREAKPOINT = 1350
+    _ICON = 20
+    _BTN = 32
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setObjectName("markupToolbar")
+        self.setFixedHeight(44)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        self._theme: str = "dark"
+        self._theme_col: str = StudioTheme.DARK_TEXT_PRIMARY
 
         self.current_tool: AnnotationType = AnnotationType.NONE
         self.stroke_color: QColor = QColor("#ff3b30")
-        self.fill_color: QColor = QColor(Qt.GlobalColor.transparent)
         self.stroke_width: float = 3.0
+        self.stroke_style: str = "solid"
+        self.fill_color: QColor = QColor(Qt.GlobalColor.transparent)
         self.font_size: int = 16
-        self._theme_col: str = "#f5f5f7"
         self._current_select_icon: str = "box-select"
         self.selected_annotation: Optional[AnnotationItem] = None
 
         self._setup_ui()
+        self._apply_style()
+        self._refresh_tool_icons()
+        self._refresh_menu_icons()
+        self.update_context_row()
+        self.handle_resize(self.width())
 
-    def minimumSizeHint(self) -> QSize:
-        return QSize(360, 44)
+    # ==================================================================
+    #  SETUP
+    # ==================================================================
+    def _setup_ui(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-    def _setup_ui(self):
-        root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.setSpacing(0)
-
-        self.setFixedHeight(44)
-
-        # -------------------------------------------------------------
-        # Single Unified Tool Bar (44px height)
-        # -------------------------------------------------------------
         self.primary_strip = QWidget()
         self.primary_strip.setObjectName("primaryStrip")
         self.primary_strip.setFixedHeight(44)
@@ -85,98 +135,63 @@ class MarkupToolbar(QWidget):
         self.btn_group.setExclusive(False)
 
         # --- Group 1: Navigation ---
-        self.pointer_btn = QToolButton()
-        self.pointer_btn.setFixedSize(32, 32)
-        self.pointer_btn.setIconSize(QSize(20, 20))
-        self.pointer_btn.setCheckable(True)
+        self.pointer_btn = self._make_nav_button("pointer", "Select / Pointer (Esc)")
         self.pointer_btn.setChecked(True)
-        self.pointer_btn.setToolTip("Select / Pointer (Esc)")
-        self.pointer_btn.setAccessibleName("Select / Pointer (Esc)")
-        self.pointer_btn.setAccessibleDescription("Select tool")
         self.pointer_btn.clicked.connect(self.unselect_all)
         self.btn_group.addButton(self.pointer_btn)
 
-        self.hand_btn = QToolButton()
-        self.hand_btn.setFixedSize(32, 32)
-        self.hand_btn.setIconSize(QSize(20, 20))
-        self.hand_btn.setCheckable(True)
-        self.hand_btn.setToolTip("Hand / Pan Document (Space+Drag)")
-        self.hand_btn.setAccessibleName("Hand / Pan Document")
-        self.hand_btn.setAccessibleDescription("Pan tool")
+        self.hand_btn = self._make_nav_button("hand", "Hand / Pan Document (Space+Drag)")
         self.hand_btn.clicked.connect(self._select_hand_tool)
         self.btn_group.addButton(self.hand_btn)
 
-        self.group_selection = self._create_tool_group([self.pointer_btn, self.hand_btn])
-        self.strip_layout.addWidget(self.group_selection)
-        self.sep_1 = self._create_divider()
-        self.strip_layout.addWidget(self.sep_1)
+        self.strip_layout.addWidget(self._make_group([self.pointer_btn, self.hand_btn]))
+        self.strip_layout.addWidget(self._make_divider())
 
         # --- Group 2: Text Markup & Notes ---
-        self.text_btn = self._create_tool_button("text", "Text Box (T)", AnnotationType.TEXT)
-        self.highlighter_btn = self._create_tool_button("chisel_highlighter", "Highlighter (Shift+H)", AnnotationType.HIGHLIGHTER)
-        self.underline_tool_btn = self._create_tool_button("underline", "Underline Text Markup (U)", AnnotationType.UNDERLINE)
-        self.strikethrough_tool_btn = self._create_tool_button("strikethrough", "Strikethrough Text Markup (S)", AnnotationType.STRIKETHROUGH)
+        self.text_btn = self._make_tool_button("text", "Text Box (T)", AnnotationType.TEXT)
+        self.highlighter_btn = self._make_tool_button("chisel_highlighter", "Highlighter (Shift+H)", AnnotationType.HIGHLIGHTER)
+        self.underline_tool_btn = self._make_tool_button("underline", "Underline Text Markup (U)", AnnotationType.UNDERLINE)
+        self.strikethrough_tool_btn = self._make_tool_button("strikethrough", "Strikethrough (S)", AnnotationType.STRIKETHROUGH)
         self.strikethrough_btn = self.strikethrough_tool_btn
-        self.note_btn = self._create_tool_button("note", "Sticky Note (N)", AnnotationType.NOTE)
-
-        self.group_text = self._create_tool_group([
-            self.text_btn, self.highlighter_btn, self.underline_tool_btn, 
-            self.strikethrough_tool_btn, self.note_btn
-        ])
-        self.strip_layout.addWidget(self.group_text)
-        self.sep_2 = self._create_divider()
-        self.strip_layout.addWidget(self.sep_2)
+        self.note_btn = self._make_tool_button("note", "Sticky Note (N)", AnnotationType.NOTE)
+        self.strip_layout.addWidget(self._make_group([
+            self.text_btn, self.highlighter_btn, self.underline_tool_btn,
+            self.strikethrough_tool_btn, self.note_btn,
+        ]))
+        self.strip_layout.addWidget(self._make_divider())
 
         # --- Group 3: Drawing ---
-        self.pen_btn = self._create_tool_button("fountain_pen", "Sketch / Pen (P)", AnnotationType.PEN)
-        self.group_drawing = self._create_tool_group([self.pen_btn])
-        self.strip_layout.addWidget(self.group_drawing)
-        self.sep_3 = self._create_divider()
-        self.strip_layout.addWidget(self.sep_3)
+        self.pen_btn = self._make_tool_button("fountain_pen", "Sketch / Pen (P)", AnnotationType.PEN)
+        self.strip_layout.addWidget(self._make_group([self.pen_btn]))
+        self.strip_layout.addWidget(self._make_divider())
 
-        # --- Group 4: Shapes & Loupe ---
+        # --- Group 4: Shapes ---
         self.shapes_btn = QToolButton()
         self.shapes_btn.setObjectName("shapesBtn")
         self.shapes_btn.setFixedSize(40, 32)
         self.shapes_btn.setIconSize(QSize(36, 22))
         self.shapes_btn.setCheckable(True)
-        self.shapes_btn.setToolTip("Shapes (Rectangle, Oval, Line, Arrow) (Shift+S)")
-        self.shapes_btn.setAccessibleName("Shapes (Shift+S)")
-        self.shapes_btn.setAccessibleDescription("Shapes dropdown")
+        self.shapes_btn.setToolTip("Shapes (Shift+S)")
+        self.shapes_btn.setAccessibleName("Shapes")
         self.shapes_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_shapes_menu()
         self.btn_group.addButton(self.shapes_btn)
+        self.strip_layout.addWidget(self._make_group([self.shapes_btn]))
+        self.strip_layout.addWidget(self._make_divider())
 
-        self.group_shapes = self._create_tool_group([self.shapes_btn])
-        self.strip_layout.addWidget(self.group_shapes)
-        self.sep_4 = self._create_divider()
-        self.strip_layout.addWidget(self.sep_4)
+        # --- Group 5: Privacy / Signature / Overlay ---
+        self.redact_btn = self._make_tool_button("redact", "Redact / Blackout (Shift+R)", AnnotationType.REDACT)
+        self.sign_btn = self._make_icon_action("rubber_stamp", "Sign Document (K)", self.signature_requested)
+        self.stamp_btn = self.sign_btn
+        self.image_overlay_btn = self._make_icon_action(
+            "image_overlay", "Add Image Overlay (Ctrl+Shift+I)", self.image_overlay_requested,
+        )
+        self.strip_layout.addWidget(self._make_group([
+            self.redact_btn, self.sign_btn, self.image_overlay_btn,
+        ]))
+        self.strip_layout.addWidget(self._make_divider())
 
-        # --- Group 5: Privacy, Signature & Overlay ---
-        self.redact_btn = self._create_tool_button("redact", "Redact / Blackout Info (Shift+R)", AnnotationType.REDACT)
-        self.sign_btn = QToolButton()
-        self.sign_btn.setFixedSize(32, 32)
-        self.sign_btn.setIconSize(QSize(20, 20))
-        self.sign_btn.setToolTip("Sign Document (K)")
-        self.sign_btn.setAccessibleName("Sign Document (K)")
-        self.sign_btn.setAccessibleDescription("Sign / Stamp Document")
-        self.sign_btn.clicked.connect(self.signature_requested.emit)
-        self.stamp_btn = self.sign_btn  # Realistic physical stamp tool reference
-
-        self.image_overlay_btn = QToolButton()
-        self.image_overlay_btn.setFixedSize(32, 32)
-        self.image_overlay_btn.setIconSize(QSize(20, 20))
-        self.image_overlay_btn.setToolTip("Add Image Overlay (Ctrl+Shift+I)")
-        self.image_overlay_btn.setAccessibleName("Add Image Overlay (Ctrl+Shift+I)")
-        self.image_overlay_btn.setAccessibleDescription("Add an image overlay onto the document")
-        self.image_overlay_btn.clicked.connect(self.image_overlay_requested.emit)
-
-        self.group_privacy = self._create_tool_group([self.redact_btn, self.sign_btn, self.image_overlay_btn])
-        self.strip_layout.addWidget(self.group_privacy)
-        self.sep_5 = self._create_divider()
-        self.strip_layout.addWidget(self.sep_5)
-
-        # --- Group 6: Selection, Crop & Image Editing ---
+        # --- Group 6a: Selection tools (ALWAYS visible) ---
         self.select_btn = QToolButton()
         self.select_btn.setObjectName("selectBtn")
         self.select_btn.setFixedSize(40, 32)
@@ -184,109 +199,74 @@ class MarkupToolbar(QWidget):
         self.select_btn.setCheckable(True)
         self.select_btn.setToolTip("Selection Tools (Rectangular, Oval, Lasso)")
         self.select_btn.setAccessibleName("Selection Tools")
-        self.select_btn.setAccessibleDescription("Selection tools dropdown")
         self.select_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_select_menu()
         self.btn_group.addButton(self.select_btn)
+        self.group_select = self._make_group([self.select_btn])
+        self.strip_layout.addWidget(self.group_select)
 
-        self.crop_btn = QToolButton()
-        self.crop_btn.setFixedSize(32, 32)
-        self.crop_btn.setIconSize(QSize(20, 20))
-        self.crop_btn.setToolTip("Crop Selection (Ctrl+K)")
-        self.crop_btn.setAccessibleName("Crop Selection (Ctrl+K)")
+        # --- Group 6b: Image operations (COLLAPSIBLE on compact) ---
+        self.crop_btn = self._make_icon_action("crop_shears", "Crop Selection (Ctrl+K)", self.crop_requested)
         self.crop_btn.setEnabled(False)
-        self.crop_btn.clicked.connect(self.crop_requested.emit)
+        self.rotate_btn = self._make_icon_action("rotate_left", "Rotate Left 90° (Ctrl+L)", self.rotate_requested)
 
-        # Loupe / Magnifier tool reference
-        self.loupe_btn = self._create_tool_button("loupe", "Magnifier (Loupe)", AnnotationType.LOUPE)
-
-
-        self.rotate_btn = QToolButton()
-        self.rotate_btn.setFixedSize(32, 32)
-        self.rotate_btn.setIconSize(QSize(20, 20))
-        self.rotate_btn.setToolTip("Rotate Left 90° (Ctrl+L)")
-        self.rotate_btn.setAccessibleName("Rotate Left 90° (Ctrl+L)")
-        self.rotate_btn.clicked.connect(self.rotate_requested.emit)
-
-        self.rotate_selection_btn = QToolButton()
-        self.rotate_selection_btn.setFixedSize(32, 32)
-        self.rotate_selection_btn.setIconSize(QSize(20, 20))
-        self.rotate_selection_btn.setToolTip("Rotate Right (Ctrl+R)")
-        self.rotate_selection_btn.setAccessibleName("Rotate Right (Ctrl+R)")
-        self.rotate_selection_btn.setEnabled(True)
-        self.rotate_selection_btn.clicked.connect(lambda: (self.rotate_selection_requested.emit(90), self.rotate_right_requested.emit()))
+        # Page-level rotate-right. Selection rotation is a separate action fired
+        # from the "Rotate Selection (90°)" button in the selection context view.
+        self.rotate_selection_btn = self._make_icon_action(
+            "rotate_right", "Rotate Page Right 90° (Ctrl+R)", self.rotate_right_requested,
+        )
         self.rotate_right_btn = self.rotate_selection_btn
 
-        self.color_adjust_btn = QToolButton()
-        self.color_adjust_btn.setFixedSize(32, 32)
-        self.color_adjust_btn.setIconSize(QSize(20, 20))
-        self.color_adjust_btn.setToolTip("Adjust Color (Ctrl+Alt+C)")
-        self.color_adjust_btn.setAccessibleName("Adjust Color (Ctrl+Alt+C)")
-        self.color_adjust_btn.clicked.connect(self.adjust_color_requested.emit)
-
-        self.size_adjust_btn = QToolButton()
-        self.size_adjust_btn.setFixedSize(32, 32)
-        self.size_adjust_btn.setIconSize(QSize(20, 20))
-        self.size_adjust_btn.setToolTip("Adjust Size (Ctrl+Alt+S)")
-        self.size_adjust_btn.setAccessibleName("Adjust Size (Ctrl+Alt+S)")
-        self.size_adjust_btn.clicked.connect(self.adjust_size_requested.emit)
-
-        self.group_image = self._create_tool_group([
-            self.select_btn, self.crop_btn, self.rotate_btn, self.rotate_selection_btn,
-            self.color_adjust_btn, self.size_adjust_btn
+        self.color_adjust_btn = self._make_icon_action("color_adjust", "Adjust Color (Ctrl+Alt+C)", self.adjust_color_requested)
+        self.size_adjust_btn = self._make_icon_action("size_adjust", "Adjust Size (Ctrl+Alt+S)", self.adjust_size_requested)
+        self.group_image = self._make_group([
+            self.crop_btn, self.rotate_btn, self.rotate_selection_btn,
+            self.color_adjust_btn, self.size_adjust_btn,
         ])
         self.strip_layout.addWidget(self.group_image)
+        self.strip_layout.addWidget(self._make_divider())
 
-        # Responsive overflow button (shown when space is tight)
+        # --- Overflow button (visible on compact) ---
         self.overflow_btn = QToolButton()
         self.overflow_btn.setObjectName("overflowBtn")
         self.overflow_btn.setFixedSize(38, 32)
-        self.overflow_btn.setToolTip("More Tools (•••)")
+        self.overflow_btn.setToolTip("More Tools")
         self.overflow_btn.setAccessibleName("More Tools")
         self.overflow_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_overflow_menu()
         self.overflow_btn.setVisible(False)
         self.strip_layout.addWidget(self.overflow_btn)
+        self.strip_layout.addWidget(self._make_divider())
 
-        # --- Group 7: History Actions ---
-        self.undo_btn = QToolButton()
-        self.undo_btn.setFixedSize(32, 32)
-        self.undo_btn.setToolTip("Undo (Ctrl+Z)")
-        self.undo_btn.setAccessibleName("Undo (Ctrl+Z)")
-        self.undo_btn.clicked.connect(self.undo_requested.emit)
+        # --- Group 7: History ---
+        self.undo_btn = self._make_icon_action("arrow_left", "Undo (Ctrl+Z)", self.undo_requested)
+        self.redo_btn = self._make_icon_action("arrow_right", "Redo (Ctrl+Shift+Z)", self.redo_requested)
+        self.strip_layout.addWidget(self._make_group([self.undo_btn, self.redo_btn]))
+        self.strip_layout.addWidget(self._make_divider())
 
-        self.redo_btn = QToolButton()
-        self.redo_btn.setFixedSize(32, 32)
-        self.redo_btn.setToolTip("Redo (Ctrl+Shift+Z)")
-        self.redo_btn.setAccessibleName("Redo (Ctrl+Shift+Z)")
-        self.redo_btn.clicked.connect(self.redo_requested.emit)
+        # --- Context-aware formatting row ---
+        self._build_context_bar()
+        self.strip_layout.addWidget(self.context_bar, 1)
 
-        self.group_history = self._create_tool_group([self.undo_btn, self.redo_btn])
-        self.strip_layout.addWidget(self.group_history)
+        root.addWidget(self.primary_strip)
 
-        self.sep_6 = self._create_divider()
-        self.strip_layout.addWidget(self.sep_6)
-
-        # --- Context-Aware Formatting Bar (Integrated Inline into the 44px Tool Bar) ---
+    def _build_context_bar(self) -> None:
+        """Build the five context sub-views (no QStackedWidget — size hint is minimal)."""
         self.context_bar = QWidget()
         self.context_bar.setObjectName("contextFormattingBar")
-        self.context_bar.setFixedHeight(34)
-        c_layout = QHBoxLayout(self.context_bar)
-        c_layout.setContentsMargins(4, 0, 4, 0)
-        c_layout.setSpacing(8)
+        self.context_bar.setFixedHeight(32)
+        c = QHBoxLayout(self.context_bar)
+        c.setContentsMargins(4, 0, 4, 0)
+        c.setSpacing(0)
 
-        self.context_stack = QStackedWidget()
-        self.context_stack.setFixedHeight(32)
+        self._context_views: List[QWidget] = []
 
-        # Sub-view 0: Shapes & Drawing Formatting (Border, Fill, Line Thickness)
+        # 0 — Shape format
         self.shape_format_widget = QWidget()
-        sf_lay = QHBoxLayout(self.shape_format_widget)
-        sf_lay.setContentsMargins(0, 0, 0, 0)
-        sf_lay.setSpacing(8)
-
-        sf_lbl = QLabel("Shape Format:")
-        sf_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #98989d;")
-        sf_lay.addWidget(sf_lbl)
+        sf = QHBoxLayout(self.shape_format_widget)
+        sf.setContentsMargins(0, 0, 0, 0)
+        sf.setSpacing(8)
+        sf.addWidget(self._section_label("Shape Format:"))
 
         self.color_btn = QToolButton()
         self.color_btn.setFixedSize(36, 24)
@@ -294,7 +274,7 @@ class MarkupToolbar(QWidget):
         self.color_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_stroke_color_menu()
         self._update_color_button_icon(self.color_btn, self.stroke_color)
-        sf_lay.addWidget(self.color_btn)
+        sf.addWidget(self.color_btn)
 
         self.fill_btn = QToolButton()
         self.fill_btn.setFixedSize(36, 24)
@@ -302,33 +282,46 @@ class MarkupToolbar(QWidget):
         self.fill_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_fill_color_menu()
         self._update_color_button_icon(self.fill_btn, self.fill_color, is_fill=True)
-        sf_lay.addWidget(self.fill_btn)
+        sf.addWidget(self.fill_btn)
 
         self.width_btn = QToolButton()
         self.width_btn.setFixedSize(36, 24)
-        self.width_btn.setToolTip("Line Style / Thickness (3 px)")
+        self.width_btn.setToolTip(
+            f"Line Style: Solid · Thickness {int(self.stroke_width)} px"
+        )
         self._setup_width_menu()
-        sf_lay.addWidget(self.width_btn)
+        sf.addWidget(self.width_btn)
 
-        sf_lay.addStretch()
-        self.context_stack.addWidget(self.shape_format_widget)
+        opacity_label = QLabel("Opacity")
+        opacity_label.setObjectName("contextSectionLabel")
+        sf.addWidget(opacity_label)
 
-        # Sub-view 1: Typography Formatting (Font Family, Size, B/I/U/S, Align)
+        self.fill_opacity_spin = QSpinBox()
+        self.fill_opacity_spin.setRange(0, 100)
+        self.fill_opacity_spin.setValue(100)
+        self.fill_opacity_spin.setSuffix("%")
+        self.fill_opacity_spin.setFixedHeight(24)
+        self.fill_opacity_spin.setFixedWidth(60)
+        self.fill_opacity_spin.setToolTip("Fill opacity")
+        self.fill_opacity_spin.valueChanged.connect(self._on_fill_opacity_changed)
+        sf.addWidget(self.fill_opacity_spin)
+
+        sf.addStretch()
+        self._context_views.append(self.shape_format_widget)
+
+        # 1 — Text format
         self.text_format_widget = QWidget()
-        tf_lay = QHBoxLayout(self.text_format_widget)
-        tf_lay.setContentsMargins(0, 0, 0, 0)
-        tf_lay.setSpacing(6)
-
-        tf_lbl = QLabel("Text Format:")
-        tf_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #98989d;")
-        tf_lay.addWidget(tf_lbl)
+        tf = QHBoxLayout(self.text_format_widget)
+        tf.setContentsMargins(0, 0, 0, 0)
+        tf.setSpacing(6)
+        tf.addWidget(self._section_label("Text Format:"))
 
         self.font_combo = QFontComboBox()
         self.font_combo.setFixedHeight(24)
         self.font_combo.setFixedWidth(130)
         self.font_combo.setToolTip("Font Family")
         self.font_combo.currentFontChanged.connect(lambda f: self.font_family_changed.emit(f.family()))
-        tf_lay.addWidget(self.font_combo)
+        tf.addWidget(self.font_combo)
 
         self.font_spin = QSpinBox()
         self.font_spin.setFixedHeight(24)
@@ -337,286 +330,589 @@ class MarkupToolbar(QWidget):
         self.font_spin.setValue(self.font_size)
         self.font_spin.setToolTip("Font Size")
         self.font_spin.valueChanged.connect(self._on_font_size_changed)
-        tf_lay.addWidget(self.font_spin)
+        tf.addWidget(self.font_spin)
 
-        self.bold_btn = QToolButton()
-        self.bold_btn.setFixedSize(24, 24)
-        self.bold_btn.setCheckable(True)
-        self.bold_btn.setText("B")
-        self.bold_btn.setStyleSheet("font-weight: 700; font-size: 12px;")
-        self.bold_btn.setToolTip("Bold (Ctrl+B)")
+        self.bold_btn = self._make_style_toggle("B", "Bold (Ctrl+B)", bold=True)
         self.bold_btn.toggled.connect(self.font_bold_changed.emit)
-        tf_lay.addWidget(self.bold_btn)
+        tf.addWidget(self.bold_btn)
 
-        self.italic_btn = QToolButton()
-        self.italic_btn.setFixedSize(24, 24)
-        self.italic_btn.setCheckable(True)
-        self.italic_btn.setText("I")
-        self.italic_btn.setStyleSheet("font-style: italic; font-size: 12px; font-family: serif;")
-        self.italic_btn.setToolTip("Italic (Ctrl+I)")
+        self.italic_btn = self._make_style_toggle("I", "Italic (Ctrl+I)", italic=True)
         self.italic_btn.toggled.connect(self.font_italic_changed.emit)
-        tf_lay.addWidget(self.italic_btn)
+        tf.addWidget(self.italic_btn)
 
-        self.underline_btn = QToolButton()
-        self.underline_btn.setFixedSize(24, 24)
-        self.underline_btn.setCheckable(True)
-        self.underline_btn.setText("U")
-        self.underline_btn.setStyleSheet("text-decoration: underline; font-size: 12px;")
-        self.underline_btn.setToolTip("Underline (Ctrl+U)")
+        self.underline_btn = self._make_style_toggle("U", "Underline (Ctrl+U)", underline=True)
         self.underline_btn.toggled.connect(self.font_underline_changed.emit)
-        tf_lay.addWidget(self.underline_btn)
+        tf.addWidget(self.underline_btn)
 
-        self.strike_btn = QToolButton()
-        self.strike_btn.setFixedSize(24, 24)
-        self.strike_btn.setCheckable(True)
-        self.strike_btn.setText("S")
-        self.strike_btn.setStyleSheet("text-decoration: line-through; font-size: 12px;")
-        self.strike_btn.setToolTip("Strikethrough")
+        self.strike_btn = self._make_style_toggle("S", "Strikethrough", strike=True)
         self.strike_btn.toggled.connect(self.font_strikethrough_changed.emit)
-        tf_lay.addWidget(self.strike_btn)
+        tf.addWidget(self.strike_btn)
 
         self.text_options_btn = QToolButton()
         self.text_options_btn.setFixedSize(32, 24)
         self.text_options_btn.setToolTip("Text Alignment & Presets")
         self.text_options_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self._setup_text_options_menu()
-        tf_lay.addWidget(self.text_options_btn)
+        tf.addWidget(self.text_options_btn)
 
-        tf_lay.addStretch()
-        self.context_stack.addWidget(self.text_format_widget)
+        tf.addStretch()
+        self._context_views.append(self.text_format_widget)
 
-        # Sub-view 2: Selection Active Context
+        # 2 — Selection active
         self.selection_format_widget = QWidget()
-        sel_lay = QHBoxLayout(self.selection_format_widget)
-        sel_lay.setContentsMargins(0, 0, 0, 0)
-        sel_lay.setSpacing(10)
-
-        sel_lbl = QLabel("Selection Active:")
-        sel_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #0a84ff;")
-        sel_lay.addWidget(sel_lbl)
+        sel = QHBoxLayout(self.selection_format_widget)
+        sel.setContentsMargins(0, 0, 0, 0)
+        sel.setSpacing(10)
+        sel.addWidget(self._section_label("Selection Active:", accent=True))
 
         crop_action_btn = QToolButton()
+        crop_action_btn.setObjectName("primaryActionBtn")
         crop_action_btn.setText("Apply Crop (Ctrl+K)")
-        crop_action_btn.setIcon(MacIconFactory.create_icon("crop", "#ffffff", 14))
         crop_action_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         crop_action_btn.setFixedHeight(24)
         crop_action_btn.setMinimumWidth(135)
-        crop_action_btn.setStyleSheet("background-color: #0a84ff; color: #ffffff; font-weight: 600; padding: 2px 10px; border-radius: 4px;")
+        crop_action_btn.setProperty("icon_name", "crop")
         crop_action_btn.clicked.connect(self.crop_requested.emit)
-        sel_lay.addWidget(crop_action_btn)
+        sel.addWidget(crop_action_btn)
+        self._sel_crop_action_btn = crop_action_btn
 
         rot_sel_btn = QToolButton()
         rot_sel_btn.setText("Rotate Selection (90°)")
-        rot_sel_btn.setIcon(MacIconFactory.create_icon("rotate_right", self._theme_col, 14))
+        rot_sel_btn.setObjectName("secondaryActionBtn")
         rot_sel_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         rot_sel_btn.setFixedHeight(24)
         rot_sel_btn.setMinimumWidth(150)
-        rot_sel_btn.setStyleSheet("padding: 2px 10px; border-radius: 4px;")
+        rot_sel_btn.setProperty("icon_name", "rotate_right")
         rot_sel_btn.clicked.connect(lambda: self.rotate_selection_requested.emit(90))
-        sel_lay.addWidget(rot_sel_btn)
+        sel.addWidget(rot_sel_btn)
+        self._sel_rot_action_btn = rot_sel_btn
 
-        sel_lay.addStretch()
-        self.context_stack.addWidget(self.selection_format_widget)
+        sel.addStretch()
+        self._context_views.append(self.selection_format_widget)
 
-        # Sub-view 3: Redaction Pending Context
+        # 3 — Pending redaction
         self.redact_format_widget = QWidget()
-        rf_lay = QHBoxLayout(self.redact_format_widget)
-        rf_lay.setContentsMargins(0, 0, 0, 0)
-        rf_lay.setSpacing(10)
-
-        rf_badge = QLabel("Pending Redaction:")
-        rf_badge.setStyleSheet("font-size: 11px; font-weight: 700; color: #ff453a;")
-        rf_lay.addWidget(rf_badge)
-
-        rf_desc = QLabel("Mark sensitive areas with black boxes, then apply permanently.")
-        rf_desc.setStyleSheet("font-size: 11px; color: #98989d;")
-        rf_lay.addWidget(rf_desc)
+        rf = QHBoxLayout(self.redact_format_widget)
+        rf.setContentsMargins(0, 0, 0, 0)
+        rf.setSpacing(10)
+        rf.addWidget(self._section_label("Pending Redaction:", danger=True))
+        rf.addWidget(self._section_label(
+            "Mark sensitive areas with black boxes, then apply permanently.", muted=True,
+        ))
 
         apply_redact_now = QToolButton()
+        apply_redact_now.setObjectName("destructiveActionBtn")
         apply_redact_now.setText("Apply Redactions Permanently")
         apply_redact_now.setFixedHeight(24)
         apply_redact_now.setMinimumWidth(190)
-        apply_redact_now.setStyleSheet("background-color: #ff3b30; color: #ffffff; font-weight: 600; padding: 2px 10px; border-radius: 4px;")
         apply_redact_now.clicked.connect(self.apply_redactions_requested.emit)
-        rf_lay.addWidget(apply_redact_now)
+        rf.addWidget(apply_redact_now)
 
-        rf_lay.addStretch()
-        self.context_stack.addWidget(self.redact_format_widget)
+        rf.addStretch()
+        self._context_views.append(self.redact_format_widget)
 
-        # Sub-view 4: Default / General Quick Actions (Roomy, Never Truncated)
+        # 4 — Default actions
         self.default_format_widget = QWidget()
-        def_lay = QHBoxLayout(self.default_format_widget)
-        def_lay.setContentsMargins(0, 0, 0, 0)
-        def_lay.setSpacing(10)
+        df = QHBoxLayout(self.default_format_widget)
+        df.setContentsMargins(0, 0, 0, 0)
+        df.setSpacing(8)
 
-        self.def_lbl = QLabel("Contextual Actions:")
-        self.def_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #98989d;")
+        self.def_lbl = self._section_label("Contextual Actions:")
         self.def_lbl.setVisible(False)
-        def_lay.addWidget(self.def_lbl)
+        df.addWidget(self.def_lbl)
 
-        self.btn_adj_col = QToolButton()
-        self.btn_adj_col.setText("Adjust Color...")
-        self.btn_adj_col.setAccessibleName("Adjust Color")
-        self.btn_adj_col.setIcon(MacIconFactory.create_icon("color_adjust", self._theme_col, 16))
-        self.btn_adj_col.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self.btn_adj_col.setFixedSize(28, 28)
-        self.btn_adj_col.setToolTip("Adjust Color (Ctrl+Alt+C)")
-        self.btn_adj_col.clicked.connect(self.adjust_color_requested.emit)
-        def_lay.addWidget(self.btn_adj_col)
+        self.btn_adj_col = self._make_small_action(
+            "color_adjust", "Adjust Color...", "Adjust Color (Ctrl+Alt+C)",
+            self.adjust_color_requested,
+        )
+        self.btn_adj_sz = self._make_small_action(
+            "size_adjust", "Adjust Size...", "Adjust Size (Ctrl+Alt+S)",
+            self.adjust_size_requested,
+        )
+        self.btn_rot = self._make_small_action(
+            "rotate_left", "Rotate Left 90°", "Rotate Left 90° (Ctrl+L)",
+            self.rotate_requested,
+        )
+        for b in (self.btn_adj_col, self.btn_adj_sz, self.btn_rot):
+            df.addWidget(b)
 
-        self.btn_adj_sz = QToolButton()
-        self.btn_adj_sz.setText("Adjust Size...")
-        self.btn_adj_sz.setAccessibleName("Adjust Size")
-        self.btn_adj_sz.setIcon(MacIconFactory.create_icon("size_adjust", self._theme_col, 16))
-        self.btn_adj_sz.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self.btn_adj_sz.setFixedSize(28, 28)
-        self.btn_adj_sz.setToolTip("Adjust Size (Ctrl+Alt+S)")
-        self.btn_adj_sz.clicked.connect(self.adjust_size_requested.emit)
-        def_lay.addWidget(self.btn_adj_sz)
+        df.addStretch()
+        self._context_views.append(self.default_format_widget)
 
-        self.btn_rot = QToolButton()
-        self.btn_rot.setText("Rotate Left 90°")
-        self.btn_rot.setAccessibleName("Rotate Left")
-        self.btn_rot.setIcon(MacIconFactory.create_icon("rotate_left", self._theme_col, 16))
-        self.btn_rot.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self.btn_rot.setFixedSize(28, 28)
-        self.btn_rot.setToolTip("Rotate Left 90° (Ctrl+L)")
-        self.btn_rot.clicked.connect(self.rotate_requested.emit)
-        def_lay.addWidget(self.btn_rot)
+        for w in self._context_views:
+            c.addWidget(w)
+            w.setVisible(False)
+        self._context_views[4].setVisible(True)  # default view
 
-        def_lay.addStretch()
-        self.context_stack.addWidget(self.default_format_widget)
+    # ----------------------------------------------------------------
+    #  Widget factory helpers
+    # ----------------------------------------------------------------
+    def _make_nav_button(self, icon_name: str, tooltip: str) -> QToolButton:
+        b = QToolButton()
+        b.setFixedSize(self._BTN, self._BTN)
+        b.setIconSize(QSize(self._ICON, self._ICON))
+        b.setCheckable(True)
+        b.setToolTip(tooltip)
+        b.setAccessibleName(tooltip)
+        b.setProperty("icon_name", icon_name)
+        return b
 
-        c_layout.addWidget(self.context_stack)
-        self.strip_layout.addWidget(self.context_bar)
-        self.strip_layout.addStretch(1)
+    def _make_tool_button(self, icon_name: str, tooltip: str, tool_type: AnnotationType) -> QToolButton:
+        b = self._make_nav_button(icon_name, tooltip)
+        b.clicked.connect(lambda: self._on_tool_clicked(b, tool_type))
+        self.btn_group.addButton(b)
+        return b
 
-        root_layout.addWidget(self.primary_strip)
+    def _make_icon_action(self, icon_name: str, tooltip: str, signal) -> QToolButton:
+        b = QToolButton()
+        b.setFixedSize(self._BTN, self._BTN)
+        b.setIconSize(QSize(self._ICON, self._ICON))
+        b.setToolTip(tooltip)
+        b.setAccessibleName(tooltip)
+        b.setProperty("icon_name", icon_name)
+        b.clicked.connect(signal.emit)
+        return b
 
-        self._refresh_tool_icons()
-        self.update_context_row()
-        self.handle_resize(self.width())
+    def _make_small_action(self, icon_name: str, text: str, tooltip: str, signal) -> QToolButton:
+        b = QToolButton()
+        b.setObjectName("iconActionBtn")
+        b.setText(text)
+        b.setIconSize(QSize(16, 16))
+        b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        b.setFixedSize(28, 28)
+        b.setToolTip(tooltip)
+        b.setAccessibleName(text)
+        b.setProperty("icon_name", icon_name)
+        b.clicked.connect(signal.emit)
+        return b
 
-    def _create_tool_group(self, buttons: List[QToolButton]) -> QFrame:
-        """Encapsulates buttons into a unified macOS pill segmented group."""
-        group_frame = QFrame()
-        group_frame.setObjectName("markupGroup")
-        group_frame.setFixedHeight(34)
-        group_frame.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        glay = QHBoxLayout(group_frame)
-        glay.setContentsMargins(1, 1, 1, 1)
-        glay.setSpacing(2)
+    def _make_style_toggle(self, text: str, tooltip: str, *, bold=False, italic=False,
+                           underline=False, strike=False) -> QToolButton:
+        b = QToolButton()
+        b.setFixedSize(24, 24)
+        b.setCheckable(True)
+        b.setText(text)
+        b.setToolTip(tooltip)
+        styles = ["font-size: 12px;"]
+        if bold:      styles.append("font-weight: 700;")
+        if italic:    styles.append("font-style: italic; font-family: serif;")
+        if underline: styles.append("text-decoration: underline;")
+        if strike:    styles.append("text-decoration: line-through;")
+        b.setStyleSheet(" ".join(styles))
+        return b
+
+    def _section_label(self, text: str, *, accent=False, danger=False, muted=False) -> QLabel:
+        lbl = QLabel(text)
+        if accent:   lbl.setObjectName("contextAccentLabel")
+        elif danger: lbl.setObjectName("contextDangerLabel")
+        elif muted:  lbl.setObjectName("contextMutedLabel")
+        else:        lbl.setObjectName("contextSectionLabel")
+        return lbl
+
+    def _make_group(self, buttons: List[QToolButton]) -> QFrame:
+        g = QFrame()
+        g.setObjectName("markupGroup")
+        g.setFixedHeight(34)
+        g.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        gl = QHBoxLayout(g)
+        gl.setContentsMargins(1, 1, 1, 1)
+        gl.setSpacing(2)
         for b in buttons:
-            glay.addWidget(b)
-        return group_frame
+            gl.addWidget(b)
+        return g
 
-    def _create_divider(self) -> QWidget:
-        """Subtle 1px vertical separator line placed only between logical groups."""
+    def _make_divider(self) -> QWidget:
         sep = QFrame()
         sep.setObjectName("markupGroupSeparator")
         sep.setFixedSize(1, 20)
         sep.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         return sep
 
-    def _create_tool_button(self, icon_name: str, tooltip: str, tool_type: AnnotationType) -> QToolButton:
-        btn = QToolButton()
-        btn.setFixedSize(32, 32)
-        btn.setIconSize(QSize(20, 20))
-        btn.setCheckable(True)
-        btn.setToolTip(tooltip)
-        btn.setAccessibleName(tooltip)
-        btn.setAccessibleDescription(tooltip)
-        btn.clicked.connect(lambda: self._on_tool_clicked(btn, tool_type))
-        self.btn_group.addButton(btn)
-        return btn
+    # ==================================================================
+    #  THEME
+    # ==================================================================
+    def _icon_color(self) -> str:
+        return (StudioTheme.DARK_TEXT_PRIMARY
+                if self._theme == "dark"
+                else StudioTheme.LIGHT_TEXT_PRIMARY)
 
-    def _setup_overflow_menu(self):
-        """Constructs overflow menu for secondary actions when window space is constrained."""
+    def update_theme(self, theme_name) -> None:
+        new_theme = _resolve_theme(theme_name)
+        if new_theme == self._theme:
+            return
+        self._theme = new_theme
+        self._theme_col = self._icon_color()
+        self._apply_style()
+        self._refresh_tool_icons()
+        self._refresh_menu_icons()
+        self._update_color_button_icon(self.color_btn, self.stroke_color)
+        self._update_color_button_icon(self.fill_btn, self.fill_color, is_fill=True)
+
+    def update_icons(self, color_hex: str) -> None:
+        """Backward-compatible: accept explicit color and refresh all icons."""
+        self._theme_col = color_hex
+        self._refresh_tool_icons()
+        self._refresh_menu_icons()
+
+    def _apply_style(self) -> None:
+        is_dark = self._theme == "dark"
+        s = StudioTheme
+
+        bg             = s.DARK_BG_WINDOW   if is_dark else s.LIGHT_BG_WINDOW
+        border         = s.DARK_BORDER_SUBTLE if is_dark else s.LIGHT_BORDER_SUBTLE
+        group_bg       = s.DARK_BG_CARD     if is_dark else s.LIGHT_BG_CARD
+        group_bdr      = s.DARK_BORDER      if is_dark else s.LIGHT_BORDER
+        btn_hover      = s.DARK_BG_HOVER    if is_dark else s.LIGHT_BG_HOVER
+        btn_press      = s.DARK_BG_ACTIVE   if is_dark else s.LIGHT_BG_ACTIVE
+        text_primary   = s.DARK_TEXT_PRIMARY   if is_dark else s.LIGHT_TEXT_PRIMARY
+        text_secondary = s.DARK_TEXT_SECONDARY if is_dark else s.LIGHT_TEXT_SECONDARY
+        accent         = s.DARK_ACCENT      if is_dark else s.LIGHT_ACCENT
+        danger         = s.DARK_DANGER      if is_dark else s.LIGHT_DANGER
+
+        self.setStyleSheet(f"""
+            #markupToolbar {{ background-color: {bg}; }}
+            #primaryStrip  {{ background-color: {bg}; }}
+            #markupGroup {{
+                background-color: {group_bg};
+                border: 1px solid {group_bdr};
+                border-radius: 7px;
+            }}
+            #markupGroupSeparator {{ background-color: {border}; border: none; }}
+            #primaryStrip QToolButton {{
+                background: transparent;
+                border: none;
+                border-radius: 5px;
+                color: {text_primary};
+            }}
+            #primaryStrip QToolButton:hover {{ background-color: {btn_hover}; }}
+            #primaryStrip QToolButton:pressed {{ background-color: {btn_press}; }}
+            #primaryStrip QToolButton:checked {{
+                background-color: {accent};
+                color: #ffffff;
+            }}
+            #primaryStrip QToolButton:disabled {{ color: {text_secondary}; }}
+            #contextSectionLabel {{
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                font-weight: 600;
+                color: {text_secondary};
+            }}
+            #contextAccentLabel {{
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                font-weight: 700;
+                color: {accent};
+            }}
+            #contextDangerLabel {{
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                font-weight: 700;
+                color: {danger};
+            }}
+            #contextMutedLabel {{
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                color: {text_secondary};
+            }}
+            #primaryActionBtn {{
+                background-color: {accent};
+                color: #ffffff;
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                font-weight: 600;
+                padding: 2px 10px;
+                border: none;
+                border-radius: 4px;
+            }}
+            #primaryActionBtn:hover {{
+                background-color: {accent};
+            }}
+            #secondaryActionBtn {{
+                background: transparent;
+                color: {text_primary};
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                padding: 2px 10px;
+                border: 1px solid {group_bdr};
+                border-radius: 4px;
+            }}
+            #secondaryActionBtn:hover {{ background-color: {btn_hover}; }}
+            #destructiveActionBtn {{
+                background-color: {danger};
+                color: #ffffff;
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                font-weight: 600;
+                padding: 2px 10px;
+                border: none;
+                border-radius: 4px;
+            }}
+            #contextFormattingBar {{
+                background: transparent;
+                border-left: 1px solid {border};
+                padding-left: 8px;
+            }}
+            #contextFormattingBar QComboBox,
+            #contextFormattingBar QFontComboBox,
+            #contextFormattingBar QSpinBox {{
+                background-color: {group_bg};
+                color: {text_primary};
+                border: 1px solid {group_bdr};
+                border-radius: 4px;
+                font-family: {s.FONT_FAMILY};
+                font-size: 11px;
+                padding: 1px 4px;
+            }}
+            #contextFormattingBar QToolButton {{
+                background: transparent;
+                border: none;
+                border-radius: 4px;
+                color: {text_primary};
+            }}
+            #contextFormattingBar QToolButton:hover {{ background-color: {btn_hover}; }}
+            #contextFormattingBar QToolButton:checked {{
+                background-color: {accent};
+                color: #ffffff;
+            }}
+            #iconActionBtn {{
+                background: transparent;
+                border: none;
+                border-radius: 4px;
+            }}
+            #iconActionBtn:hover {{ background-color: {btn_hover}; }}
+        """)
+
+    # ==================================================================
+    #  ICONS
+    # ==================================================================
+    def _refresh_tool_icons(self) -> None:
+        c = self._theme_col
+        def ic(name, size=18):
+            return _safe_icon(name, c, size)
+
+        self.pointer_btn.setIcon(ic("pointer"))
+        self.hand_btn.setIcon(ic("hand"))
+        self.select_btn.setIcon(_safe_dropdown(self._current_select_icon, c))
+        self.shapes_btn.setIcon(_safe_dropdown("shapes", c))
+        self.pen_btn.setIcon(ic("fountain_pen"))
+        self.highlighter_btn.setIcon(ic("chisel_highlighter"))
+        self.underline_tool_btn.setIcon(ic("underline"))
+        self.strikethrough_tool_btn.setIcon(ic("strikethrough"))
+        self.text_btn.setIcon(ic("text"))
+        self.note_btn.setIcon(ic("note"))
+        self.redact_btn.setIcon(ic("redact"))
+        self.sign_btn.setIcon(ic("rubber_stamp"))
+        self.image_overlay_btn.setIcon(ic("image_overlay"))
+        self.crop_btn.setIcon(ic("crop_shears"))
+        self.rotate_btn.setIcon(ic("rotate_left"))
+        self.rotate_selection_btn.setIcon(ic("rotate_right"))
+        self.color_adjust_btn.setIcon(ic("color_adjust"))
+        self.size_adjust_btn.setIcon(ic("size_adjust"))
+        self.overflow_btn.setIcon(ic("more"))
+        self.undo_btn.setIcon(ic("arrow_left"))
+        self.redo_btn.setIcon(ic("arrow_right"))
+        self.text_options_btn.setIcon(_safe_dropdown("text", c, 32, 24))
+        self.width_btn.setIcon(_safe_dropdown("line_style", c, 32, 24))
+
+        self.btn_adj_col.setIcon(ic("color_adjust", 16))
+        self.btn_adj_sz.setIcon(ic("size_adjust", 16))
+        self.btn_rot.setIcon(ic("rotate_left", 16))
+
+    def _refresh_menu_icons(self) -> None:
+        """Refresh QAction icons in all menus to match the current theme."""
+        c = self._theme_col
+        for btn in (self.overflow_btn, self.select_btn, self.shapes_btn,
+                    self.width_btn, self.text_options_btn):
+            menu = btn.menu()
+            if not menu:
+                continue
+            for action in menu.actions():
+                name = action.data()
+                if isinstance(name, str) and name:
+                    action.setIcon(_safe_icon(name, c, 16))
+
+    # ==================================================================
+    #  MENUS
+    # ==================================================================
+    def _setup_overflow_menu(self) -> None:
         menu = QMenu(self)
+        c = self._theme_col
 
-        crop_act = QAction("Crop Selection", self)
-        crop_act.setShortcut("Ctrl+K")
-        crop_act.setIcon(MacIconFactory.create_icon("crop", self._theme_col, 16))
-        crop_act.triggered.connect(self.crop_requested.emit)
-        menu.addAction(crop_act)
-        self._overflow_crop_act = crop_act
+        def add(menu_, text, icon_name, shortcut, signal_or_callable):
+            act = QAction(_safe_icon(icon_name, c, 16), text, self)
+            act.setData(icon_name)
+            if shortcut:
+                act.setShortcut(shortcut)
+            if callable(signal_or_callable) and not hasattr(signal_or_callable, "emit"):
+                act.triggered.connect(signal_or_callable)
+            else:
+                act.triggered.connect(signal_or_callable.emit)
+            menu_.addAction(act)
+            return act
 
-        rot_act = QAction("Rotate Left 90°", self)
-        rot_act.setShortcut("Ctrl+L")
-        rot_act.setIcon(MacIconFactory.create_icon("rotate_left", self._theme_col, 16))
-        rot_act.triggered.connect(self.rotate_requested.emit)
-        menu.addAction(rot_act)
-
-        rot_sel_act = QAction("Rotate Selection 90°", self)
-        rot_sel_act.setShortcut("Ctrl+R")
-        rot_sel_act.setIcon(MacIconFactory.create_icon("rotate_right", self._theme_col, 16))
-        rot_sel_act.triggered.connect(lambda: self.rotate_selection_requested.emit(90))
-        menu.addAction(rot_sel_act)
-        self._overflow_rot_sel_act = rot_sel_act
-
+        self._overflow_crop_act = add(menu, "Crop Selection", "crop", "Ctrl+K", self.crop_requested)
+        add(menu, "Rotate Left 90°", "rotate_left", "Ctrl+L", self.rotate_requested)
+        self._overflow_rot_sel_act = add(
+            menu, "Rotate Selection 90°", "rotate_right", "Ctrl+R",
+            lambda: self.rotate_selection_requested.emit(90),
+        )
+        menu.addSeparator()
+        add(menu, "Adjust Color...", "color_adjust", "Ctrl+Alt+C", self.adjust_color_requested)
+        add(menu, "Adjust Size...", "size_adjust", "Ctrl+Alt+S", self.adjust_size_requested)
         menu.addSeparator()
 
-        col_act = QAction("Adjust Color...", self)
-        col_act.setShortcut("Ctrl+Alt+C")
-        col_act.setIcon(MacIconFactory.create_icon("color_adjust", self._theme_col, 16))
-        col_act.triggered.connect(self.adjust_color_requested.emit)
-        menu.addAction(col_act)
+        sel_menu = menu.addMenu("Selection Tools")
+        sel_menu.setIcon(_safe_icon("box-select", c, 16))
+        for name, atype, icon_name in [
+            ("Rectangular Selection", AnnotationType.CROP_BOX,   "box-select"),
+            ("Oval Selection",        AnnotationType.CROP_OVAL,  "select_oval"),
+            ("Lasso Selection",       AnnotationType.CROP_LASSO, "lasso"),
+        ]:
+            act = QAction(_safe_icon(icon_name, c, 16), name, self)
+            act.setData(icon_name)
+            act.triggered.connect(lambda _, t=atype, i=icon_name: self._select_crop_tool(t, i))
+            sel_menu.addAction(act)
 
-        sz_act = QAction("Adjust Size...", self)
-        sz_act.setShortcut("Ctrl+Alt+S")
-        sz_act.setIcon(MacIconFactory.create_icon("size_adjust", self._theme_col, 16))
-        sz_act.triggered.connect(self.adjust_size_requested.emit)
-        menu.addAction(sz_act)
+        loupe_act = menu.addAction(_safe_icon("loupe", c, 16), "Magnifier (Loupe)")
+        loupe_act.setData("loupe")
+        loupe_act.triggered.connect(lambda: self._select_shape_tool(AnnotationType.LOUPE))
 
         menu.addSeparator()
-
-        overlay_act = QAction("Add Image Overlay...", self)
-        overlay_act.setShortcut("Ctrl+Shift+I")
-        overlay_act.setIcon(MacIconFactory.create_icon("image_overlay", self._theme_col, 16))
-        overlay_act.triggered.connect(self.image_overlay_requested.emit)
-        menu.addAction(overlay_act)
+        add(menu, "Add Image Overlay...", "image_overlay", "Ctrl+Shift+I", self.image_overlay_requested)
 
         self.overflow_btn.setMenu(menu)
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.handle_resize(self.width())
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.handle_resize(event.size().width())
-
-    def handle_resize(self, width: int):
-        """Adapts toolbar layout dynamically when window width changes."""
-        if width < 940:
-            self.group_image.setVisible(False)
-            self.overflow_btn.setVisible(True)
-        else:
-            self.group_image.setVisible(True)
-            self.overflow_btn.setVisible(False)
-
-        # Contextual actions: switch to icon-only with tooltips when space is tight (< 1350px)
-        # to ensure labels are NEVER truncated. Show full labels when space is ample.
-        is_tight = (width < 1350)
-        if hasattr(self, "def_lbl"):
-            self.def_lbl.setVisible(not is_tight)
-        for btn, full_text in [
-            (getattr(self, "btn_adj_col", None), "Adjust Color..."),
-            (getattr(self, "btn_adj_sz", None), "Adjust Size..."),
-            (getattr(self, "btn_rot", None), "Rotate Left 90°"),
+    def _setup_select_menu(self) -> None:
+        menu = QMenu(self)
+        c = self._theme_col
+        for name, atype, icon_name in [
+            ("Rectangular Selection", AnnotationType.CROP_BOX,   "box-select"),
+            ("Oval Selection",        AnnotationType.CROP_OVAL,  "select_oval"),
+            ("Lasso Selection",       AnnotationType.CROP_LASSO, "lasso"),
         ]:
-            if btn:
-                if is_tight:
-                    btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-                    btn.setFixedSize(28, 28)
-                else:
-                    btn.setText(full_text)
-                    btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-                    btn.setFixedHeight(28)
-                    btn.setMinimumWidth(115)
-                    btn.setMaximumWidth(160)
+            act = QAction(_safe_icon(icon_name, c, 16), name, self)
+            act.setData(icon_name)
+            act.triggered.connect(lambda _, t=atype, i=icon_name: self._select_crop_tool(t, i))
+            menu.addAction(act)
+        self.select_btn.setMenu(menu)
 
-    def _select_hand_tool(self):
+    def _setup_shapes_menu(self) -> None:
+        menu = QMenu(self)
+        c = self._theme_col
+        for name, stype, icon_name in [
+            ("Rectangle",         AnnotationType.RECTANGLE,    "square"),
+            ("Rounded Rectangle", AnnotationType.ROUNDED_RECT, "shapes"),
+            ("Oval",              AnnotationType.ELLIPSE,      "circle"),
+            ("Line",              AnnotationType.LINE,         "minus"),
+            ("Arrow",             AnnotationType.ARROW,        "arrow_right"),
+            ("Callout Bubble",    AnnotationType.CALLOUT,      "callout"),
+            ("Magnifier (Loupe)", AnnotationType.LOUPE,        "loupe"),
+        ]:
+            act = QAction(_safe_icon(icon_name, c, 16), name, self)
+            act.setData(icon_name)
+            act.triggered.connect(lambda _, t=stype: self._select_shape_tool(t))
+            menu.addAction(act)
+        self.shapes_btn.setMenu(menu)
+
+    def _setup_width_menu(self) -> None:
+        """Menu with line style presets (solid/dash/dot/dashdot) and pixel widths."""
+        menu = QMenu(self)
+
+        style_group = QActionGroup(self)
+        style_group.setExclusive(True)
+        for label, key, preview in [
+            ("Solid",    "solid",   "───────"),
+            ("Dashed",   "dash",    "── ── ──"),
+            ("Dotted",   "dot",     "· · · · ·"),
+            ("Dash-Dot", "dashdot", "── · ── ·"),
+        ]:
+            act = QAction(f"{label}  {preview}", self)
+            act.setCheckable(True)
+            act.setChecked(key == self.stroke_style)
+            act.setData(key)
+            act.triggered.connect(lambda _, k=key: self._set_stroke_style(k))
+            style_group.addAction(act)
+            menu.addAction(act)
+
+        menu.addSeparator()
+
+        width_group = QActionGroup(self)
+        width_group.setExclusive(True)
+        for w in [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]:
+            act = QAction(f"{int(w)} px", self)
+            act.setCheckable(True)
+            act.setChecked(abs(w - self.stroke_width) < 0.01)
+            act.setData(w)
+            act.triggered.connect(lambda _, val=w: self._set_width(val))
+            width_group.addAction(act)
+            menu.addAction(act)
+
+        self.width_btn.setMenu(menu)
+        self._width_menu = menu
+
+    def _setup_text_options_menu(self) -> None:
+        menu = QMenu(self)
+        for label, align in [
+            ("Align Left",   Qt.AlignmentFlag.AlignLeft),
+            ("Align Center", Qt.AlignmentFlag.AlignHCenter),
+            ("Align Right",  Qt.AlignmentFlag.AlignRight),
+        ]:
+            act = QAction(label, self)
+            act.triggered.connect(lambda _, a=align: self.text_align_changed.emit(a))
+            menu.addAction(act)
+        menu.addSeparator()
+        for sz in [10, 12, 14, 16, 20, 24, 32, 48, 64]:
+            act = QAction(f"{sz} pt", self)
+            act.triggered.connect(lambda _, s=sz: self.font_spin.setValue(s))
+            menu.addAction(act)
+        self.text_options_btn.setMenu(menu)
+
+    def _setup_stroke_color_menu(self) -> None:
+        menu = QMenu(self)
+        presets = [
+            ("Red", "#ff3b30"), ("Orange", "#ff9500"), ("Yellow", "#ffcc00"),
+            ("Green", "#34c759"), ("Cyan", "#30b0c7"), ("Blue", "#007aff"),
+            ("Purple", "#af52de"), ("Pink", "#ff2d55"), ("Black", "#000000"),
+            ("Gray", "#8e8e93"), ("White", "#ffffff"),
+        ]
+        for name, hex_val in presets:
+            col = QColor(hex_val)
+            act = QAction(self._create_swatch_icon(col), name, self)
+            act.triggered.connect(lambda _, c=col: self._set_stroke_color(c))
+            menu.addAction(act)
+        menu.addSeparator()
+        act = QAction("Show Colors...", self)
+        act.triggered.connect(self._choose_custom_stroke_color)
+        menu.addAction(act)
+        self.color_btn.setMenu(menu)
+
+    def _setup_fill_color_menu(self) -> None:
+        menu = QMenu(self)
+        act = QAction(self._create_transparent_swatch_icon(), "No Fill (Transparent)", self)
+        act.triggered.connect(lambda: self._set_fill_color(QColor(Qt.GlobalColor.transparent)))
+        menu.addAction(act)
+        menu.addSeparator()
+        presets = [
+            ("Red", "#ff3b30"), ("Orange", "#ff9500"), ("Yellow", "#ffcc00"),
+            ("Green", "#34c759"), ("Cyan", "#30b0c7"), ("Blue", "#007aff"),
+            ("Purple", "#af52de"), ("Pink", "#ff2d55"), ("Black", "#000000"),
+            ("Gray", "#8e8e93"), ("White", "#ffffff"),
+        ]
+        for name, hex_val in presets:
+            col = QColor(hex_val)
+            act = QAction(self._create_swatch_icon(col), name, self)
+            act.triggered.connect(lambda _, c=col: self._set_fill_color(c))
+            menu.addAction(act)
+        menu.addSeparator()
+        act = QAction("Show Colors...", self)
+        act.triggered.connect(self._choose_custom_fill_color)
+        menu.addAction(act)
+        self.fill_btn.setMenu(menu)
+
+    # ==================================================================
+    #  TOOL LOGIC
+    # ==================================================================
+    def _select_hand_tool(self) -> None:
         for b in self.btn_group.buttons():
             b.setChecked(False)
         self.hand_btn.setChecked(True)
@@ -624,11 +920,10 @@ class MarkupToolbar(QWidget):
         self.tool_changed.emit(self.current_tool)
         self.update_context_row()
 
-    def _on_tool_clicked(self, clicked_btn: QToolButton, tool_type: AnnotationType):
+    def _on_tool_clicked(self, clicked_btn: QToolButton, tool_type: AnnotationType) -> None:
         if not clicked_btn.isChecked():
             self.unselect_all()
             return
-
         for b in self.btn_group.buttons():
             if b is not clicked_btn:
                 b.setChecked(False)
@@ -637,7 +932,7 @@ class MarkupToolbar(QWidget):
         self.tool_changed.emit(self.current_tool)
         self.update_context_row()
 
-    def unselect_all(self):
+    def unselect_all(self) -> None:
         for b in self.btn_group.buttons():
             b.setChecked(False)
         self.pointer_btn.setChecked(True)
@@ -645,57 +940,7 @@ class MarkupToolbar(QWidget):
         self.tool_changed.emit(self.current_tool)
         self.update_context_row()
 
-    def set_selected_annotation(self, annot: Optional[AnnotationItem]):
-        self.selected_annotation = annot
-        self.update_context_row()
-
-    def update_context_row(self):
-        """Swaps context formatting sub-view based on selection or active tool."""
-        if self.selected_annotation:
-            t = self.selected_annotation.item_type
-            if t in (AnnotationType.TEXT, AnnotationType.NOTE, AnnotationType.CALLOUT):
-                self.context_stack.setCurrentIndex(1)
-                self.font_combo.setCurrentFont(QFont(self.selected_annotation.font_family))
-                self.font_spin.setValue(self.selected_annotation.font_size)
-                return
-            elif t in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, AnnotationType.ELLIPSE,
-                       AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
-                self.context_stack.setCurrentIndex(0)
-                self._update_color_button_icon(self.color_btn, self.selected_annotation.stroke_color)
-                self._update_color_button_icon(self.fill_btn, self.selected_annotation.fill_color, is_fill=True)
-                return
-            elif t == AnnotationType.REDACT:
-                self.context_stack.setCurrentIndex(3)
-                return
-
-        # Based on active tool
-        if self.current_tool in (AnnotationType.TEXT, AnnotationType.NOTE, AnnotationType.UNDERLINE, AnnotationType.STRIKETHROUGH):
-            self.context_stack.setCurrentIndex(1)
-        elif self.current_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, AnnotationType.ELLIPSE,
-                                   AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
-            self.context_stack.setCurrentIndex(0)
-        elif self.current_tool in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, AnnotationType.CROP_LASSO):
-            self.context_stack.setCurrentIndex(2)
-        elif self.current_tool == AnnotationType.REDACT:
-            self.context_stack.setCurrentIndex(3)
-        else:
-            self.context_stack.setCurrentIndex(4)
-
-    def _setup_select_menu(self):
-        menu = QMenu(self)
-        tools = [
-            ("Rectangular Selection", AnnotationType.CROP_BOX, "box-select"),
-            ("Oval Selection", AnnotationType.CROP_OVAL, "select_oval"),
-            ("Lasso Selection", AnnotationType.CROP_LASSO, "lasso")
-        ]
-        for name, atype, icon_name in tools:
-            action = QAction(name, self)
-            action.setIcon(MacIconFactory.create_icon(icon_name, self._theme_col, 16))
-            action.triggered.connect(lambda _, t=atype, iname=icon_name: self._select_crop_tool(t, iname))
-            menu.addAction(action)
-        self.select_btn.setMenu(menu)
-
-    def _select_crop_tool(self, tool_type: AnnotationType, icon_name: str):
+    def _select_crop_tool(self, tool_type: AnnotationType, icon_name: str) -> None:
         for b in self.btn_group.buttons():
             b.setChecked(False)
         self.select_btn.setChecked(True)
@@ -705,25 +950,7 @@ class MarkupToolbar(QWidget):
         self.tool_changed.emit(self.current_tool)
         self.update_context_row()
 
-    def _setup_shapes_menu(self):
-        menu = QMenu(self)
-        shapes = [
-            ("Rectangle", AnnotationType.RECTANGLE, "square"),
-            ("Rounded Rectangle", AnnotationType.ROUNDED_RECT, "shapes"),
-            ("Oval", AnnotationType.ELLIPSE, "circle"),
-            ("Line", AnnotationType.LINE, "minus"),
-            ("Arrow", AnnotationType.ARROW, "arrow_right"),
-            ("Callout Bubble", AnnotationType.CALLOUT, "callout"),
-            ("Magnifier (Loupe)", AnnotationType.LOUPE, "loupe"),
-        ]
-        for name, stype, icon_name in shapes:
-            action = QAction(name, self)
-            action.setIcon(MacIconFactory.create_icon(icon_name, self._theme_col, 16))
-            action.triggered.connect(lambda _, t=stype: self._select_shape_tool(t))
-            menu.addAction(action)
-        self.shapes_btn.setMenu(menu)
-
-    def _select_shape_tool(self, tool_type: AnnotationType):
+    def _select_shape_tool(self, tool_type: AnnotationType) -> None:
         for b in self.btn_group.buttons():
             b.setChecked(False)
         self.shapes_btn.setChecked(True)
@@ -732,20 +959,79 @@ class MarkupToolbar(QWidget):
         self.tool_changed.emit(self.current_tool)
         self.update_context_row()
 
-    def _setup_width_menu(self):
-        menu = QMenu(self)
-        for w in [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]:
-            action = QAction(f"{int(w)} px", self)
-            action.triggered.connect(lambda _, val=w: self._set_width(val))
-            menu.addAction(action)
-        self.width_btn.setMenu(menu)
-        self.width_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+    # ==================================================================
+    #  CONTEXT ROW
+    # ==================================================================
+    def _set_context_view(self, idx: int) -> None:
+        for i, w in enumerate(self._context_views):
+            w.setVisible(i == idx)
+        self.context_bar.updateGeometry()
 
-    def _set_width(self, val: float):
-        self.stroke_width = val
-        self.width_btn.setToolTip(f"Line Style / Thickness ({int(val)} px)")
-        self.stroke_width_changed.emit(val)
+    def set_selected_annotation(self, annot: Optional[AnnotationItem]) -> None:
+        self.selected_annotation = annot
+        self.update_context_row()
 
+    def update_context_row(self) -> None:
+        """Swap context sub-view. Programmatic widget updates are signal-guarded."""
+        if self.selected_annotation:
+            t = self.selected_annotation.item_type
+            if t in (AnnotationType.TEXT, AnnotationType.NOTE, AnnotationType.CALLOUT):
+                self._set_context_view(1)
+                self._sync_text_format_controls(self.selected_annotation)
+                return
+            elif t in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
+                       AnnotationType.ELLIPSE, AnnotationType.LINE, AnnotationType.ARROW,
+                       AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
+                self._set_context_view(0)
+                self._update_color_button_icon(self.color_btn, self.selected_annotation.stroke_color)
+                self._update_color_button_icon(self.fill_btn, self.selected_annotation.fill_color, is_fill=True)
+                return
+            elif t == AnnotationType.REDACT:
+                self._set_context_view(3)
+                return
+
+        if self.current_tool in (AnnotationType.TEXT, AnnotationType.NOTE,
+                                 AnnotationType.UNDERLINE, AnnotationType.STRIKETHROUGH):
+            self._set_context_view(1)
+        elif self.current_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
+                                   AnnotationType.ELLIPSE, AnnotationType.LINE,
+                                   AnnotationType.ARROW, AnnotationType.PEN,
+                                   AnnotationType.HIGHLIGHTER):
+            self._set_context_view(0)
+        elif self.current_tool in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL,
+                                   AnnotationType.CROP_LASSO):
+            self._set_context_view(2)
+        elif self.current_tool == AnnotationType.REDACT:
+            self._set_context_view(3)
+        else:
+            self._set_context_view(4)
+
+    def _sync_text_format_controls(self, annot: AnnotationItem) -> None:
+        """Sync text-format widgets to the annotation WITHOUT emitting signals."""
+        self.font_combo.blockSignals(True)
+        self.font_spin.blockSignals(True)
+        self.bold_btn.blockSignals(True)
+        self.italic_btn.blockSignals(True)
+        self.underline_btn.blockSignals(True)
+        self.strike_btn.blockSignals(True)
+        try:
+            self.font_combo.setCurrentFont(QFont(getattr(annot, "font_family", "Helvetica")))
+            self.font_spin.setValue(int(getattr(annot, "font_size", 16)))
+            self.bold_btn.setChecked(bool(getattr(annot, "is_bold", False)))
+            self.italic_btn.setChecked(bool(getattr(annot, "is_italic", False)))
+            self.underline_btn.setChecked(bool(getattr(annot, "is_underline", False)))
+            self.strike_btn.setChecked(bool(getattr(annot, "is_strikethrough", False)))
+        finally:
+            self.font_combo.blockSignals(False)
+            self.font_spin.blockSignals(False)
+            self.bold_btn.blockSignals(False)
+            self.italic_btn.blockSignals(False)
+            self.underline_btn.blockSignals(False)
+            self.strike_btn.blockSignals(False)
+
+    # ==================================================================
+    #  COLORS
+    # ==================================================================
     def _create_swatch_icon(self, color: QColor) -> QIcon:
         pix = QPixmap(14, 14)
         pix.fill(Qt.GlobalColor.transparent)
@@ -768,101 +1054,15 @@ class MarkupToolbar(QWidget):
         p.end()
         return QIcon(pix)
 
-    def _setup_stroke_color_menu(self):
-        menu = QMenu(self)
-        presets = [
-            ("Red", "#ff3b30"), ("Orange", "#ff9500"), ("Yellow", "#ffcc00"),
-            ("Green", "#34c759"), ("Cyan", "#30b0c7"), ("Blue", "#007aff"),
-            ("Purple", "#af52de"), ("Pink", "#ff2d55"), ("Black", "#000000"),
-            ("Gray", "#8e8e93"), ("White", "#ffffff"),
-        ]
-        for name, hex_val in presets:
-            col = QColor(hex_val)
-            action = QAction(self._create_swatch_icon(col), name, self)
-            action.triggered.connect(lambda _, c=col: self._set_stroke_color(c))
-            menu.addAction(action)
-
-        menu.addSeparator()
-        custom_action = QAction("Show Colors...", self)
-        custom_action.triggered.connect(self._choose_custom_stroke_color)
-        menu.addAction(custom_action)
-        self.color_btn.setMenu(menu)
-
-    def _setup_fill_color_menu(self):
-        menu = QMenu(self)
-        transparent_action = QAction(self._create_transparent_swatch_icon(), "No Fill (Transparent)", self)
-        transparent_action.triggered.connect(lambda: self._set_fill_color(QColor(Qt.GlobalColor.transparent)))
-        menu.addAction(transparent_action)
-
-        menu.addSeparator()
-        presets = [
-            ("Red", "#ff3b30"), ("Orange", "#ff9500"), ("Yellow", "#ffcc00"),
-            ("Green", "#34c759"), ("Cyan", "#30b0c7"), ("Blue", "#007aff"),
-            ("Purple", "#af52de"), ("Pink", "#ff2d55"), ("Black", "#000000"),
-            ("Gray", "#8e8e93"), ("White", "#ffffff"),
-        ]
-        for name, hex_val in presets:
-            col = QColor(hex_val)
-            action = QAction(self._create_swatch_icon(col), name, self)
-            action.triggered.connect(lambda _, c=col: self._set_fill_color(c))
-            menu.addAction(action)
-
-        menu.addSeparator()
-        custom_action = QAction("Show Colors...", self)
-        custom_action.triggered.connect(self._choose_custom_fill_color)
-        menu.addAction(custom_action)
-        self.fill_btn.setMenu(menu)
-
-    def _choose_custom_stroke_color(self):
-        col = QColorDialog.getColor(self.stroke_color, self, "Select Stroke Color")
-        if col.isValid():
-            self._set_stroke_color(col)
-
-    def _choose_custom_fill_color(self):
-        col = QColorDialog.getColor(self.fill_color, self, "Select Fill Color")
-        if col.isValid():
-            self._set_fill_color(col)
-
-    def _set_stroke_color(self, col: QColor):
-        self.stroke_color = col
-        self._update_color_button_icon(self.color_btn, col)
-        self.stroke_color_changed.emit(col)
-
-    def _set_fill_color(self, col: QColor):
-        self.fill_color = col
-        self._update_color_button_icon(self.fill_btn, col, is_fill=True)
-        self.fill_color_changed.emit(col)
-
-    def _setup_text_options_menu(self):
-        menu = QMenu(self)
-        align_left = QAction("Align Left", self)
-        align_left.triggered.connect(lambda: self.text_align_changed.emit(Qt.AlignmentFlag.AlignLeft))
-        menu.addAction(align_left)
-
-        align_center = QAction("Align Center", self)
-        align_center.triggered.connect(lambda: self.text_align_changed.emit(Qt.AlignmentFlag.AlignHCenter))
-        menu.addAction(align_center)
-
-        align_right = QAction("Align Right", self)
-        align_right.triggered.connect(lambda: self.text_align_changed.emit(Qt.AlignmentFlag.AlignRight))
-        menu.addAction(align_right)
-
-        menu.addSeparator()
-        for sz in [10, 12, 14, 16, 20, 24, 32, 48, 64]:
-            action = QAction(f"{sz} pt", self)
-            action.triggered.connect(lambda _, s=sz: self.font_spin.setValue(s))
-            menu.addAction(action)
-
-        self.text_options_btn.setMenu(menu)
-
-    def _update_color_button_icon(self, btn: QToolButton, color: QColor, is_fill: bool = False):
+    def _update_color_button_icon(self, btn: QToolButton, color: QColor, is_fill: bool = False) -> None:
         pix = QPixmap(28, 16)
         pix.fill(Qt.GlobalColor.transparent)
         p = QPainter(pix)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         if not is_fill:
             p.setBrush(Qt.BrushStyle.NoBrush)
-            p.setPen(QPen(color, 2.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            p.setPen(QPen(color, 2.4, Qt.PenStyle.SolidLine,
+                          Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
             p.drawRoundedRect(QRectF(1.5, 1.5, 13.0, 13.0), 3, 3)
         else:
             if color.alpha() == 0:
@@ -874,78 +1074,144 @@ class MarkupToolbar(QWidget):
                 p.setPen(QPen(QColor(255, 255, 255, 160), 0.8))
                 p.drawRoundedRect(QRectF(1.5, 1.5, 13.0, 13.0), 3, 3)
 
-        arrow_col = QColor(self._theme_col)
-        p.setPen(QPen(QColor(arrow_col.red(), arrow_col.green(), arrow_col.blue(), 75), 1.0))
+        arrow = QColor(self._theme_col)
+        p.setPen(QPen(QColor(arrow.red(), arrow.green(), arrow.blue(), 75), 1.0))
         p.drawLine(QPointF(17.5, 2.5), QPointF(17.5, 13.5))
-
         cx, cy = 23.5, 8.0
         tri = QPolygonF([
             QPointF(cx - 2.8, cy - 1.8),
             QPointF(cx + 2.8, cy - 1.8),
-            QPointF(cx, cy + 2.0)
+            QPointF(cx, cy + 2.0),
         ])
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(arrow_col))
+        p.setBrush(QBrush(arrow))
         p.drawPolygon(tri)
-
         p.end()
         btn.setIcon(QIcon(pix))
         btn.setIconSize(QSize(28, 16))
 
-    def _on_font_size_changed(self, size: int):
+    def _choose_custom_stroke_color(self) -> None:
+        col = QColorDialog.getColor(self.stroke_color, self, "Select Stroke Color")
+        if col.isValid():
+            self._set_stroke_color(col)
+
+    def _choose_custom_fill_color(self) -> None:
+        col = QColorDialog.getColor(self.fill_color, self, "Select Fill Color")
+        if col.isValid():
+            self._set_fill_color(col)
+
+    def _set_stroke_color(self, col: QColor) -> None:
+        self.stroke_color = col
+        self._update_color_button_icon(self.color_btn, col)
+        self.stroke_color_changed.emit(col)
+
+    def _set_fill_color(self, col: QColor) -> None:
+        self.fill_color = col
+        self._update_color_button_icon(self.fill_btn, col, is_fill=True)
+        if hasattr(self, "fill_opacity_spin"):
+            pct = int(round(col.alphaF() * 100))
+            self.fill_opacity_spin.blockSignals(True)
+            self.fill_opacity_spin.setValue(pct)
+            self.fill_opacity_spin.blockSignals(False)
+        self.fill_color_changed.emit(col)
+
+    def _on_fill_opacity_changed(self, value: int) -> None:
+        new_color = QColor(self.fill_color)
+        new_color.setAlphaF(value / 100.0)
+        self.fill_color = new_color
+        self._update_color_button_icon(self.fill_btn, new_color, is_fill=True)
+        self.fill_opacity_changed.emit(value)
+
+    def _set_stroke_style(self, style: str) -> None:
+        self.stroke_style = style
+        self.width_btn.setToolTip(
+            f"Line Style: {style.capitalize()} · Thickness {int(self.stroke_width)} px"
+        )
+        self.stroke_style_changed.emit(style)
+
+    def _set_width(self, val: float) -> None:
+        self.stroke_width = val
+        self.width_btn.setToolTip(
+            f"Line Style: {self.stroke_style.capitalize()} · Thickness {int(val)} px"
+        )
+        self.stroke_width_changed.emit(val)
+
+    def _on_font_size_changed(self, size: int) -> None:
         self.font_size = size
         self.font_size_changed.emit(size)
 
-    def set_crop_enabled(self, enabled: bool):
+    # ==================================================================
+    #  CONTEXT / SHORTCUTS
+    # ==================================================================
+    def set_context(self, has_selection: bool = False,
+                    pending_redactions: int = 0,
+                    has_document: bool = True) -> None:
+        """Enable/disable context-dependent buttons."""
+        self.crop_btn.setEnabled(has_selection and has_document)
+        self.rotate_selection_btn.setEnabled(has_document)
+        self.rotate_btn.setEnabled(has_document)
+        self.rotate_right_btn.setEnabled(has_document)
+        self.color_adjust_btn.setEnabled(has_document)
+        self.size_adjust_btn.setEnabled(has_document)
+        self.redact_btn.setEnabled(has_document)
+        self.sign_btn.setEnabled(has_document)
+        self.image_overlay_btn.setEnabled(has_document)
+        if hasattr(self, "_overflow_crop_act"):
+            self._overflow_crop_act.setEnabled(has_selection and has_document)
+
+    def set_crop_enabled(self, enabled: bool) -> None:
+        """Backward-compat: enable crop action."""
         self.crop_btn.setEnabled(enabled)
-        self.rotate_selection_btn.setEnabled(True)
-        self.rotate_selection_btn.setToolTip("Rotate Right (Ctrl+R)")
         if hasattr(self, "_overflow_crop_act"):
             self._overflow_crop_act.setEnabled(enabled)
-        if hasattr(self, "_overflow_rot_sel_act"):
-            self._overflow_rot_sel_act.setEnabled(True)
 
-    def update_icons(self, color_hex: str):
-        self._theme_col = color_hex
-        self._refresh_tool_icons()
+    def shortcut_specs(self) -> List[Tuple[QKeySequence, object]]:
+        """Hand to the window so it can create QShortcut objects with correct focus scope."""
+        return [
+            (QKeySequence("Ctrl+Z"),       self.undo_requested),
+            (QKeySequence("Ctrl+Shift+Z"), self.redo_requested),
+            (QKeySequence("Ctrl+K"),       self.crop_requested),
+            (QKeySequence("Ctrl+L"),       self.rotate_requested),
+            (QKeySequence("Ctrl+R"),       self.rotate_right_requested),
+            (QKeySequence("Ctrl+Alt+C"),   self.adjust_color_requested),
+            (QKeySequence("Ctrl+Alt+S"),   self.adjust_size_requested),
+            (QKeySequence("Ctrl+Shift+I"), self.image_overlay_requested),
+        ]
 
-    def _refresh_tool_icons(self):
-        col = self._theme_col
-        self.pointer_btn.setIcon(MacIconFactory.create_icon("pointer", col, 18))
-        self.hand_btn.setIcon(MacIconFactory.create_icon("hand", col, 18))
-        self.select_btn.setIcon(MacIconFactory.create_dropdown_tool_icon(self._current_select_icon, col, 36, 22))
-        self.shapes_btn.setIcon(MacIconFactory.create_dropdown_tool_icon("shapes", col, 36, 22))
-        self.pen_btn.setIcon(MacIconFactory.create_icon("fountain_pen", col, 18))
-        self.highlighter_btn.setIcon(MacIconFactory.create_icon("chisel_highlighter", col, 18))
-        self.underline_tool_btn.setIcon(MacIconFactory.create_icon("underline", col, 18))
-        self.strikethrough_tool_btn.setIcon(MacIconFactory.create_icon("strikethrough", col, 18))
-        self.text_btn.setIcon(MacIconFactory.create_icon("text", col, 18))
-        self.note_btn.setIcon(MacIconFactory.create_icon("note", col, 18))
-        self.redact_btn.setIcon(MacIconFactory.create_icon("redact", col, 18))
-        self.sign_btn.setIcon(MacIconFactory.create_icon("rubber_stamp", col, 18))
-        self.image_overlay_btn.setIcon(MacIconFactory.create_icon("image_overlay", col, 18))
-        self.crop_btn.setIcon(MacIconFactory.create_icon("crop_shears", col, 18))
-        self.rotate_btn.setIcon(MacIconFactory.create_icon("rotate_left", col, 18))
-        self.rotate_selection_btn.setIcon(MacIconFactory.create_icon("rotate_right", col, 18))
-        self.color_adjust_btn.setIcon(MacIconFactory.create_icon("color_adjust", col, 18))
-        self.size_adjust_btn.setIcon(MacIconFactory.create_icon("size_adjust", col, 18))
-        self.overflow_btn.setIcon(MacIconFactory.create_icon("more", col, 18))
-        self.undo_btn.setIcon(MacIconFactory.create_icon("arrow_left", col, 18))
-        self.redo_btn.setIcon(MacIconFactory.create_icon("arrow_right", col, 18))
-        self.text_options_btn.setIcon(MacIconFactory.create_dropdown_tool_icon("text", col, 32, 24))
-        self.width_btn.setIcon(MacIconFactory.create_dropdown_tool_icon("line_style", col, 32, 24))
+    # ==================================================================
+    #  RESPONSIVE
+    # ==================================================================
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.handle_resize(self.width())
 
-        if hasattr(self, "loupe_btn"):
-            self.loupe_btn.setIcon(MacIconFactory.create_icon("loupe", col, 18))
-        if hasattr(self, "stamp_btn") and self.stamp_btn is not self.sign_btn:
-            self.stamp_btn.setIcon(MacIconFactory.create_icon("rubber_stamp", col, 18))
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.handle_resize(event.size().width())
 
-        if hasattr(self, "btn_adj_col"):
-            self.btn_adj_col.setIcon(MacIconFactory.create_icon("color_adjust", col, 16))
-        if hasattr(self, "btn_adj_sz"):
-            self.btn_adj_sz.setIcon(MacIconFactory.create_icon("size_adjust", col, 16))
-        if hasattr(self, "btn_rot"):
-            self.btn_rot.setIcon(MacIconFactory.create_icon("rotate_left", col, 16))
+    def handle_resize(self, width: int) -> None:
+        """Collapse image-op group below breakpoint; small actions switch to icon-only when tight."""
+        compact = width < self._COMPACT_BREAKPOINT
+        if compact != (not self.group_image.isVisible()):
+            self.group_image.setVisible(not compact)
+            self.overflow_btn.setVisible(compact)
+            self.strip_layout.invalidate()
+            self.updateGeometry()
 
-        self._update_color_button_icon(self.color_btn, self.stroke_color)
-        self._update_color_button_icon(self.fill_btn, self.fill_color, is_fill=True)
+        is_tight = width < self._TIGHT_BREAKPOINT
+        self.def_lbl.setVisible(not is_tight)
+        for btn, label in (
+            (self.btn_adj_col, "Adjust Color..."),
+            (self.btn_adj_sz,  "Adjust Size..."),
+            (self.btn_rot,     "Rotate Left 90°"),
+        ):
+            if is_tight:
+                btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                btn.setFixedSize(28, 28)
+            else:
+                btn.setText(label)
+                btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                btn.setFixedHeight(28)
+                btn.setMinimumWidth(115)
+                btn.setMaximumWidth(160)
+            btn.updateGeometry()

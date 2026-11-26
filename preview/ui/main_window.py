@@ -9,13 +9,13 @@ from typing import Optional, List
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
-    QToolButton, QLineEdit, QLabel, QFileDialog, QMessageBox, 
+    QToolButton, QLineEdit, QLabel, QFileDialog, QMessageBox, QAbstractButton,
     QApplication, QMenu, QMenuBar, QStatusBar, QSizePolicy, QGraphicsDropShadowEffect,
     QGraphicsOpacityEffect, QFrame, QDialog
 )
 from PyQt6.QtGui import (
     QAction, QActionGroup, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
-    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap, QCloseEvent
+    QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap, QCloseEvent, QShortcut
 )
 from PyQt6.QtCore import Qt, QPoint, QPointF, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
@@ -342,8 +342,9 @@ class StudioWindowControls(QWidget):
         self.setObjectName("studioWindowControls")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setContentsMargins(0, 5, 16, 5)
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        layout.setSpacing(5)
 
         self.btn_min = QToolButton(self)
         self.btn_min.setObjectName("windowMinBtn")
@@ -367,6 +368,16 @@ class StudioWindowControls(QWidget):
         self.btn_close.setAccessibleName("Close Window")
         self.btn_close.clicked.connect(main_win.close)
 
+        self.btn_toggle_toolbar = QToolButton(self)
+        self.btn_toggle_toolbar.setObjectName("windowToolbarToggleBtn")
+        self.btn_toggle_toolbar.setFixedSize(30, 30)
+        self.btn_toggle_toolbar.setIconSize(QSize(12, 12))
+        self.btn_toggle_toolbar.setToolTip("Hide Toolbar (Ctrl+Alt+T)")
+        self.btn_toggle_toolbar.setAccessibleName("Toggle Primary Toolbar")
+        self.btn_toggle_toolbar.clicked.connect(main_win._toggle_primary_toolbar)
+
+        layout.addWidget(self.btn_toggle_toolbar)
+        layout.addSpacing(6)
         layout.addWidget(self.btn_min)
         layout.addWidget(self.btn_max)
         layout.addWidget(self.btn_close)
@@ -376,6 +387,8 @@ class StudioWindowControls(QWidget):
         self.update()
 
     def update_icons(self, col: str):
+        if hasattr(self, "btn_toggle_toolbar"):
+            self.btn_toggle_toolbar.setIcon(MacIconFactory.create_icon("panel-top", col, 12))
         self.btn_min.setIcon(MacIconFactory.create_icon("window_minimize", col, 14))
         is_max = self.main_win.isMaximized()
         max_icon = "window_restore" if is_max else "window_maximize"
@@ -433,7 +446,7 @@ class TrafficLightCluster(QWidget):
 
 
 class DraggableToolbar(QWidget):
-    """Unified header bar (52px) supporting window dragging, double-click maximize, and centered title."""
+    """Unified header bar (52px) with centered title, native window dragging on empty space, and double-click maximize."""
 
     def __init__(self, main_win: 'MacMainWindow'):
         super().__init__(main_win)
@@ -451,40 +464,56 @@ class DraggableToolbar(QWidget):
         """Header bar layout with stretch items automatically centers the title container."""
         pass
 
+    def _is_draggable_target(self, pos: QPoint) -> bool:
+        child = self.childAt(pos)
+        title_w = getattr(self.main_win, 'title_widget', None)
+        center_c = getattr(self.main_win, 'center_container', None)
+        is_empty_or_title = (
+            child is None or
+            child is self or
+            child is title_w or
+            child is center_c or
+            isinstance(child, QLabel) or
+            (title_w is not None and title_w.isAncestorOf(child))
+        )
+        if is_empty_or_title and not isinstance(child, (QAbstractButton, QLineEdit)):
+            return True
+        return False
+
     def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
-            child = self.childAt(event.position().toPoint())
-            title_w = getattr(self.main_win, 'title_widget', None)
-            if (child is None or child is self or isinstance(child, QLabel) or
-                child is title_w or (title_w and title_w.isAncestorOf(child))):
-                win_handle = self.main_win.windowHandle()
-                if win_handle and hasattr(win_handle, "startSystemMove"):
-                    win_handle.startSystemMove()
-                else:
-                    self._drag_start_pos = event.globalPosition().toPoint() - self.main_win.frameGeometry().topLeft()
+        if event.button() == Qt.MouseButton.LeftButton and self._is_draggable_target(event.position().toPoint()):
+            if self.main_win.start_window_drag(event):
+                event.accept()
+                return
+            self._drag_start_pos = event.globalPosition().toPoint() - self.main_win.pos()
+            event.accept()
+            return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._drag_start_pos and (event.buttons() & Qt.MouseButton.LeftButton):
             if not self.main_win.isMaximized():
                 self.main_win.move(event.globalPosition().toPoint() - self._drag_start_pos)
+                event.accept()
+                return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self._drag_start_pos = None
+        self.unsetCursor()
+        self.main_win.unsetCursor()
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
-            child = self.childAt(event.position().toPoint())
-            title_w = getattr(self.main_win, 'title_widget', None)
-            if (child is None or child is self or isinstance(child, QLabel) or
-                child is title_w or (title_w and title_w.isAncestorOf(child))):
-                self.main_win._toggle_maximize()
+        if event.button() == Qt.MouseButton.LeftButton and self._is_draggable_target(event.position().toPoint()):
+            self.main_win._toggle_maximize()
+            event.accept()
+            return
         super().mouseDoubleClickEvent(event)
 
+
 class DraggableMenuBar(QMenuBar):
-    """Sleek macOS-styled top menu bar supporting window dragging when clicked outside menus."""
+    """Sleek macOS-styled top menu bar supporting native window dragging outside menus."""
 
     def __init__(self, main_win: 'MacMainWindow'):
         super().__init__(main_win)
@@ -492,29 +521,44 @@ class DraggableMenuBar(QMenuBar):
         self._drag_start_pos: Optional[QPoint] = None
 
     def mousePressEvent(self, event: QMouseEvent):
-        action = self.actionAt(event.position().toPoint())
-        if action is None and event.button() == Qt.MouseButton.LeftButton:
-            win_handle = self.main_win.windowHandle()
-            if win_handle and hasattr(win_handle, "startSystemMove"):
-                win_handle.startSystemMove()
-            else:
-                self._drag_start_pos = event.globalPosition().toPoint() - self.main_win.frameGeometry().topLeft()
+        if event.button() == Qt.MouseButton.LeftButton:
+            action = self.actionAt(event.position().toPoint())
+            corner_w = self.cornerWidget(Qt.Corner.TopRightCorner)
+            pos = event.position().toPoint()
+            is_in_corner = corner_w is not None and corner_w.geometry().contains(pos)
+            if action is None and not is_in_corner:
+                if self.main_win.start_window_drag(event):
+                    event.accept()
+                    return
+                self._drag_start_pos = event.globalPosition().toPoint() - self.main_win.pos()
+                event.accept()
+                return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._drag_start_pos and (event.buttons() & Qt.MouseButton.LeftButton):
             if not self.main_win.isMaximized():
                 self.main_win.move(event.globalPosition().toPoint() - self._drag_start_pos)
+                event.accept()
+                return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self._drag_start_pos = None
+        self.unsetCursor()
+        self.main_win.unsetCursor()
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        action = self.actionAt(event.position().toPoint())
-        if action is None and event.button() == Qt.MouseButton.LeftButton:
-            self.main_win._toggle_maximize()
+        if event.button() == Qt.MouseButton.LeftButton:
+            action = self.actionAt(event.position().toPoint())
+            corner_w = self.cornerWidget(Qt.Corner.TopRightCorner)
+            pos = event.position().toPoint()
+            is_in_corner = corner_w is not None and corner_w.geometry().contains(pos)
+            if action is None and not is_in_corner:
+                self.main_win._toggle_maximize()
+                event.accept()
+                return
         super().mouseDoubleClickEvent(event)
 
 class MacMainWindow(QMainWindow):
@@ -605,6 +649,7 @@ class MacMainWindow(QMainWindow):
         # 0. Topbar Menu Bar (Logo, File, Edit, View, Go, Tools, Window, Help)
         self.top_menubar = DraggableMenuBar(self)
         self.top_menubar.setObjectName("macMenubar")
+        self.top_menubar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.main_layout.addWidget(self.top_menubar)
 
         # 1. Canvas & Sidebar instantiation
@@ -769,10 +814,10 @@ class MacMainWindow(QMainWindow):
         open_files_action.triggered.connect(self._open_file_dialog)
         open_menu.addAction(open_files_action)
 
-        open_new_tab_action = QAction("Open in New Tab...", self)
-        open_new_tab_action.setShortcut(QKeySequence("Ctrl+Alt+O"))
-        open_new_tab_action.triggered.connect(self._on_new_tab_triggered)
-        open_menu.addAction(open_new_tab_action)
+        # open_new_tab_action = QAction("Open in New Tab...", self)
+        # open_new_tab_action.setShortcut(QKeySequence("Ctrl+Alt+O"))
+        # open_new_tab_action.triggered.connect(self._on_new_tab_triggered)
+        # open_menu.addAction(open_new_tab_action)
 
         open_folder_action = QAction("Open Folder of Images...", self)
         open_folder_action.setShortcut(QKeySequence("Ctrl+Shift+O"))
@@ -918,7 +963,7 @@ class MacMainWindow(QMainWindow):
         # Rotate button (32x32)
         self.rotate_btn = QToolButton()
         self.rotate_btn.setObjectName("rotateBtn")
-        self.rotate_btn.setFixedSize(32, 32)
+        self.rotate_btn.setFixedSize(0, 0)
         self.rotate_btn.setToolTip("Rotate (Ctrl+R) - Learn more (F1)")
         self.rotate_btn.setAccessibleName("Rotate Clockwise")
         self.rotate_btn.clicked.connect(self._rotate_right)
@@ -990,16 +1035,12 @@ class MacMainWindow(QMainWindow):
         self.settings_btn.clicked.connect(self.open_settings_dialog)
         toolbar_layout.addWidget(self.settings_btn)
 
-        # Modern standard window controls on the right side
-        toolbar_layout.addSpacing(10)
-        self.divider3 = self._create_divider()
-        toolbar_layout.addWidget(self.divider3)
-        toolbar_layout.addSpacing(6)
-
+        # Modern standard window controls placed in topbar (menubar top-right corner)
+        self.divider3 = None
         self.window_controls = StudioWindowControls(self)
         self.traffic_cluster = self.window_controls  # Fully backwards-compatible alias
+        self.top_menubar.setCornerWidget(self.window_controls, Qt.Corner.TopRightCorner)
         self.window_controls.setVisible(self.is_frameless)
-        toolbar_layout.addWidget(self.window_controls)
 
         self._update_all_icons()
 
@@ -1074,6 +1115,34 @@ class MacMainWindow(QMainWindow):
         self.markup_bar.signature_requested.connect(self._open_signature_dialog)
         self.markup_bar.image_overlay_requested.connect(self._add_image_overlay)
         self.canvas.tool_deselected.connect(self.markup_bar.unselect_all)
+
+        # --- Undo / Redo ---
+        self.markup_bar.undo_requested.connect(self._undo)
+        self.markup_bar.redo_requested.connect(self._redo)
+
+        # --- Permanent redactions ---
+        if hasattr(self, "_apply_redactions_permanently"):
+            self.markup_bar.apply_redactions_requested.connect(
+                self._apply_redactions_permanently
+            )
+        else:
+            print("[WARN] No _apply_redactions_permanently handler on MainWindow — "
+                  "apply_redactions_requested will not do anything.")
+
+        # --- Strikethrough (text format) ---
+        self.markup_bar.font_strikethrough_changed.connect(
+            lambda on: self.canvas.set_strikethrough(on)
+        )
+
+        # --- Line styles (dashed/dotted) ---
+        self.markup_bar.stroke_style_changed.connect(
+            lambda style: self.canvas.set_stroke_style(style)
+        )
+
+        # --- Fill opacity ---
+        self.markup_bar.fill_opacity_changed.connect(
+            lambda pct: self.canvas.set_fill_opacity(pct / 100.0)
+        )
 
     def _setup_menus(self):
         # Ensure QMainWindow's native outer menubar is hidden
@@ -1255,6 +1324,14 @@ class MacMainWindow(QMainWindow):
 
         # 4. View Menu
         self.view_menu = self.top_menubar.addMenu("View")
+        self.toggle_primary_toolbar_act = QAction("Hide Toolbar", self)
+        self.toggle_primary_toolbar_act.setShortcuts([
+            QKeySequence("Ctrl+Alt+T"),
+            QKeySequence("F8"),
+        ])
+        self.toggle_primary_toolbar_act.triggered.connect(self._toggle_primary_toolbar)
+        self.view_menu.addAction(self.toggle_primary_toolbar_act)
+
         toggle_sb = QAction("Toggle Sidebar", self)
         toggle_sb.setShortcut(QKeySequence("Ctrl+B"))
         toggle_sb.triggered.connect(self._toggle_sidebar)
@@ -1506,8 +1583,28 @@ class MacMainWindow(QMainWindow):
                   preview_help_act, shortcuts_guide_act]:
             self.addAction(a)
 
+        # --- Markup toolbar shortcuts ---
+        for key_seq, sig in self.markup_bar.shortcut_specs():
+            QShortcut(key_seq, self, activated=sig.emit)
+
+        # --- Organize toolbar shortcuts ---
+        for key_seq, sig in self.organize_bar.shortcut_specs():
+            QShortcut(key_seq, self, activated=sig.emit)
+
     def _toggle_menu_bar(self, checked: bool):
         self.top_menubar.setVisible(checked)
+
+    def set_primary_toolbar_visible(self, visible: bool):
+        self.toolbar_widget.setVisible(visible)
+        tip = "Hide Toolbar (Ctrl+Alt+T)" if visible else "Show Toolbar (Ctrl+Alt+T)"
+        if hasattr(self, "window_controls") and hasattr(self.window_controls, "btn_toggle_toolbar"):
+            self.window_controls.btn_toggle_toolbar.setToolTip(tip)
+        if hasattr(self, "toggle_primary_toolbar_act"):
+            self.toggle_primary_toolbar_act.setText("Hide Toolbar" if visible else "Show Toolbar")
+        self._update_window_chrome_state()
+
+    def _toggle_primary_toolbar(self, *args, **kwargs):
+        self.set_primary_toolbar_visible(not self.toolbar_widget.isVisible())
 
     def _toggle_status_bar(self, checked: bool):
         self.status_bar.setVisible(checked)
@@ -1646,6 +1743,7 @@ class MacMainWindow(QMainWindow):
         self.set_modified(tab.is_modified)
         self._update_modified_ui()
         self._update_status()
+        self._sync_toolbar_contexts()
         if self.canvas:
             self.canvas.update()
 
@@ -2434,6 +2532,7 @@ class MacMainWindow(QMainWindow):
         if self.document:
             self.document.set_current_page(page_idx)
         self._update_status()
+        self._sync_toolbar_contexts()
 
     def _on_canvas_zoom_changed(self, zoom: float):
         zoom_str = "Fit" if getattr(self.canvas, '_auto_fit', False) else f"{int(zoom * 100)}%"
@@ -2455,6 +2554,7 @@ class MacMainWindow(QMainWindow):
         self.canvas.update()
         self._update_status()
         self._update_modified_ui()
+        self._sync_toolbar_contexts()
 
     def _on_doc_page_changed(self, page_idx: int):
         self.sidebar.reload_thumbnails()
@@ -2554,6 +2654,7 @@ class MacMainWindow(QMainWindow):
             self.splitter.setSizes([target_sb_w, max(300, total_w - target_sb_w), 0])
             self._show_status("Organize Mode: Page reordering, insertion, and document actions")
 
+        self._sync_toolbar_contexts()
         self._update_all_icons()
 
     def _toggle_markup_bar(self):
@@ -2623,6 +2724,170 @@ class MacMainWindow(QMainWindow):
         self._inspector_anim.finished.connect(on_done)
         self._inspector_anim.start()
 
+    def _stub_flip_horizontal(self) -> None:
+        if not self.document:
+            return
+        if self.document.is_pdf:
+            self._show_status("Flip is only available for image documents.")
+            return
+        page = self.canvas.current_page
+        self.document.flip_page_horizontal(page)
+        self.canvas.zoom_to_fit()
+        self._sync_toolbar_contexts()
+
+
+    def _stub_flip_vertical(self) -> None:
+        if not self.document:
+            return
+        if self.document.is_pdf:
+            self._show_status("Flip is only available for image documents.")
+            return
+        page = self.canvas.current_page
+        self.document.flip_page_vertical(page)
+        self.canvas.zoom_to_fit()
+        self._sync_toolbar_contexts()
+
+
+    def _stub_crop(self) -> None:
+        # Delegate to the canvas's existing crop pipeline (handles PIL crop + history)
+        if hasattr(self.canvas, "apply_crop"):
+            self.canvas.apply_crop()
+            self._sync_toolbar_contexts()
+
+
+    def _stub_resize(self) -> None:
+        if not self.document or self.document.is_pdf:
+            self._show_status("Resize is only available for image documents.")
+            return
+        w, h = self.document.get_page_size(self.canvas.current_page)
+        from PyQt6.QtWidgets import QInputDialog
+        new_w, ok = QInputDialog.getInt(self, "Resize Page", "New width (px):",
+                                         int(w), 32, 10000, 1)
+        if not ok:
+            return
+        new_h, ok = QInputDialog.getInt(self, "Resize Page", "New height (px):",
+                                         int(h), 32, 10000, 1)
+        if not ok:
+            return
+        if self.document.resize_page(self.canvas.current_page, new_w, new_h):
+            self.canvas.zoom_to_fit()
+            self._show_status(f"Resized to {new_w} × {new_h}")
+            self._sync_toolbar_contexts()
+
+
+    def _stub_move_up(self) -> None:
+        if not self.document:
+            return
+        cur = self.canvas.current_page
+        if cur <= 0:
+            return
+        if self.document.move_page(cur, cur - 1):
+            self.canvas.set_page(cur - 1)
+            self.document.set_current_page(cur - 1)
+            self.sidebar.reload_thumbnails()
+            self.sidebar.select_page(cur - 1)
+            self._update_status()
+            self._sync_toolbar_contexts()
+
+
+    def _stub_move_down(self) -> None:
+        if not self.document:
+            return
+        cur = self.canvas.current_page
+        if cur >= self.document.page_count - 1:
+            return
+        if self.document.move_page(cur, cur + 1):
+            self.canvas.set_page(cur + 1)
+            self.document.set_current_page(cur + 1)
+            self.sidebar.reload_thumbnails()
+            self.sidebar.select_page(cur + 1)
+            self._update_status()
+            self._sync_toolbar_contexts()
+
+
+    def _stub_reduce_size(self) -> None:
+        if not self.document:
+            return
+        from PyQt6.QtWidgets import QFileDialog
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, "Reduce File Size — Save As", "Reduced.pdf",
+            "PDF Document (*.pdf)"
+        )
+        if not out_path:
+            return
+        if self.document.reduce_file_size(out_path):
+            import os
+            before = os.path.getsize(self.document.file_path) if (self.document.file_path and os.path.exists(self.document.file_path)) else 0
+            after = os.path.getsize(out_path) if os.path.exists(out_path) else 0
+            pct = int((1 - after / before) * 100) if before > 0 else 0
+            self._show_status(f"Reduced from {before // 1024} KB to {after // 1024} KB ({pct}% smaller)")
+        else:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Reduce Failed", "Could not reduce file size.")
+
+
+    def _stub_insert_clipboard(self) -> None:
+        from PyQt6.QtWidgets import QApplication
+        from PIL import Image
+        from PIL.ImageQt import fromqimage
+        clipboard = QApplication.clipboard()
+        qimg = clipboard.image()
+        if qimg.isNull():
+            self._show_status("Clipboard does not contain an image.")
+            return
+        try:
+            pil_img = fromqimage(qimg)
+            if self.document is None:
+                self._show_status("No document open — open a document first.")
+                return
+            if self.document.insert_from_clipboard_image(pil_img, self.canvas.current_page):
+                self.sidebar.reload_thumbnails()
+                self.canvas.set_page(self.canvas.current_page + 1)
+                self.document.set_current_page(self.canvas.current_page)
+                self.sidebar.select_page(self.canvas.current_page)
+                self._show_status("Pasted image as new page.")
+                self._sync_toolbar_contexts()
+            else:
+                self._show_status("Failed to paste image from clipboard.")
+        except Exception as e:
+            self._show_status(f"Clipboard paste error: {e}")
+
+    # ---------------------------
+
+    def _undo(self) -> None:
+        if hasattr(self, "canvas") and self.canvas:
+            self.canvas.undo()
+
+    def _redo(self) -> None:
+        if hasattr(self, "canvas") and self.canvas:
+            self.canvas.redo()
+
+    def _apply_redactions_permanently(self) -> None:
+        self._apply_redactions_menu()
+
+    def _sync_toolbar_contexts(self) -> None:
+        doc = self.document
+        if hasattr(self, "organize_bar") and self.organize_bar:
+            if doc is None:
+                if hasattr(self.organize_bar, "set_context"):
+                    self.organize_bar.set_context(has_document=False)
+            else:
+                if hasattr(self.organize_bar, "set_context"):
+                    self.organize_bar._is_pdf = bool(getattr(doc, "is_pdf", False))
+                    self.organize_bar.set_context(
+                        has_document=True,
+                        page_count=doc.page_count,
+                        current_page=getattr(self.canvas, "current_page", doc.current_page),
+                    )
+        if hasattr(self, "markup_bar") and self.markup_bar:
+            has_sel = bool(getattr(self.canvas, "_crop_box", None) or getattr(self.canvas, "_selected_annotation", None))
+            if hasattr(self.markup_bar, "set_context"):
+                self.markup_bar.set_context(
+                    has_selection=has_sel,
+                    pending_redactions=getattr(self, "_pending_redaction_count", 0),
+                    has_document=doc is not None,
+                )
+
     def _connect_organize_bar(self):
         self.organize_bar.rotate_left_requested.connect(self._rotate_left)
         self.organize_bar.rotate_right_requested.connect(self._rotate_right)
@@ -2633,6 +2898,24 @@ class MacMainWindow(QMainWindow):
         self.organize_bar.merge_requested.connect(self._merge_pdfs)
         self.organize_bar.split_requested.connect(self._split_pdf)
         self.organize_bar.export_requested.connect(self._export_file)
+
+        # Extended organize bar actions
+        if hasattr(self.organize_bar, "flip_horizontal_requested"):
+            self.organize_bar.flip_horizontal_requested.connect(self._stub_flip_horizontal)
+        if hasattr(self.organize_bar, "flip_vertical_requested"):
+            self.organize_bar.flip_vertical_requested.connect(self._stub_flip_vertical)
+        if hasattr(self.organize_bar, "crop_requested"):
+            self.organize_bar.crop_requested.connect(self._stub_crop)
+        if hasattr(self.organize_bar, "resize_requested"):
+            self.organize_bar.resize_requested.connect(self._stub_resize)
+        if hasattr(self.organize_bar, "move_up_requested"):
+            self.organize_bar.move_up_requested.connect(self._stub_move_up)
+        if hasattr(self.organize_bar, "move_down_requested"):
+            self.organize_bar.move_down_requested.connect(self._stub_move_down)
+        if hasattr(self.organize_bar, "reduce_size_requested"):
+            self.organize_bar.reduce_size_requested.connect(self._stub_reduce_size)
+        if hasattr(self.organize_bar, "insert_clipboard_requested"):
+            self.organize_bar.insert_clipboard_requested.connect(self._stub_insert_clipboard)
 
     def _connect_inspector_panel(self):
         self.inspector_panel.close_requested.connect(lambda: self.set_inspector_visible(False))
@@ -2648,6 +2931,7 @@ class MacMainWindow(QMainWindow):
             self.inspector_panel.set_selected_annotation(annot)
             if annot is not None and not self.inspector_panel.isVisible():
                 self.set_inspector_visible(True)
+        self._sync_toolbar_contexts()
 
     def _on_document_or_annotations_modified(self):
         self._update_modified_ui()
@@ -2714,9 +2998,9 @@ class MacMainWindow(QMainWindow):
         super().changeEvent(event)
 
     def _get_resize_edge(self, pos: QPoint) -> Optional[Qt.Edge]:
-        if self.isMaximized():
+        if not getattr(self, "is_frameless", False) or self.isMaximized():
             return None
-        margin = 12
+        margin = 6
         w = self.width()
         h = self.height()
         x = pos.x()
@@ -2724,7 +3008,7 @@ class MacMainWindow(QMainWindow):
         
         left = (x <= margin)
         right = (x >= w - margin)
-        top = (y <= margin)
+        top = (y <= 3)
         bottom = (y >= h - margin)
         
         if top and left:
@@ -2746,28 +3030,63 @@ class MacMainWindow(QMainWindow):
         return None
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        edge = self._get_resize_edge(event.position().toPoint())
-        if edge:
-            if (edge & (Qt.Edge.TopEdge | Qt.Edge.BottomEdge)) and (edge & (Qt.Edge.LeftEdge | Qt.Edge.RightEdge)):
-                if (edge & Qt.Edge.TopEdge and edge & Qt.Edge.LeftEdge) or (edge & Qt.Edge.BottomEdge and edge & Qt.Edge.RightEdge):
-                    self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+        if getattr(self, "is_frameless", False) and not self.isMaximized():
+            edge = self._get_resize_edge(event.position().toPoint())
+            if edge:
+                if (edge & (Qt.Edge.TopEdge | Qt.Edge.BottomEdge)) and (edge & (Qt.Edge.LeftEdge | Qt.Edge.RightEdge)):
+                    if (edge & Qt.Edge.TopEdge and edge & Qt.Edge.LeftEdge) or (edge & Qt.Edge.BottomEdge and edge & Qt.Edge.RightEdge):
+                        self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                    else:
+                        self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                elif edge & (Qt.Edge.LeftEdge | Qt.Edge.RightEdge):
+                    self.setCursor(Qt.CursorShape.SizeHorCursor)
                 else:
-                    self.setCursor(Qt.CursorShape.SizeBDiagCursor)
-            elif edge & (Qt.Edge.LeftEdge | Qt.Edge.RightEdge):
-                self.setCursor(Qt.CursorShape.SizeHorCursor)
-            else:
-                self.setCursor(Qt.CursorShape.SizeVerCursor)
-        else:
-            self.unsetCursor()
+                    self.setCursor(Qt.CursorShape.SizeVerCursor)
+                super().mouseMoveEvent(event)
+                return
+        self.unsetCursor()
         super().mouseMoveEvent(event)
 
+    def leaveEvent(self, event: QEvent):
+        self.unsetCursor()
+        super().leaveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self.unsetCursor()
+        super().mouseReleaseEvent(event)
+
+    def start_window_drag(self, event: Optional[QMouseEvent] = None) -> bool:
+        """Initiate native OS window manager move (Wayland / X11 / macOS / Windows)."""
+        self.unsetCursor()
+        
+        if self.isMaximized():
+            self._toggle_maximize()
+            QApplication.processEvents()
+
+        win_handle = self.windowHandle()
+        if not win_handle:
+            self.winId()
+            win_handle = self.windowHandle()
+
+        if win_handle and hasattr(win_handle, "startSystemMove"):
+            try:
+                if win_handle.startSystemMove():
+                    return True
+            except Exception as e:
+                print(f"[window] startSystemMove failed: {e}")
+        return False
+
     def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton and getattr(self, "is_frameless", False):
             edge = self._get_resize_edge(event.position().toPoint())
             if edge:
                 win_handle = self.windowHandle()
                 if win_handle and hasattr(win_handle, "startSystemResize"):
                     win_handle.startSystemResize(edge)
+                    return
+            elif event.position().y() <= 40:
+                if self.start_window_drag(event):
+                    event.accept()
                     return
         super().mousePressEvent(event)
 
@@ -2851,8 +3170,22 @@ class MacMainWindow(QMainWindow):
             self._update_all_icons()
             self.sidebar.thumb_list.update()
             self.traffic_cluster.update()
-            if hasattr(self, "tab_container") and self.tab_container:
-                self.tab_container.update_theme(theme_name)
+            for child, method in (
+                (getattr(self, "sidebar", None),         "update_theme"),
+                (getattr(self, "tab_container", None),   "update_theme"),
+                (getattr(self, "markup_bar", None),      "update_theme"),
+                (getattr(self, "organize_bar", None),    "update_theme"),
+                (getattr(self, "inspector_panel", None), "update_theme"),
+            ):
+                if child is None:
+                    continue
+                fn = getattr(child, method, None)
+                if callable(fn):
+                    try:
+                        fn(theme_name)
+                    except Exception as e:
+                        print(f"[theme] {type(child).__name__}.{method} failed: {e}")
+            self._sync_toolbar_contexts()
             anim.start()
         else:
             qss = MacTheme.get_stylesheet(theme_name)
@@ -2860,8 +3193,22 @@ class MacMainWindow(QMainWindow):
             self._update_all_icons()
             self.sidebar.thumb_list.update()
             self.traffic_cluster.update()
-            if hasattr(self, "tab_container") and self.tab_container:
-                self.tab_container.update_theme(theme_name)
+            for child, method in (
+                (getattr(self, "sidebar", None),         "update_theme"),
+                (getattr(self, "tab_container", None),   "update_theme"),
+                (getattr(self, "markup_bar", None),      "update_theme"),
+                (getattr(self, "organize_bar", None),    "update_theme"),
+                (getattr(self, "inspector_panel", None), "update_theme"),
+            ):
+                if child is None:
+                    continue
+                fn = getattr(child, method, None)
+                if callable(fn):
+                    try:
+                        fn(theme_name)
+                    except Exception as e:
+                        print(f"[theme] {type(child).__name__}.{method} failed: {e}")
+            self._sync_toolbar_contexts()
 
     def _rotate_left(self):
         if self.canvas and (self.canvas.crop_box or self.canvas._selected_annotation):

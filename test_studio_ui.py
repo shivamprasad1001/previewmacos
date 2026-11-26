@@ -219,17 +219,17 @@ class TestStudioWindowControlsAndHeader(unittest.TestCase):
         self.assertGreater(wc.btn_close.width(), 0)
 
 
-        # Verify placement: on the right side of toolbar_widget
+        # Verify placement: window controls in top-right menubar corner, settings after sidebar in toolbar
         layout = win.toolbar_widget.layout()
-        idx_wc = layout.indexOf(wc)
         idx_settings = layout.indexOf(win.settings_btn)
         idx_sidebar = layout.indexOf(win.sidebar_btn)
 
         # Sidebar is on the left (first control)
         self.assertEqual(idx_sidebar, 0)
-        # Settings and window controls are placed towards the end (right side)
+        # Settings is placed towards the end (right side)
         self.assertGreater(idx_settings, idx_sidebar)
-        self.assertGreater(idx_wc, idx_settings)
+        # Window controls sit in the top-right corner of the menubar
+        self.assertIs(win.top_menubar.cornerWidget(Qt.Corner.TopRightCorner), wc)
 
         win.close()
 
@@ -331,9 +331,10 @@ class TestStudioActionRibbonAndInspector(unittest.TestCase):
         self.assertIsNotNone(mb.crop_btn)
         self.assertFalse(mb.crop_btn.icon().isNull())
 
-        # 5. Magnifying Loupe
-        self.assertTrue(hasattr(mb, "loupe_btn"))
-        self.assertFalse(mb.loupe_btn.icon().isNull())
+        # 5. Magnifying Loupe (in Shapes dropdown menu)
+        loupe_actions = [a for a in mb.shapes_btn.menu().actions() if a.data() == "loupe"]
+        self.assertEqual(len(loupe_actions), 1)
+        self.assertFalse(loupe_actions[0].icon().isNull())
 
         win.close()
 

@@ -983,6 +983,187 @@ class Document(QObject):
         self.page_changed.emit(to_idx)
         return True
 
+    # =====================================================================
+    #  FLIP — image documents only
+    # =====================================================================
+
+    def can_flip(self) -> bool:
+        """Flip operations are only supported for non-PDF image documents."""
+        return not self.is_pdf
+
+    def flip_page_horizontal(self, page_idx: int) -> bool:
+        """Mirror the page horizontally. Returns False for PDFs."""
+        if self.is_pdf:
+            return False
+        img = self._get_pil_for_page(page_idx)
+        if img is None:
+            return False
+        try:
+            flipped = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        except Exception:
+            return False
+        self._image_cache[page_idx] = flipped
+        if page_idx == self.current_page:
+            self._pil_image = flipped
+        self._invalidate_thumbnail(page_idx)
+        self._rendered_cache.remove_page(page_idx)
+        self.is_dirty = True
+        self.document_changed.emit()
+        self.page_changed.emit(page_idx)
+        return True
+
+    def flip_page_vertical(self, page_idx: int) -> bool:
+        """Mirror the page vertically. Returns False for PDFs."""
+        if self.is_pdf:
+            return False
+        img = self._get_pil_for_page(page_idx)
+        if img is None:
+            return False
+        try:
+            flipped = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        except Exception:
+            return False
+        self._image_cache[page_idx] = flipped
+        if page_idx == self.current_page:
+            self._pil_image = flipped
+        self._invalidate_thumbnail(page_idx)
+        self._rendered_cache.remove_page(page_idx)
+        self.is_dirty = True
+        self.document_changed.emit()
+        self.page_changed.emit(page_idx)
+        return True
+
+    # =====================================================================
+    #  CROP — image documents only
+    # =====================================================================
+
+    def crop_page(self, page_idx: int, rect: QRectF) -> bool:
+        """Crop an image page to the given rectangle (image-pixel coordinates)."""
+        if self.is_pdf:
+            return False
+        img = self._get_pil_for_page(page_idx)
+        if img is None:
+            return False
+        x1 = max(0, int(rect.left()))
+        y1 = max(0, int(rect.top()))
+        x2 = min(img.width, int(rect.right()))
+        y2 = min(img.height, int(rect.bottom()))
+        if x2 - x1 < 2 or y2 - y1 < 2:
+            return False
+        try:
+            cropped = img.crop((x1, y1, x2, y2))
+        except Exception:
+            return False
+        self._image_cache[page_idx] = cropped
+        if page_idx == self.current_page:
+            self._pil_image = cropped
+        self._invalidate_thumbnail(page_idx)
+        self._rendered_cache.remove_page(page_idx)
+        self.is_dirty = True
+        self.metadata["width"] = cropped.width
+        self.metadata["height"] = cropped.height
+        self.metadata["dimensions"] = f"{cropped.width} × {cropped.height}"
+        self.document_changed.emit()
+        self.page_changed.emit(page_idx)
+        return True
+
+    # =====================================================================
+    #  RESIZE — image documents only
+    # =====================================================================
+
+    def resize_page(self, page_idx: int, new_width: int, new_height: int) -> bool:
+        """Resize an image page. Returns False for PDFs."""
+        if self.is_pdf:
+            return False
+        if new_width <= 0 or new_height <= 0:
+            return False
+        img = self._get_pil_for_page(page_idx)
+        if img is None:
+            return False
+        try:
+            resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        except Exception:
+            return False
+        self._image_cache[page_idx] = resized
+        if page_idx == self.current_page:
+            self._pil_image = resized
+        self._invalidate_thumbnail(page_idx)
+        self._rendered_cache.remove_page(page_idx)
+        self.is_dirty = True
+        self.metadata["width"] = new_width
+        self.metadata["height"] = new_height
+        self.metadata["dimensions"] = f"{new_width} × {new_height}"
+        self.document_changed.emit()
+        self.page_changed.emit(page_idx)
+        return True
+
+    # =====================================================================
+    #  REDUCE FILE SIZE — wrapper around compress_pdf_document
+    # =====================================================================
+
+    def reduce_file_size(self, output_path: str) -> bool:
+        """Save a compressed copy of the document to output_path."""
+        try:
+            if self.is_pdf and self._pdf_doc:
+                for p_idx, deg in self.rotations.items():
+                    if deg != 0 and p_idx < len(self._pdf_doc):
+                        page = self._pdf_doc[p_idx]
+                        page.set_rotation((page.rotation + deg) % 360)
+                clone = pymupdf.open("pdf", self._pdf_doc.tobytes())
+                self.compress_pdf_document(clone, output_path)
+                clone.close()
+                return True
+            else:
+                self.export_all_to_pdf(output_path, reduce_size=True)
+                return True
+        except Exception:
+            return False
+
+    # =====================================================================
+    #  INSERT FROM CLIPBOARD — insert image as a new page
+    # =====================================================================
+
+    def insert_from_clipboard_image(self, pil_image, after_page_idx=None) -> bool:
+        """Insert a PIL image from clipboard as a new page after the given index."""
+        if pil_image is None:
+            return False
+        if after_page_idx is None:
+            after_page_idx = self.current_page
+        insert_at = after_page_idx + 1
+        try:
+            if self.is_pdf and self._pdf_doc:
+                buf = io.BytesIO()
+                rgb = pil_image.convert("RGB") if pil_image.mode in ("RGBA", "P") else pil_image
+                rgb.save(buf, format="PNG")
+                buf.seek(0)
+                w, h = float(rgb.width), float(rgb.height)
+                new_page = self._pdf_doc.new_page(pno=insert_at, width=w, height=h)
+                new_page.insert_image(new_page.rect, stream=buf.getvalue())
+                self.page_count = len(self._pdf_doc)
+            else:
+                tf = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tf.close()
+                pil_image.save(tf.name)
+                self.image_paths.insert(insert_at, tf.name)
+                self.page_count = len(self.image_paths)
+            new_rotations = {}
+            for idx, deg in self.rotations.items():
+                if idx < insert_at:
+                    new_rotations[idx] = deg
+                else:
+                    new_rotations[idx + 1] = deg
+            self.rotations = new_rotations
+            self._thumbnail_cache.clear()
+            self._rendered_cache.clear()
+            self._image_cache.clear()
+            self.is_dirty = True
+            self.current_page = insert_at
+            self.document_changed.emit()
+            self.page_changed.emit(insert_at)
+            return True
+        except Exception:
+            return False
+
     def insert_file(self, file_path: str, after_page_idx: int) -> bool:
         """Inserts a PDF or image into the document after the specified page index."""
         if not os.path.exists(file_path):
