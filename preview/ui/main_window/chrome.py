@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QToolButton, QLabel, QLineEdit, QAbstractButton,
+    QWidget, QHBoxLayout, QFrame, QToolButton, QLabel, QLineEdit, QAbstractButton,
     QMenuBar, QGraphicsOpacityEffect
 )
 from PyQt6.QtGui import (
@@ -85,58 +85,85 @@ class FloatingStatusPill(QWidget):
         self.move(max(0, x), max(0, y))
 
 class FloatingSlideshowHUD(QWidget):
-    """Floating translucent control bar for Fullscreen Slideshow mode."""
+    """Floating translucent control bar for Fullscreen and Slideshow modes."""
 
     def __init__(self, main_win: 'MacMainWindow', parent: QWidget):
         super().__init__(parent)
         self.main_win = main_win
         self.setObjectName("floatingSlideshowHUD")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet("""
             #floatingSlideshowHUD {
-                background-color: rgba(24, 24, 26, 220);
-                border: 1px solid rgba(255, 255, 255, 38);
-                border-radius: 18px;
+                background-color: rgba(24, 24, 28, 232);
+                border: 1px solid rgba(255, 255, 255, 48);
+                border-radius: 19px;
             }
             #floatingSlideshowHUD QToolButton {
                 background: transparent;
                 border: none;
-                border-radius: 12px;
-                color: #ffffff;
-                font-size: 13px;
+                border-radius: 13px;
+                color: #f5f5f7;
+                font-size: 12px;
+                font-weight: 500;
                 padding: 4px 8px;
+                min-height: 26px;
             }
             #floatingSlideshowHUD QToolButton:hover {
-                background-color: rgba(255, 255, 255, 35);
+                background-color: rgba(255, 255, 255, 36);
+            }
+            #floatingSlideshowHUD QToolButton#fullscreenExitBtn {
+                background-color: rgba(255, 255, 255, 22);
+                border: 1px solid rgba(255, 255, 255, 34);
+                border-radius: 13px;
+                color: #ffffff;
+                font-weight: 600;
+                padding: 4px 12px;
+            }
+            #floatingSlideshowHUD QToolButton#fullscreenExitBtn:hover {
+                background-color: rgba(255, 69, 58, 210);
+                border-color: rgba(255, 99, 88, 230);
+            }
+            #floatingSlideshowHUD QFrame#hudDivider {
+                background-color: rgba(255, 255, 255, 42);
+                min-width: 1px;
+                max-width: 1px;
+                min-height: 16px;
+                max-height: 16px;
             }
             #floatingSlideshowHUD QLabel {
                 color: #e5e5ea;
                 font-size: 12px;
-                font-weight: 500;
-                padding: 0 10px;
+                font-weight: 600;
+                padding: 0 8px;
             }
         """)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(6)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(4)
 
         # Prev
         self.prev_btn = QToolButton()
-        self.prev_btn.setText("◀")
+        self.prev_btn.setIcon(MacIconFactory.create_icon("chevron-left", "#f5f5f7", 15))
+        self.prev_btn.setIconSize(QSize(15, 15))
+        self.prev_btn.setFixedSize(28, 28)
         self.prev_btn.setToolTip("Previous Page (Left Arrow)")
         self.prev_btn.clicked.connect(self.main_win.prev_page)
         layout.addWidget(self.prev_btn)
 
         # Play / Pause
         self.play_btn = QToolButton()
-        self.play_btn.setText("⏸")
+        self.play_btn.setText("▶")
+        self.play_btn.setFixedSize(28, 28)
         self.play_btn.setToolTip("Pause / Resume Auto-advance (Space)")
         self.play_btn.clicked.connect(self.main_win._toggle_slideshow_timer)
         layout.addWidget(self.play_btn)
 
         # Next
         self.next_btn = QToolButton()
-        self.next_btn.setText("▶")
+        self.next_btn.setIcon(MacIconFactory.create_icon("chevron-right", "#f5f5f7", 15))
+        self.next_btn.setIconSize(QSize(15, 15))
+        self.next_btn.setFixedSize(28, 28)
         self.next_btn.setToolTip("Next Page (Right Arrow)")
         self.next_btn.clicked.connect(self.main_win.next_page)
         layout.addWidget(self.next_btn)
@@ -145,10 +172,20 @@ class FloatingSlideshowHUD(QWidget):
         self.counter_label = QLabel("1 / 1")
         layout.addWidget(self.counter_label)
 
-        # Exit
+        divider = QFrame(self)
+        divider.setObjectName("hudDivider")
+        layout.addWidget(divider)
+        layout.addSpacing(4)
+
+        # Exit Full Screen / Slideshow button
         self.exit_btn = QToolButton()
-        self.exit_btn.setText("✕")
-        self.exit_btn.setToolTip("Exit Slideshow (Esc)")
+        self.exit_btn.setObjectName("fullscreenExitBtn")
+        self.exit_btn.setIcon(MacIconFactory.create_icon("minimize", "#ffffff", 14))
+        self.exit_btn.setIconSize(QSize(14, 14))
+        self.exit_btn.setText("Exit")
+        self.exit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.exit_btn.setToolTip("Exit Full Screen (Esc)")
+        self.exit_btn.setAccessibleName("Exit Full Screen")
         self.exit_btn.clicked.connect(lambda: self.main_win.toggle_fullscreen(auto_advance=False))
         layout.addWidget(self.exit_btn)
 
@@ -162,6 +199,9 @@ class FloatingSlideshowHUD(QWidget):
 
     def set_playing(self, is_playing: bool):
         self.play_btn.setText("⏸" if is_playing else "▶")
+        self.exit_btn.setToolTip("Exit Slideshow (Esc)" if is_playing else "Exit Full Screen (Esc)")
+        self.adjustSize()
+        self._reposition()
 
     def _reposition(self):
         p = self.parentWidget()
