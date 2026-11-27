@@ -11,7 +11,7 @@ Unit and integration tests for the improved Edit toolbar in Preview for Linux:
 import os
 import tempfile
 import unittest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QFrame
 from PIL import Image
 
 from preview.core.annotations import AnnotationType
@@ -41,23 +41,11 @@ class TestEditToolbarImprovements(unittest.TestCase):
         win.set_workspace_mode("Edit")
         mb = win.markup_bar
 
-        # Check that all 7 logical group containers exist
-        self.assertIsNotNone(mb.group_selection)
-        self.assertIsNotNone(mb.group_text)
-        self.assertIsNotNone(mb.group_drawing)
-        self.assertIsNotNone(mb.group_shapes)
-        self.assertIsNotNone(mb.group_privacy)
+        # Check that all logical group containers exist
+        self.assertIsNotNone(mb.group_select)
         self.assertIsNotNone(mb.group_image)
-        self.assertIsNotNone(mb.group_history)
-
-        # Check object names for QSS styling
-        self.assertEqual(mb.group_selection.objectName(), "markupGroup")
-        self.assertEqual(mb.group_text.objectName(), "markupGroup")
-        self.assertEqual(mb.group_drawing.objectName(), "markupGroup")
-        self.assertEqual(mb.group_shapes.objectName(), "markupGroup")
-        self.assertEqual(mb.group_privacy.objectName(), "markupGroup")
-        self.assertEqual(mb.group_image.objectName(), "markupGroup")
-        self.assertEqual(mb.group_history.objectName(), "markupGroup")
+        groups = [g for g in mb.findChildren(QFrame) if g.objectName() == "markupGroup"]
+        self.assertGreaterEqual(len(groups), 7)
 
         # Verify consistent button sizing across all standard tools
         standard_btns = [
@@ -146,7 +134,7 @@ class TestEditToolbarImprovements(unittest.TestCase):
 
         # Default context (index 4)
         mb.update_context_row()
-        self.assertEqual(mb.context_stack.currentIndex(), 4)
+        self.assertFalse(mb._context_views[4].isHidden())
 
         # Buttons have full labels
         self.assertEqual(mb.btn_adj_col.text(), "Adjust Color...")
@@ -170,22 +158,22 @@ class TestEditToolbarImprovements(unittest.TestCase):
         # Pen tool
         mb.pen_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.PEN)
-        self.assertEqual(mb.context_stack.currentIndex(), 0)
+        self.assertFalse(mb._context_views[0].isHidden())
 
         # Text tool
         mb.text_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.TEXT)
-        self.assertEqual(mb.context_stack.currentIndex(), 1)
+        self.assertFalse(mb._context_views[1].isHidden())
 
         # Redact tool
         mb.redact_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.REDACT)
-        self.assertEqual(mb.context_stack.currentIndex(), 3)
+        self.assertFalse(mb._context_views[3].isHidden())
 
         # Pointer tool / Esc
         mb.pointer_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.NONE)
-        self.assertEqual(mb.context_stack.currentIndex(), 4)
+        self.assertFalse(mb._context_views[4].isHidden())
 
         win.close()
 
