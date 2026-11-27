@@ -4,11 +4,11 @@
   var REPO_OWNER = 'shivamprasad1001';
   var REPO_NAME = 'previewmacos';
   var FALLBACK_RELEASE = {
-    version: 'v1.7.2',
-    debName: 'preview-app_1.7.2_amd64.deb',
-    debUrl: 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb',
-    exeName: 'Preview-Setup-v1.7.2.exe',
-    exeUrl: 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/Preview-Setup-v1.7.2.exe'
+    version: 'v1.7.3',
+    debName: 'preview-app_1.7.3_amd64.deb',
+    debUrl: 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.3/preview-app_1.7.3_amd64.deb',
+    exeName: 'Preview-Setup-v1.7.3.exe',
+    exeUrl: 'https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.3/Preview-Setup-v1.7.3.exe'
   };
 
   var GALLERY_SLIDES = [

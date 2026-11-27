@@ -42,7 +42,7 @@ Per the SignPath Foundation terms:
 
 The application handles network communication strictly as follows:
 * **No Telemetry or User Data Collection:** The application does not collect, track, or transmit any user documents, personal data, or telemetry.
-* **Software Update Checks:** The application checks the public GitHub REST API (`https://api.github.com/repos/shivamprasad1001/previewmacos/releases/latest`) to determine whether a newer version is available. Users can also manually trigger this check from the Help menu. No personal or document data is transmitted during update checks.
+* **Software Update Checks and Verified Downloads:** The application checks the public GitHub REST API (`https://api.github.com/repos/shivamprasad1001/previewmacos/releases/latest`) to determine whether a newer version is available. Users can also manually trigger this check from the Help menu. Only when the user explicitly clicks to install an update does the application download the release installer and `SHA256SUMS.txt` from GitHub Releases over HTTPS, verifying the installer's SHA-256 checksum against `SHA256SUMS.txt` before launching the installer. No personal or document data is transmitted during update checks or downloads.
 * **Third-Party Services:** Update requests communicate directly with GitHub's public API and are subject to [GitHub's Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
 
 ---

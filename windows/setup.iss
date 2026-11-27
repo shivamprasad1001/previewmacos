@@ -3,8 +3,8 @@
 ; Repository: https://github.com/shivamprasad1001/previewmacos
 
 #define MyAppName "Preview"
-#define MyAppVersion "1.7.2"
-#define MyAppNumericVersion "1.7.2.0"
+#define MyAppVersion "1.7.3"
+#define MyAppNumericVersion "1.7.3.0"
 #define MyAppPublisher "Shivam Prasad"
 #define MyAppURL "https://github.com/shivamprasad1001/previewmacos"
 #define MyAppExeName "Preview.exe"

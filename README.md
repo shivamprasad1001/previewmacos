@@ -35,8 +35,8 @@ Get the official multiplatform installer for your operating system:
 
 | Platform | Package | Download Link |
 | :--- | :--- | :--- |
-| **Ubuntu / Debian / Kali / Mint** | `.deb` Package | [**Download preview-app_1.7.2_amd64.deb**](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb) |
-| **Windows 10 / 11** | Setup Installer | [**Download Preview-Setup-v1.7.2.exe**](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/Preview-Setup-v1.7.2.exe) |
+| **Ubuntu / Debian / Kali / Mint** | `.deb` Package | [**Download preview-app_1.7.3_amd64.deb**](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.3/preview-app_1.7.3_amd64.deb) |
+| **Windows 10 / 11** | Setup Installer | [**Download Preview-Setup-v1.7.3.exe**](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.3/Preview-Setup-v1.7.3.exe) |
 | **All Platforms (Source)** | Python 3.10+ | [**GitHub Source Repository**](https://github.com/shivamprasad1001/previewmacos) |
 
 ---
@@ -129,8 +129,8 @@ Toggle the secondary markup toolbar with `Ctrl + Shift + A`:
 #### Option 1: Install from Release Binary
 Download and install the official Debian/Ubuntu package:
 ```bash
-wget https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb
-sudo dpkg -i preview-app_1.7.2_amd64.deb || sudo apt-get install -f -y
+wget https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.3/preview-app_1.7.3_amd64.deb
+sudo dpkg -i preview-app_1.7.3_amd64.deb || sudo apt-get install -f -y
 ```
 
 #### Option 2: Build Debian Package from Source
@@ -146,7 +146,7 @@ sudo dpkg -i dist/preview-app_*.deb
 
 ### 🪟 Windows Installation
 
-1. Download [`Preview-Setup-v1.7.2.exe`](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/Preview-Setup-v1.7.2.exe).
+1. Download [`Preview-Setup-v1.7.3.exe`](https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.3/Preview-Setup-v1.7.3.exe).
 2. Run the installer wizard and launch **Preview** from your Start Menu or Desktop shortcut.
 
 #### Windows SmartScreen Note
@@ -159,7 +159,7 @@ To proceed:
 You can verify the download against the SHA-256 checksum published on the GitHub Releases page (`SHA256SUMS.txt`). Run the following command in PowerShell:
 
 ```powershell
-Get-FileHash .\Preview-Setup-v1.7.2.exe -Algorithm SHA256
+Get-FileHash .\Preview-Setup-v1.7.3.exe -Algorithm SHA256
 ```
 
 ---
