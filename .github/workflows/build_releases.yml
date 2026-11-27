@@ -38,7 +38,7 @@ jobs:
           CI: "true"
           PREVIEW_TESTING: "true"
         run: |
-          python -m unittest test_studio_ui.py test_icons.py test_preview_features.py
+          pytest tests/ -p no:typeguard
 
       - name: Build Debian Package (.deb)
         run: |

@@ -8,7 +8,7 @@ import os
 import unittest
 
 # Ensure path is included
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PIL import Image
 from PyQt6.QtWidgets import QApplication, QLabel

@@ -2,7 +2,7 @@ name: Studio UI & Integration CI
 
 on:
   push:
-    branches: [ main, 'feat/**' ]
+    branches: [ main, 'feat/**', 'chore/**' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -12,16 +12,20 @@ permissions:
 
 jobs:
   test-ui:
-    name: Run Studio Pro UI & Icon Tests
+    name: Test Suite (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
       - name: Install System Dependencies
@@ -32,12 +36,16 @@ jobs:
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pytest
+          python -m pip install -r requirements.txt pytest ruff
 
-      - name: Run Studio UI & Icon Tests (Headless)
+      - name: Lint with Ruff
+        run: |
+          ruff check .
+
+      - name: Run Full Test Suite (Headless)
         env:
           QT_QPA_PLATFORM: offscreen
           CI: "true"
           PREVIEW_TESTING: "true"
         run: |
-          pytest test_studio_ui.py test_icons.py -p no:typeguard
+          pytest tests/ -p no:typeguard
