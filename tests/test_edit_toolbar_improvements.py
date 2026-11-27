@@ -9,6 +9,7 @@ Unit and integration tests for the improved Edit toolbar in Preview for Linux:
 """
 
 import os
+import tempfile
 import unittest
 from PyQt6.QtWidgets import QApplication
 from PIL import Image
@@ -24,17 +25,14 @@ class TestEditToolbarImprovements(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
         # Create temporary test image
-        cls.test_img_path = "/tmp/test_edit_toolbar.png"
+        cls._tmp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        cls.test_img_path = os.path.join(cls._tmp_dir.name, "test_edit_toolbar.png")
         img = Image.new("RGB", (600, 400), color=(120, 160, 220))
         img.save(cls.test_img_path)
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists(cls.test_img_path):
-            try:
-                os.remove(cls.test_img_path)
-            except Exception:
-                pass
+        cls._tmp_dir.cleanup()
 
     def test_01_logical_tool_grouping_and_containers(self):
         """Verifies editing tools are organized into logical groups with consistent dimensions."""

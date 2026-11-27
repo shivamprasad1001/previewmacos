@@ -5,6 +5,7 @@ Validates parity with macOS Preview functionality.
 
 import sys
 import os
+import tempfile
 import unittest
 
 # Ensure path is included
@@ -33,7 +34,8 @@ class TestPreviewParity(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Create temporary test image
-        cls.test_img_path = "/tmp/test_preview_photo.png"
+        cls._tmp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        cls.test_img_path = os.path.join(cls._tmp_dir.name, "test_preview_photo.png")
         img = Image.new("RGBA", (800, 600), color=(100, 150, 200, 255))
         img.save(cls.test_img_path)
 
@@ -42,8 +44,7 @@ class TestPreviewParity(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists(cls.test_img_path):
-            os.remove(cls.test_img_path)
+        cls._tmp_dir.cleanup()
 
     def test_01_image_loading_and_metadata(self):
         doc = Document(self.test_img_path)
@@ -300,7 +301,7 @@ class TestPreviewParity(unittest.TestCase):
     def test_14_page_duplication_and_blank_insert(self):
         import pymupdf
         # Test with a PDF document
-        test_pdf = "/tmp/test_dup.pdf"
+        test_pdf = os.path.join(self._tmp_dir.name, "test_dup.pdf")
         pdoc = pymupdf.open()
         pdoc.new_page(width=300, height=300)
         pdoc.save(test_pdf)
@@ -322,7 +323,7 @@ class TestPreviewParity(unittest.TestCase):
 
     def test_15_text_extraction(self):
         import pymupdf
-        test_pdf = "/tmp/test_extract.pdf"
+        test_pdf = os.path.join(self._tmp_dir.name, "test_extract.pdf")
         pdoc = pymupdf.open()
         p = pdoc.new_page(width=400, height=400)
         p.insert_text((50, 50), "Hello Preview macOS")
@@ -348,7 +349,7 @@ class TestPreviewParity(unittest.TestCase):
         Image.new("RGB", (150, 150), "yellow").save(tf2.name)
 
         doc = Document([tf1.name, tf2.name])
-        out_pdf = "/tmp/test_exported_collection.pdf"
+        out_pdf = os.path.join(self._tmp_dir.name, "test_exported_collection.pdf")
         doc.export_all_to_pdf(out_pdf)
         self.assertTrue(os.path.exists(out_pdf))
 
@@ -475,7 +476,7 @@ class TestPreviewParity(unittest.TestCase):
 
     def test_25_downloader_and_auto_install(self):
         from preview.core.updater import UpdateDownloadWorker
-        worker = UpdateDownloadWorker("https://example.com/test.deb", "/tmp/test.deb")
+        worker = UpdateDownloadWorker("https://example.com/test.deb", os.path.join(self._tmp_dir.name, "test.deb"))
         self.assertEqual(worker.download_url, "https://example.com/test.deb")
         self.assertFalse(worker._is_cancelled)
         worker.cancel()
@@ -542,7 +543,7 @@ class TestPreviewParity(unittest.TestCase):
         win.close()
 
     def test_30_pdf_links_and_words(self):
-        pdf_path = "/tmp/test_pdf_links_words.pdf"
+        pdf_path = os.path.join(self._tmp_dir.name, "test_pdf_links_words.pdf")
         pdf = pymupdf.open()
         p1 = pdf.new_page(width=612, height=792)
         p1.insert_text(pymupdf.Point(72, 72), "Hello macOS Preview PDF Engine")
@@ -580,7 +581,7 @@ class TestPreviewParity(unittest.TestCase):
             os.remove(pdf_path)
 
     def test_31_pdf_page_reordering_and_insertion(self):
-        pdf_path = "/tmp/test_pdf_reorder.pdf"
+        pdf_path = os.path.join(self._tmp_dir.name, "test_pdf_reorder.pdf")
         pdf = pymupdf.open()
         p0 = pdf.new_page()
         p0.insert_text(pymupdf.Point(72, 72), "Page Zero")
@@ -602,7 +603,7 @@ class TestPreviewParity(unittest.TestCase):
         self.assertIn("Page One", doc.extract_text(0))
 
         # Insert page from an image or pdf
-        insert_path = "/tmp/test_pdf_to_insert.pdf"
+        insert_path = os.path.join(self._tmp_dir.name, "test_pdf_to_insert.pdf")
         p_ins = pymupdf.open()
         p_new = p_ins.new_page()
         p_new.insert_text(pymupdf.Point(72, 72), "Inserted Fresh Page")
@@ -620,10 +621,10 @@ class TestPreviewParity(unittest.TestCase):
             os.remove(insert_path)
 
     def test_32_pdf_merge_and_split(self):
-        pdf1 = "/tmp/test_merge_1.pdf"
-        pdf2 = "/tmp/test_merge_2.pdf"
-        merged = "/tmp/test_merged_out.pdf"
-        split_out = "/tmp/test_split_out.pdf"
+        pdf1 = os.path.join(self._tmp_dir.name, "test_merge_1.pdf")
+        pdf2 = os.path.join(self._tmp_dir.name, "test_merge_2.pdf")
+        merged = os.path.join(self._tmp_dir.name, "test_merged_out.pdf")
+        split_out = os.path.join(self._tmp_dir.name, "test_split_out.pdf")
 
         # Create two test PDFs
         d1 = pymupdf.open()
@@ -656,8 +657,8 @@ class TestPreviewParity(unittest.TestCase):
                 os.remove(p)
 
     def test_33_pdf_password_protection(self):
-        pdf_path = "/tmp/test_pdf_plain.pdf"
-        enc_path = "/tmp/test_pdf_encrypted.pdf"
+        pdf_path = os.path.join(self._tmp_dir.name, "test_pdf_plain.pdf")
+        enc_path = os.path.join(self._tmp_dir.name, "test_pdf_encrypted.pdf")
 
         pdf = pymupdf.open()
         p = pdf.new_page()
@@ -683,8 +684,8 @@ class TestPreviewParity(unittest.TestCase):
                 os.remove(p)
 
     def test_34_pdf_save_with_annotations(self):
-        pdf_path = "/tmp/test_pdf_annot.pdf"
-        annot_out = "/tmp/test_pdf_annot_baked.pdf"
+        pdf_path = os.path.join(self._tmp_dir.name, "test_pdf_annot.pdf")
+        annot_out = os.path.join(self._tmp_dir.name, "test_pdf_annot_baked.pdf")
 
         pdf = pymupdf.open()
         p = pdf.new_page(width=600, height=800)
@@ -753,7 +754,7 @@ class TestPreviewParity(unittest.TestCase):
         canvas.close()
 
     def test_36_permanent_redactions_and_form_fields(self):
-        pdf_path = "/tmp/test_pdf_redact_form.pdf"
+        pdf_path = os.path.join(self._tmp_dir.name, "test_pdf_redact_form.pdf")
         pdf = pymupdf.open()
         page = pdf.new_page(width=600, height=800)
         page.insert_text(pymupdf.Point(50, 100), "Sensitive Secret Token XYZ")
@@ -794,7 +795,7 @@ class TestPreviewParity(unittest.TestCase):
             os.remove(pdf_path)
 
     def test_35_pdf_render_scale_and_scroll_parity(self):
-        pdf_path = "/tmp/test_pdf_scale_scroll.pdf"
+        pdf_path = os.path.join(self._tmp_dir.name, "test_pdf_scale_scroll.pdf")
         pdf = pymupdf.open()
         p1 = pdf.new_page(width=612, height=792)
         p1.insert_text(pymupdf.Point(72, 72), "Page 1 Content")

@@ -9,6 +9,7 @@ import json
 import hashlib
 import hmac
 import logging
+import tempfile
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -335,7 +336,7 @@ def install_update(filepath: str, expected_sha256: Optional[str] = None) -> Tupl
     system = platform.system().lower()
 
     if "linux" in system:
-        script_path = "/tmp/preview_auto_update.sh"
+        script_path = os.path.join(tempfile.gettempdir(), "preview_auto_update.sh")
         escaped_deb = os.path.abspath(filepath)
 
         script_content = f"""#!/usr/bin/env bash
