@@ -409,6 +409,11 @@ class TestStudioActionRibbonAndInspector(unittest.TestCase):
         win.sidebar.set_view_mode("Contact Sheet")
         self.assertLessEqual(win.width(), 750)
 
+        # Segmented header control must never overflow sidebar width even at minimum width
+        win.sidebar.resize(140, 500)
+        QApplication.processEvents()
+        self.assertLessEqual(win.sidebar.seg_control.width(), win.sidebar.width())
+
         win.close()
 
 

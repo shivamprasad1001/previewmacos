@@ -72,7 +72,8 @@ class AnimatedSegmentedControl(QWidget):
         self._is_dark = True
         self.setMouseTracking(True)
         self.setFixedHeight(28)
-        self.setMinimumWidth(180)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # Selection sliding animation (interpolates fractional segment position 0.0 .. len-1)
@@ -88,8 +89,11 @@ class AnimatedSegmentedControl(QWidget):
         self._hover_anim.valueChanged.connect(self._on_hover_anim_frame)
 
     # ---- public API ----
+    def minimumSizeHint(self) -> QSize:
+        return QSize(120, 28)
+
     def sizeHint(self) -> QSize:
-        return QSize(240, 28)
+        return QSize(220, 28)
 
     def currentIndex(self) -> int:
         return self._current
@@ -262,11 +266,15 @@ class AnimatedSegmentedControl(QWidget):
                 col = text_idle
                 weight = QFont.Weight.Medium
 
-            font = QFont(s.FONT_FAMILY, 11)
+            seg_w = r.width()
+            font = QFont(s.FONT_FAMILY)
+            font.setPixelSize(11 if seg_w >= 62 else 10)
             font.setWeight(weight)
             p.setFont(font)
             p.setPen(col)
-            p.drawText(r, int(Qt.AlignmentFlag.AlignCenter), label)
+            avail_w = max(8, int(seg_w - 6))
+            text = p.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, avail_w)
+            p.drawText(r, int(Qt.AlignmentFlag.AlignCenter), text)
 
 
 # =====================================================================
@@ -466,7 +474,7 @@ class MacSidebar(QWidget):
         header.setFixedHeight(40)
         header.setObjectName("sidebarHeader")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 6, 10, 6)
+        header_layout.setContentsMargins(8, 6, 8, 6)
         header_layout.setSpacing(6)
 
         self.seg_control = AnimatedSegmentedControl(self._SEG_LABELS, self)
@@ -1070,8 +1078,10 @@ class MacSidebar(QWidget):
         is_toc = mode_name in ("Table of Contents", "Outline")
 
         if mode_name == "Thumbnails":
-            saved_w = getattr(self, "_last_thumbnail_sidebar_width", int(self.thumbnail_width + 54))
-            target_w = max(140, min(saved_w, int(self.thumbnail_width + 64)))
+            total_w = sum(sizes)
+            saved_w = getattr(self, "_last_thumbnail_sidebar_width", 220)
+            target_w = max(216, min(saved_w, int(self.thumbnail_width + 110)))
+            target_w = max(140, min(target_w, max(140, total_w - 250)))
             if sizes[0] > target_w:
                 diff = sizes[0] - target_w
                 self._animate_splitter(target_w, sizes[1] + diff, duration=duration)

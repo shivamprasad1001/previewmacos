@@ -889,6 +889,10 @@ class StudioTheme:
             height: 0px;
         }}
 
+        QScrollBar::add-page, QScrollBar::sub-page {{
+            background: transparent;
+        }}
+
         /* SpinBox & Font Controls */
         QSpinBox {{
             background-color: {cls.DARK_BG_CARD};
@@ -1914,6 +1918,10 @@ class StudioTheme:
         QScrollBar::add-line, QScrollBar::sub-line {{
             width: 0px;
             height: 0px;
+        }}
+
+        QScrollBar::add-page, QScrollBar::sub-page {{
+            background: transparent;
         }}
 
         /* SpinBox & Combos (Light) */

@@ -270,7 +270,7 @@ class WorkspaceModesMixin:
             self.set_inspector_visible(False)
             # Switch sidebar to Contact Sheet to present multi-page grid
             if hasattr(self.sidebar, "set_view_mode"):
-                self.sidebar.set_view_mode("Contact Sheet")
+                self.sidebar.set_view_mode("Contact Sheet", animate=False)
             # Widen sidebar splitter for better multi-page grid display
             sizes = self.splitter.sizes()
             total_w = sum(sizes) if sum(sizes) > 0 else self.width()

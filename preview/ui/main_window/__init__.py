@@ -84,7 +84,7 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.inspector_dialog: Optional[InspectorDialog] = None
         self.color_dialog: Optional[AdjustColorDialog] = None
         self.is_frameless: bool = True
-        self._last_sidebar_width: int = 190
+        self._last_sidebar_width: int = 220
         self._sidebar_anim: Optional[QVariantAnimation] = None
         self._update_worker: Optional[UpdateCheckWorker] = None
         self.update_banner: Optional[UpdateBanner] = None
