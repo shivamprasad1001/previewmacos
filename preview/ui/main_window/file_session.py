@@ -61,7 +61,9 @@ class FileSessionMixin:
         if hasattr(self, "document") and self.document:
             base_name = self.document.file_name or "Untitled"
             title = f"{base_name} - Edited" if is_mod else base_name
-            if hasattr(self, "title_label") and self.title_label:
+            if hasattr(self, "_set_toolbar_title"):
+                self._set_toolbar_title(title)
+            elif hasattr(self, "title_label") and self.title_label:
                 self.title_label.setText(title)
             self.setWindowTitle(title)
             if hasattr(self, "toolbar_widget") and self.toolbar_widget:
@@ -143,7 +145,9 @@ class FileSessionMixin:
             self.sidebar.select_page(tab.current_page)
         else:
             self.sidebar.clear()
-            if hasattr(self, "title_label") and self.title_label:
+            if hasattr(self, "_set_toolbar_title"):
+                self._set_toolbar_title("No document")
+            elif hasattr(self, "title_label") and self.title_label:
                 self.title_label.setText("No document")
             if hasattr(self, "page_badge") and self.page_badge:
                 self.page_badge.setText("")

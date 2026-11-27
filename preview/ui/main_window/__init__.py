@@ -112,6 +112,7 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self._setup_ui()
         self._setup_menus()
         self._apply_theme(self.current_theme, animate=False)
+        self._apply_responsive_toolbar(self.width())
 
         # Background update check on startup (delayed 2.5s)
         if not (os.environ.get("CI") or os.environ.get("PREVIEW_TESTING")):
@@ -253,7 +254,7 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.toolbar_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         toolbar_layout = QHBoxLayout(self.toolbar_widget)
-        toolbar_layout.setContentsMargins(16, 0, 16, 0)
+        toolbar_layout.setContentsMargins(12, 0, 12, 0)
         toolbar_layout.setSpacing(0)
 
         # 1. Left Group: Sidebar Toggle + Back/Forward + Open
@@ -343,10 +344,10 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         toolbar_layout.addWidget(self.open_segmented)
 
         # Thin Vertical Divider 1
-        toolbar_layout.addSpacing(16)
+        toolbar_layout.addSpacing(10)
         self.divider1 = self._create_divider()
         toolbar_layout.addWidget(self.divider1)
-        toolbar_layout.addSpacing(16)
+        toolbar_layout.addSpacing(10)
 
         toolbar_layout.addStretch(1)
 
@@ -367,8 +368,10 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
 
         self.proxy_icon_label = QLabel()
         self.proxy_icon_label.setFixedSize(16, 16)
+        self._full_title: str = "No document"
         self.title_label = QLabel("No document")
         self.title_label.setObjectName("windowTitleLabel")
+        self.title_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
         self.page_badge = QLabel("")
         self.page_badge.setObjectName("pageBadge")
         self.page_badge.setVisible(False)
@@ -378,15 +381,16 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         title_box.addWidget(self.page_badge)
         center_layout.addWidget(self.title_widget)
 
-        center_layout.addSpacing(8)
+        center_layout.addSpacing(6)
 
         # Mode Segmented Control: [ View | Edit | Organize ]
         self.mode_segmented = QWidget(self.center_container)
         self.mode_segmented.setObjectName("modeSegmented")
         self.mode_segmented.setFixedHeight(32)
+        self.mode_segmented.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         mode_layout = QHBoxLayout(self.mode_segmented)
-        mode_layout.setContentsMargins(0, 0, 0, 0)
-        mode_layout.setSpacing(0)
+        mode_layout.setContentsMargins(3, 3, 3, 3)
+        mode_layout.setSpacing(2)
 
         self.mode_view_btn = QToolButton()
         self.mode_view_btn.setObjectName("modeViewBtn")
@@ -394,7 +398,8 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.mode_view_btn.setChecked(True)
         self.mode_view_btn.setText("View")
         self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.mode_view_btn.setFixedHeight(32)
+        self.mode_view_btn.setFixedHeight(24)
+        self.mode_view_btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.mode_view_btn.setToolTip("View Mode: Clean document reading (Alt+1)")
         self.mode_view_btn.setAccessibleName("View Mode")
         self.mode_view_btn.clicked.connect(lambda: self.set_workspace_mode("View"))
@@ -405,7 +410,8 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.mode_edit_btn.setCheckable(True)
         self.mode_edit_btn.setText("Edit")
         self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.mode_edit_btn.setFixedHeight(32)
+        self.mode_edit_btn.setFixedHeight(24)
+        self.mode_edit_btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.mode_edit_btn.setToolTip("Edit Mode: Annotation and markup tools (Alt+2)")
         self.mode_edit_btn.setAccessibleName("Edit Mode")
         self.mode_edit_btn.clicked.connect(lambda: self.set_workspace_mode("Edit"))
@@ -416,7 +422,8 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.mode_organize_btn.setCheckable(True)
         self.mode_organize_btn.setText("Organize")
         self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.mode_organize_btn.setFixedHeight(32)
+        self.mode_organize_btn.setFixedHeight(24)
+        self.mode_organize_btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.mode_organize_btn.setToolTip("Organize Mode: Page & document management (Alt+3)")
         self.mode_organize_btn.setAccessibleName("Organize Mode")
         self.mode_organize_btn.clicked.connect(lambda: self.set_workspace_mode("Organize"))
@@ -428,10 +435,10 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         toolbar_layout.addStretch(1)
 
         # Thin Vertical Divider 2
-        toolbar_layout.addSpacing(16)
+        toolbar_layout.addSpacing(10)
         self.divider2 = self._create_divider()
         toolbar_layout.addWidget(self.divider2)
-        toolbar_layout.addSpacing(16)
+        toolbar_layout.addSpacing(10)
 
         # 3. Right Group: Zoom + Rotate + Markup + Search + Info + Theme
         self.zoom_segmented = QWidget()
@@ -470,9 +477,7 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
         toolbar_layout.addWidget(self.fullscreen_btn)
 
-        toolbar_layout.addSpacing(8)
-
-        # Rotate button (32x32)
+        # Rotate button (hidden proxy action, kept 0x0 for compatibility)
         self.rotate_btn = QToolButton()
         self.rotate_btn.setObjectName("rotateBtn")
         self.rotate_btn.setFixedSize(0, 0)
@@ -483,7 +488,7 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.rotate_left_btn = self.rotate_btn
         toolbar_layout.addWidget(self.rotate_btn)
 
-        toolbar_layout.addSpacing(8)
+        toolbar_layout.addSpacing(6)
 
         # Markup primary button (32px tall)
         self.markup_toggle_btn = QToolButton()
@@ -497,14 +502,14 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.markup_toggle_btn.clicked.connect(self._toggle_markup_bar)
         toolbar_layout.addWidget(self.markup_toggle_btn)
 
-        toolbar_layout.addSpacing(8)
+        toolbar_layout.addSpacing(6)
 
         # Search Bar
         self.search_edit = QLineEdit()
         self.search_edit.setObjectName("macSearchField")
         self.search_edit.setPlaceholderText("Search")
         self.search_edit.setFixedHeight(32)
-        self.search_edit.setFixedWidth(130)
+        self.search_edit.setFixedWidth(115)
         self.search_edit.setAccessibleName("Search Document")
         self.search_edit.returnPressed.connect(self._on_search)
         self.search_action = self.search_edit.addAction(

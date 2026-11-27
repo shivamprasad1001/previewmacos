@@ -592,6 +592,77 @@ class WindowEventsAndToolsMixin:
             return
         super().keyPressEvent(event)
 
+    def _set_toolbar_title(self, title: str):
+        self._full_title = title
+        if hasattr(self, "title_label") and self.title_label:
+            self.title_label.setToolTip(title)
+            self._update_title_elide()
+
+    def _update_title_elide(self):
+        if not hasattr(self, "title_label") or not self.title_label:
+            return
+        full = getattr(self, "_full_title", None) or self.title_label.text()
+        w = self.width() if self.width() > 0 else 1150
+        if w < 1200:
+            max_w = max(80, min(220, w - 820))
+        else:
+            max_w = max(120, min(240, w - 1030))
+        fm = self.title_label.fontMetrics()
+        elided = fm.elidedText(full, Qt.TextElideMode.ElideMiddle, max_w)
+        self.title_label.setText(elided)
+        self.title_label.setMinimumWidth(min(max_w, fm.horizontalAdvance(elided) + 2))
+
+    def _apply_responsive_toolbar(self, w: int):
+        compact = w < 1200
+        if hasattr(self, "mode_view_btn") and hasattr(self, "mode_edit_btn") and hasattr(self, "mode_organize_btn"):
+            if compact:
+                self.mode_view_btn.setText("")
+                self.mode_edit_btn.setText("")
+                self.mode_organize_btn.setText("")
+                self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+                for b in (self.mode_view_btn, self.mode_edit_btn, self.mode_organize_btn):
+                    b.setMinimumWidth(34)
+            else:
+                self.mode_view_btn.setText("View")
+                self.mode_edit_btn.setText("Edit")
+                self.mode_organize_btn.setText("Organize")
+                self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+                for b in (self.mode_view_btn, self.mode_edit_btn, self.mode_organize_btn):
+                    b.setMinimumWidth(b.sizeHint().width())
+            if hasattr(self, "mode_segmented"):
+                req_w = (
+                    self.mode_view_btn.sizeHint().width()
+                    + self.mode_edit_btn.sizeHint().width()
+                    + self.mode_organize_btn.sizeHint().width()
+                    + 12
+                )
+                self.mode_segmented.setFixedWidth(req_w)
+
+        if hasattr(self, "markup_toggle_btn"):
+            if compact:
+                self.markup_toggle_btn.setText("")
+                self.markup_toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            else:
+                self.markup_toggle_btn.setText("Markup")
+                self.markup_toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+
+        if hasattr(self, "search_edit"):
+            self.search_edit.setFixedWidth(88 if compact else 115)
+
+        if hasattr(self, "open_btn"):
+            if w < 960:
+                self.open_btn.setText("")
+                self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            else:
+                self.open_btn.setText("Open")
+                self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+
+        self._update_title_elide()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = event.size().width()
@@ -605,33 +676,7 @@ class WindowEventsAndToolsMixin:
         if hasattr(self, "markup_bar") and hasattr(self.markup_bar, "handle_resize"):
             self.markup_bar.handle_resize(w)
 
-        # Responsive toolbar adaptation: collapse buttons to icon-only when narrow (< 1060px)
-        if hasattr(self, "mode_view_btn") and hasattr(self, "mode_edit_btn") and hasattr(self, "mode_organize_btn"):
-            if w < 1060:
-                self.mode_view_btn.setText("")
-                self.mode_edit_btn.setText("")
-                self.mode_organize_btn.setText("")
-                self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-                self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-                self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-            else:
-                self.mode_view_btn.setText("View")
-                self.mode_edit_btn.setText("Edit")
-                self.mode_organize_btn.setText("Organize")
-                self.mode_view_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-                self.mode_edit_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-                self.mode_organize_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-
-        if hasattr(self, "search_edit"):
-            self.search_edit.setFixedWidth(90 if w < 1024 else 130)
-
-        if hasattr(self, "open_btn"):
-            if w < 960:
-                self.open_btn.setText("")
-                self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-            else:
-                self.open_btn.setText("Open")
-                self.open_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._apply_responsive_toolbar(w)
 
         if w < 820 and hasattr(self, "sidebar") and self.sidebar.isVisible():
             self.set_sidebar_visible(False)

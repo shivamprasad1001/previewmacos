@@ -677,7 +677,7 @@ class StudioTheme:
         }}
 
         /* Segmented Controls (Sidebar & Mode Switchers) */
-        #sidebarSegmented, #modeSegmented {{
+        #sidebarSegmented {{
             background-color: {cls.DARK_BG_CARD};
             border: 1px solid {cls.DARK_BORDER_SUBTLE};
             border-radius: 6px;
@@ -685,16 +685,24 @@ class StudioTheme:
             margin: 6px 8px;
         }}
 
+        #modeSegmented {{
+            background-color: {cls.DARK_BG_CARD};
+            border: 1px solid {cls.DARK_BORDER_SUBTLE};
+            border-radius: 8px;
+            padding: 3px;
+            margin: 0px;
+        }}
+
         #sidebarSegmented QToolButton, #modeSegmented QToolButton {{
             background: transparent;
             border: none;
-            border-radius: {cls.RADIUS_SM}px;
+            border-radius: 5px;
             color: {cls.DARK_TEXT_SECONDARY};
             font-size: {cls.FONT_SIZE_XS}px;
             font-weight: 500;
-            padding: 3px 8px;
-            min-height: 24px;
-            max-height: 24px;
+            padding: 2px 10px;
+            min-height: 20px;
+            max-height: 20px;
         }}
 
         #sidebarSegmented QToolButton:hover, #modeSegmented QToolButton:hover {{
@@ -1720,7 +1728,7 @@ class StudioTheme:
         }}
 
         /* Segmented Controls (Light) */
-        #sidebarSegmented, #modeSegmented {{
+        #sidebarSegmented {{
             background-color: rgba(0, 0, 0, 0.05);
             border: 1px solid {cls.LIGHT_BORDER_SUBTLE};
             border-radius: 6px;
@@ -1728,16 +1736,24 @@ class StudioTheme:
             margin: 6px 8px;
         }}
 
+        #modeSegmented {{
+            background-color: rgba(0, 0, 0, 0.05);
+            border: 1px solid {cls.LIGHT_BORDER_SUBTLE};
+            border-radius: 8px;
+            padding: 3px;
+            margin: 0px;
+        }}
+
         #sidebarSegmented QToolButton, #modeSegmented QToolButton {{
             background: transparent;
             border: none;
-            border-radius: {cls.RADIUS_SM}px;
+            border-radius: 5px;
             color: {cls.LIGHT_TEXT_SECONDARY};
             font-size: {cls.FONT_SIZE_XS}px;
             font-weight: 500;
-            padding: 3px 8px;
-            min-height: 24px;
-            max-height: 24px;
+            padding: 2px 10px;
+            min-height: 20px;
+            max-height: 20px;
         }}
 
         #sidebarSegmented QToolButton:hover, #modeSegmented QToolButton:hover {{
