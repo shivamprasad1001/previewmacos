@@ -436,6 +436,7 @@ class CanvasView(QWidget):
         if has_two_up:
             w2, h2 = self.document.get_page_size(self.current_page + 1)
             total_w = w_doc + w2 + 12.0
+            total_h = max(h_doc, h2)
         else:
             total_w = w_doc
             total_h = h_doc
