@@ -2,7 +2,6 @@
 """Builds the complete Help Dictionary adhering to strict writing rules."""
 
 import json
-import os
 
 entries = [
     # A

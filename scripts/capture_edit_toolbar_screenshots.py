@@ -11,16 +11,12 @@ import os
 import sys
 import tempfile
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QPointF, QRectF
-from PyQt6.QtGui import QColor
-from PIL import Image
 
 from preview.ui.main_window import MacMainWindow
-from preview.core.annotations import AnnotationItem, AnnotationType
 from preview.theme import MacTheme
 
 def capture_screenshots(out_dir: str = "docs/screenshots"):
-    app = QApplication.instance() or QApplication(sys.argv)
+    QApplication.instance() or QApplication(sys.argv)
     resolved_out_dir = os.path.abspath(out_dir)
     os.makedirs(resolved_out_dir, exist_ok=True)
 

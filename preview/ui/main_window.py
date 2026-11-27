@@ -1,25 +1,26 @@
 """
 Main Window for Preview macOS Linux clone.
-Implements unified macOS toolbar, authentic traffic light controls, collapsible sidebar, 
+Implements unified macOS toolbar, authentic traffic light controls, collapsible sidebar,
 markup bar, canvas, menus, keyboard shortcuts, multi-image & folder support, and file drag-and-drop.
 """
 
+import logging
 import os
 from typing import Optional, List
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, 
-    QToolButton, QLineEdit, QLabel, QFileDialog, QMessageBox, QAbstractButton,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
+    QToolButton, QLineEdit, QLabel, QFileDialog, QInputDialog, QMessageBox, QAbstractButton,
     QApplication, QMenu, QMenuBar, QStatusBar, QSizePolicy, QGraphicsDropShadowEffect,
-    QGraphicsOpacityEffect, QFrame, QDialog
+    QGraphicsOpacityEffect, QDialog
 )
 from PyQt6.QtGui import (
-    QAction, QActionGroup, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor, 
+    QAction, QActionGroup, QIcon, QKeySequence, QDragEnterEvent, QDropEvent, QColor,
     QMouseEvent, QPainter, QBrush, QPen, QFont, QKeyEvent, QPixmap, QCloseEvent, QShortcut
 )
 from PyQt6.QtCore import Qt, QPoint, QPointF, QSize, QTimer, QRectF, QEvent, QPropertyAnimation, QVariantAnimation, QEasingCurve, QSettings
 
-from preview.theme import MacTheme, StudioTheme, ThemeManager, apply_theme, get_stylesheet
+from preview.theme import MacTheme, ThemeManager
 from preview.icons import MacIconFactory
 from preview.core.document import Document
 from preview.core.annotations import AnnotationType
@@ -227,7 +228,7 @@ class TrafficLightButton(QToolButton):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         is_active = self._active
         if self.window():
             is_active = is_active and self.window().isActiveWindow()
@@ -597,7 +598,7 @@ class MacMainWindow(QMainWindow):
             try:
                 app.styleHints().colorSchemeChanged.connect(self._on_system_color_scheme_changed)
             except Exception:
-                pass
+                logging.getLogger(__name__).exception("Failed to connect system colorSchemeChanged signal")
 
         # Window chrome flags for rounded corners and shadow
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
@@ -739,7 +740,7 @@ class MacMainWindow(QMainWindow):
         self.toolbar_widget.setObjectName("macToolbar")
         self.toolbar_widget.setFixedHeight(48)
         self.toolbar_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        
+
         toolbar_layout = QHBoxLayout(self.toolbar_widget)
         toolbar_layout.setContentsMargins(16, 0, 16, 0)
         toolbar_layout.setSpacing(0)
@@ -1840,7 +1841,7 @@ class MacMainWindow(QMainWindow):
 
     def _on_new_tab_triggered(self):
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Open Document in New Tab", "", 
+            self, "Open Document in New Tab", "",
             "Supported Files (*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.tiff);;PDF Files (*.pdf);;Images (*.png *.jpg *.jpeg *.webp *.bmp *.tiff);;All Files (*.*)"
         )
         if paths:
@@ -1955,10 +1956,10 @@ class MacMainWindow(QMainWindow):
             return
         self.document.document_changed.connect(self._on_doc_changed)
         self.document.page_changed.connect(self._on_doc_page_changed)
-        
+
         self.sidebar.set_document(self.document)
         self.canvas.set_document(self.document)
-        
+
         self.set_modified(False)
         self._update_modified_ui()
         self._update_status()
@@ -1998,7 +1999,7 @@ class MacMainWindow(QMainWindow):
 
     def _open_file_dialog(self, force_new_tab: bool = False):
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Open Document or Images", "", 
+            self, "Open Document or Images", "",
             "Supported Files (*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.tiff);;PDF Files (*.pdf);;Images (*.png *.jpg *.jpeg *.webp *.bmp *.tiff);;All Files (*.*)"
         )
         if not paths:
@@ -2303,7 +2304,7 @@ class MacMainWindow(QMainWindow):
                     self.document.export_all_to_pdf(dlg.selected_path, reduce_size=dlg.reduce_file_size)
                 else:
                     self.document.export_document(
-                        dlg.selected_path, 
+                        dlg.selected_path,
                         format_name=dlg.selected_format,
                         quality=dlg.selected_quality,
                         page_idx=target_page,
@@ -2353,8 +2354,8 @@ class MacMainWindow(QMainWindow):
                     printer.newPage()
                 pix = self.document.render_page(p_idx, zoom=2.0)
                 scaled = pix.scaled(
-                    page_rect.size(), 
-                    Qt.AspectRatioMode.KeepAspectRatio, 
+                    page_rect.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation
                 )
                 x = page_rect.left() + (page_rect.width() - scaled.width()) / 2
@@ -2605,7 +2606,7 @@ class MacMainWindow(QMainWindow):
     def set_workspace_mode(self, mode: str):
         """Switches workspace between View, Edit, and Organize modes."""
         self.current_workspace_mode = mode
-        
+
         # Update mode segmented buttons
         if hasattr(self, "mode_view_btn"):
             self.mode_view_btn.setChecked(mode == "View")
@@ -2828,7 +2829,6 @@ class MacMainWindow(QMainWindow):
 
     def _stub_insert_clipboard(self) -> None:
         from PyQt6.QtWidgets import QApplication
-        from PIL import Image
         from PIL.ImageQt import fromqimage
         clipboard = QApplication.clipboard()
         qimg = clipboard.image()
@@ -3005,12 +3005,12 @@ class MacMainWindow(QMainWindow):
         h = self.height()
         x = pos.x()
         y = pos.y()
-        
+
         left = (x <= margin)
         right = (x >= w - margin)
         top = (y <= 3)
         bottom = (y >= h - margin)
-        
+
         if top and left:
             return Qt.Edge.TopEdge | Qt.Edge.LeftEdge
         if top and right:
@@ -3058,7 +3058,7 @@ class MacMainWindow(QMainWindow):
     def start_window_drag(self, event: Optional[QMouseEvent] = None) -> bool:
         """Initiate native OS window manager move (Wayland / X11 / macOS / Windows)."""
         self.unsetCursor()
-        
+
         if self.isMaximized():
             self._toggle_maximize()
             QApplication.processEvents()
@@ -3328,7 +3328,7 @@ class MacMainWindow(QMainWindow):
             except OSError:
                 file_sz = 0
         dialog = AdjustSizeDialog(self.document._pil_image, file_sz, self)
-        
+
         def on_size(resized):
             self.document.update_image(resized, page)
             def undo_sz():
@@ -3398,7 +3398,7 @@ class MacMainWindow(QMainWindow):
             self.canvas.search_results.clear()
             self.canvas.update()
             return
-        
+
         results = self.document.search_text(query)
         self.canvas.search_results = results
         if results:

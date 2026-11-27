@@ -10,13 +10,10 @@ Unit and integration tests for the improved Edit toolbar in Preview for Linux:
 
 import os
 import unittest
-from PyQt6.QtWidgets import QApplication, QToolButton
-from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import QApplication
 from PIL import Image
 
-from preview.core.document import Document
-from preview.core.annotations import AnnotationItem, AnnotationType
+from preview.core.annotations import AnnotationType
 from preview.ui.main_window import MacMainWindow
 from preview.theme import MacTheme
 

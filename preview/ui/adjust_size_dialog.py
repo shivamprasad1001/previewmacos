@@ -2,11 +2,11 @@
 macOS style 'Adjust Size' dialog with proportional scaling, unit selection, and size preview.
 """
 
-from typing import Optional, Tuple
+from typing import Optional
 from PIL import Image
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
     QLineEdit, QComboBox, QCheckBox, QPushButton, QWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal

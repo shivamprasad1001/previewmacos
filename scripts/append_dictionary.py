@@ -2,7 +2,6 @@
 """Adds supplemental code-verified entries to dictionary.json to guarantee 100% test coverage."""
 
 import json
-import os
 
 extra_entries = [
     {

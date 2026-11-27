@@ -7,11 +7,8 @@ import os
 import sys
 import tempfile
 import pymupdf
-from PIL import Image
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor
 
 from preview.ui.main_window import MacMainWindow
 from preview.theme import MacTheme

@@ -4,21 +4,17 @@ Provides a multi-tab configuration interface with persistent QSettings storage,
 legacy settings synchronization, and live application updates.
 """
 
-import os
 from typing import Dict, Any, Optional
 
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QComboBox, QCheckBox, QSpinBox, QDoubleSpinBox,
     QPushButton, QColorDialog, QTableWidget, QTableWidgetItem,
-    QHeaderView, QLineEdit, QGroupBox, QFormLayout, QFrame,
-    QMessageBox, QSizePolicy
+    QHeaderView, QLineEdit, QGroupBox, QFormLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSettings
-from PyQt6.QtGui import QColor, QFont, QPixmap, QPainter, QIcon
+from PyQt6.QtGui import QColor, QPixmap, QPainter
 
-from preview.icons import MacIconFactory
-from preview.theme import StudioTheme, MacTheme, ThemeManager
 
 
 # Standard default settings configuration

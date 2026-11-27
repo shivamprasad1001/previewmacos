@@ -1,7 +1,7 @@
 import hashlib
 import io
 import urllib.error
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 

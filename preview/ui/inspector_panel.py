@@ -5,22 +5,20 @@ and annotation layer management.
 """
 
 import os
-from typing import Optional, List, Dict, Any
-from PIL import Image
+from typing import Optional
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStackedWidget,
     QToolButton, QScrollArea, QFrame, QSpinBox, QDoubleSpinBox,
-    QSlider, QComboBox, QFontComboBox, QPlainTextEdit, QPushButton,
+    QFontComboBox, QPlainTextEdit, QPushButton,
     QListWidget, QListWidgetItem, QSizePolicy, QColorDialog, QMessageBox
 )
-from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QRectF, QPointF
+from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from preview.core.document import Document
 from preview.core.annotations import AnnotationItem, AnnotationType
 from preview.icons import MacIconFactory
-from preview.theme import MacTheme
 
 
 class MacInspectorPanel(QWidget):
@@ -115,7 +113,7 @@ class MacInspectorPanel(QWidget):
 
         # 2. Stacked Content Area with 16px Padding
         self.stack = QStackedWidget()
-        
+
         # Tab 0: Properties / Format
         self.properties_scroll = QScrollArea()
         self.properties_scroll.setWidgetResizable(True)
@@ -217,7 +215,7 @@ class MacInspectorPanel(QWidget):
 
     def _build_annotation_properties(self, annot: AnnotationItem):
         type_name = str(annot.item_type.name).replace("_", " ").title()
-        
+
         # Header with type icon and label
         hdr_box = QHBoxLayout()
         title_lbl = QLabel(f"<b>{type_name}</b>")
@@ -256,7 +254,7 @@ class MacInspectorPanel(QWidget):
         s_lay.addLayout(stroke_row)
 
         # Fill Color (for shapes)
-        if annot.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
+        if annot.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
                                AnnotationType.ELLIPSE, AnnotationType.CALLOUT):
             fill_row = QHBoxLayout()
             fill_lbl = QLabel("Fill:")
@@ -367,7 +365,7 @@ class MacInspectorPanel(QWidget):
 
     def _build_document_properties(self, doc: Document):
         meta = doc.metadata or {}
-        
+
         # Document Summary Card
         card = QFrame()
         card.setObjectName("inspectorCard")

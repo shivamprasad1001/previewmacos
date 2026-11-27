@@ -4,11 +4,11 @@ Provides interactive hit-testing, resize handles, and rendering over documents.
 """
 
 from enum import Enum, auto
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import math
 
 from PyQt6.QtGui import QPainter, QPainterPath, QColor, QPen, QBrush, QFont, QPixmap
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSizeF
+from PyQt6.QtCore import Qt, QPointF, QRectF
 
 class AnnotationType(Enum):
     NONE = auto()
@@ -50,7 +50,7 @@ class Handle(Enum):
 
 class AnnotationItem:
     """A single markup or annotation element."""
-    
+
     def __init__(self, item_type: AnnotationType):
         self.item_type: AnnotationType = item_type
         self.rect: QRectF = QRectF()
@@ -84,7 +84,7 @@ class AnnotationItem:
                 pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                 pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
                 painter.setPen(pen)
-                
+
                 path = QPainterPath()
                 p0 = self.points[0] * zoom
                 path.moveTo(p0)
@@ -101,7 +101,7 @@ class AnnotationItem:
                 pen.setCapStyle(Qt.PenCapStyle.SquareCap)
                 pen.setJoinStyle(Qt.PenJoinStyle.BevelJoin)
                 painter.setPen(pen)
-                
+
                 path = QPainterPath()
                 path.moveTo(self.points[0] * zoom)
                 for pt in self.points[1:]:
@@ -112,7 +112,7 @@ class AnnotationItem:
             pen = QPen(self.stroke_color, self.stroke_width * zoom)
             painter.setPen(pen)
             painter.setBrush(QBrush(self.fill_color))
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             painter.drawRect(scaled_rect)
 
@@ -120,7 +120,7 @@ class AnnotationItem:
             pen = QPen(self.stroke_color, self.stroke_width * zoom)
             painter.setPen(pen)
             painter.setBrush(QBrush(self.fill_color))
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             painter.drawRoundedRect(scaled_rect, 10 * zoom, 10 * zoom)
 
@@ -128,7 +128,7 @@ class AnnotationItem:
             pen = QPen(self.stroke_color, self.stroke_width * zoom)
             painter.setPen(pen)
             painter.setBrush(QBrush(self.fill_color))
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             painter.drawEllipse(scaled_rect)
 
@@ -163,13 +163,13 @@ class AnnotationItem:
                 painter.drawPath(path)
 
         elif self.item_type == AnnotationType.TEXT:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             if self.fill_color.alpha() > 0:
                 painter.setBrush(QBrush(self.fill_color))
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.drawRoundedRect(scaled_rect, 4, 4)
-            
+
             font = QFont(self.font_family, int(self.font_size * zoom))
             if getattr(self, "is_bold", False):
                 font.setBold(True)
@@ -183,7 +183,7 @@ class AnnotationItem:
             painter.drawText(scaled_rect, align, self.text)
 
         elif self.item_type == AnnotationType.NOTE:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  32 * zoom, 32 * zoom)
             # Yellow note square
             painter.setBrush(QBrush(QColor("#ffd60a")))
@@ -195,12 +195,12 @@ class AnnotationItem:
             painter.drawRect(f_rect)
 
         elif self.item_type == AnnotationType.SIGNATURE and self.signature_pixmap:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             painter.drawPixmap(scaled_rect.toRect(), self.signature_pixmap)
 
         elif self.item_type == AnnotationType.REDACT:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(QColor("#000000")))
@@ -211,7 +211,7 @@ class AnnotationItem:
             painter.drawRect(scaled_rect)
 
         elif self.item_type == AnnotationType.CROP_BOX:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             pen = QPen(QColor("#007aff"), 1.8)
             pen.setStyle(Qt.PenStyle.DashLine)
@@ -222,7 +222,7 @@ class AnnotationItem:
             self._draw_size_badge(painter, scaled_rect)
 
         elif self.item_type == AnnotationType.CROP_OVAL:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             pen = QPen(QColor("#007aff"), 1.8)
             pen.setStyle(Qt.PenStyle.DashLine)
@@ -246,7 +246,7 @@ class AnnotationItem:
                 painter.drawPath(path)
 
         elif self.item_type == AnnotationType.LOUPE:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             if scaled_rect.width() > 2 and scaled_rect.height() > 2:
                 clip_path = QPainterPath()
@@ -285,21 +285,21 @@ class AnnotationItem:
                 painter.drawEllipse(scaled_rect.adjusted(1.5, 1.5, -1.5, -1.5))
 
         elif self.item_type == AnnotationType.CALLOUT:
-            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom, 
+            scaled_rect = QRectF(self.rect.left() * zoom, self.rect.top() * zoom,
                                  self.rect.width() * zoom, self.rect.height() * zoom)
             tail = self.tail_point * zoom if (self.tail_point and not self.tail_point.isNull()) else QPointF(scaled_rect.left() - 20 * zoom, scaled_rect.bottom() + 25 * zoom)
-            
+
             # Construct speech bubble path
             path = QPainterPath()
             rad = 8.0 * zoom
             path.addRoundedRect(scaled_rect, rad, rad)
-            
+
             tri = QPainterPath()
             cx = scaled_rect.center().x()
             cy = scaled_rect.center().y()
             dx = tail.x() - cx
             dy = tail.y() - cy
-            
+
             if abs(dy) >= abs(dx):
                 if dy >= 0:
                     base_y = scaled_rect.bottom()
@@ -397,7 +397,7 @@ class AnnotationItem:
     def _draw_resize_handles(self, painter: QPainter, rect: QRectF, zoom: float = 1.0):
         """Draws standard macOS resize handles."""
         h_sz = 8.0
-        
+
         if self.item_type in (AnnotationType.LINE, AnnotationType.ARROW) and len(self.points) >= 2:
             painter.setBrush(QBrush(QColor("#ffffff")))
             painter.setPen(QPen(QColor("#0a84ff"), 1.5))
@@ -496,7 +496,7 @@ class AnnotationItem:
         b = self.get_bounds()
         if not b.isValid() or b.isEmpty():
             return {}
-        
+
         return {
             Handle.NW: b.topLeft(),
             Handle.N: QPointF(b.center().x(), b.top()),
@@ -560,10 +560,10 @@ class AnnotationItem:
 
         new_rect = QRectF(l, t, r - l, b - t)
 
-        if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
-                              AnnotationType.ELLIPSE, AnnotationType.TEXT, 
-                              AnnotationType.NOTE, AnnotationType.SIGNATURE, 
-                              AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, 
+        if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
+                              AnnotationType.ELLIPSE, AnnotationType.TEXT,
+                              AnnotationType.NOTE, AnnotationType.SIGNATURE,
+                              AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL,
                               AnnotationType.REDACT, AnnotationType.LOUPE, AnnotationType.CALLOUT,
                               AnnotationType.IMAGE_OVERLAY):
             self.rect = new_rect
@@ -581,10 +581,10 @@ class AnnotationItem:
 
     def get_bounds(self) -> QRectF:
         """Calculates bounding box of annotation in document coordinates."""
-        if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
-                              AnnotationType.ELLIPSE, AnnotationType.TEXT, 
-                              AnnotationType.NOTE, AnnotationType.SIGNATURE, 
-                              AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL, 
+        if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
+                              AnnotationType.ELLIPSE, AnnotationType.TEXT,
+                              AnnotationType.NOTE, AnnotationType.SIGNATURE,
+                              AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL,
                               AnnotationType.REDACT, AnnotationType.LOUPE,
                               AnnotationType.IMAGE_OVERLAY):
             return self.rect.normalized()

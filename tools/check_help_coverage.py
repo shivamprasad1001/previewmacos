@@ -8,8 +8,6 @@ def verify_coverage():
         help_data = json.load(f)
 
     dict_items = help_data.get("dictionary", [])
-    dict_names = {item["name"].lower(): item for item in dict_items}
-    dict_actions = {item.get("action_id"): item for item in dict_items if item.get("action_id")}
 
     print(f"Total Help Dictionary entries: {len(dict_items)}")
 

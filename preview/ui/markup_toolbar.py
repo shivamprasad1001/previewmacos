@@ -14,7 +14,7 @@ from typing import List, Optional, Tuple
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QColorDialog, QMenu,
-    QSpinBox, QComboBox, QFontComboBox, QLabel, QButtonGroup, QFrame,
+    QSpinBox, QFontComboBox, QLabel, QButtonGroup, QFrame,
     QSizePolicy,
 )
 from PyQt6.QtGui import (
@@ -494,19 +494,27 @@ class MarkupToolbar(QWidget):
         b.setText(text)
         b.setToolTip(tooltip)
         styles = ["font-size: 12px;"]
-        if bold:      styles.append("font-weight: 700;")
-        if italic:    styles.append("font-style: italic; font-family: serif;")
-        if underline: styles.append("text-decoration: underline;")
-        if strike:    styles.append("text-decoration: line-through;")
+        if bold:
+            styles.append("font-weight: 700;")
+        if italic:
+            styles.append("font-style: italic; font-family: serif;")
+        if underline:
+            styles.append("text-decoration: underline;")
+        if strike:
+            styles.append("text-decoration: line-through;")
         b.setStyleSheet(" ".join(styles))
         return b
 
     def _section_label(self, text: str, *, accent=False, danger=False, muted=False) -> QLabel:
         lbl = QLabel(text)
-        if accent:   lbl.setObjectName("contextAccentLabel")
-        elif danger: lbl.setObjectName("contextDangerLabel")
-        elif muted:  lbl.setObjectName("contextMutedLabel")
-        else:        lbl.setObjectName("contextSectionLabel")
+        if accent:
+            lbl.setObjectName("contextAccentLabel")
+        elif danger:
+            lbl.setObjectName("contextDangerLabel")
+        elif muted:
+            lbl.setObjectName("contextMutedLabel")
+        else:
+            lbl.setObjectName("contextSectionLabel")
         return lbl
 
     def _make_group(self, buttons: List[QToolButton]) -> QFrame:

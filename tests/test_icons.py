@@ -6,8 +6,8 @@ color tinting in dark and light themes, dropdown variants, and vector fallbacks.
 
 import unittest
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QColor, QPixmap, QIcon
-from preview.icons import Icon, MacIconFactory, ICON_MAP, BUILTIN_SVGS
+from PyQt6.QtGui import QColor
+from preview.icons import Icon, MacIconFactory, BUILTIN_SVGS
 
 # Ensure single offscreen Qt application
 app = QApplication.instance()

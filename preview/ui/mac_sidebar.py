@@ -18,14 +18,14 @@ from enum import Enum
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
     QTreeWidget, QTreeWidgetItem, QLabel, QStackedWidget,
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu, QMessageBox,
+    QStyledItemDelegate, QStyle, QMenu, QMessageBox,
     QSlider, QFileDialog, QSizePolicy, QGraphicsOpacityEffect,
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QAction,
 )
 from PyQt6.QtCore import (
-    Qt, pyqtSignal, QSize, QRectF, QModelIndex, QEvent, QPointF,
+    Qt, pyqtSignal, QSize, QRectF, QEvent, QPointF,
     QVariantAnimation, QPropertyAnimation, QEasingCurve, QAbstractAnimation,
 )
 

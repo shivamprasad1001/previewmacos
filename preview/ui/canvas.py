@@ -1,9 +1,9 @@
 """
-Interactive document canvas widget supporting High-DPI rendering, zoom, pan, 
+Interactive document canvas widget supporting High-DPI rendering, zoom, pan,
 markup drawing, handle manipulation, search highlight, and cropping.
 """
 
-from typing import List, Optional, Tuple, Dict
+from typing import Any, List, Optional, Tuple, Dict
 import copy
 import math
 from PIL import Image, ImageDraw, ImageChops
@@ -14,8 +14,8 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFrame
 )
 from PyQt6.QtGui import (
-    QPainter, QColor, QPen, QBrush, QPixmap, QCursor, QMouseEvent, 
-    QWheelEvent, QKeyEvent, QPaintEvent, QNativeGestureEvent, QPainterPath, QPolygonF
+    QPainter, QColor, QPen, QBrush, QPixmap, QMouseEvent,
+    QWheelEvent, QKeyEvent, QPaintEvent, QPainterPath, QPolygonF
 )
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal, QTimer, QEvent, QVariantAnimation, QEasingCurve
 
@@ -145,7 +145,7 @@ class CanvasView(QWidget):
 
         # Annotations per page: page_idx -> List[AnnotationItem]
         self.annotations: Dict[int, List[AnnotationItem]] = {}
-        
+
         # Current active tool
         self.active_tool: AnnotationType = AnnotationType.NONE
         self.stroke_color: QColor = QColor("#ff3b30")
@@ -383,11 +383,11 @@ class CanvasView(QWidget):
     def animate_zoom_to(self, target_zoom: float, center: Optional[QPointF] = None, duration: int = 150):
         if hasattr(self, "_zoom_anim") and self._zoom_anim and self._zoom_anim.state() == QVariantAnimation.State.Running:
             self._zoom_anim.stop()
-        
+
         target_zoom = max(0.05, min(10.0, target_zoom))
         if center is None:
             center = QPointF(self.width() / 2.0, self.height() / 2.0)
-        
+
         start_zoom = self.zoom
         if abs(start_zoom - target_zoom) < 0.001 or not self.isVisible():
             if self.zoom > 0:
@@ -436,7 +436,6 @@ class CanvasView(QWidget):
         if has_two_up:
             w2, h2 = self.document.get_page_size(self.current_page + 1)
             total_w = w_doc + w2 + 12.0
-            total_h = max(h_doc, h2)
         else:
             total_w = w_doc
             total_h = h_doc
@@ -467,17 +466,14 @@ class CanvasView(QWidget):
         if has_two_up:
             w2, h2 = self.document.get_page_size(self.current_page + 1)
             total_w = w_doc + w2 + 12.0
-            total_h = max(h_doc, h2)
         else:
             total_w = w_doc
-            total_h = h_doc
         padding = 24.0
         vw = max(50.0, float(self.width()) - 2.0 * padding)
         if total_w > 0:
             scale = vw / total_w
             self.set_zoom(scale)
             actual_pw = (w_doc + w2) * self.zoom + 12.0 if has_two_up else w_doc * self.zoom
-            actual_ph = max(h_doc, h2) * self.zoom if has_two_up else h_doc * self.zoom
             self._pan_offset = QPointF(
                 (float(self.width()) - actual_pw) / 2.0,
                 padding
@@ -499,7 +495,7 @@ class CanvasView(QWidget):
         else:
             self._loupe_pos = QPointF(-1000, -1000)
             self.status_message.emit("Magnifier closed")
-        
+
         self._update_cursor()
         self.update()
 
@@ -520,8 +516,8 @@ class CanvasView(QWidget):
             self.setCursor(Qt.CursorShape.CrossCursor)
         elif self.active_tool in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
             self.setCursor(Qt.CursorShape.CrossCursor)
-        elif self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
-                                  AnnotationType.ELLIPSE, AnnotationType.LINE, 
+        elif self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
+                                  AnnotationType.ELLIPSE, AnnotationType.LINE,
                                   AnnotationType.ARROW, AnnotationType.CROP_BOX,
                                   AnnotationType.CROP_OVAL, AnnotationType.CROP_LASSO,
                                   AnnotationType.REDACT):
@@ -661,7 +657,7 @@ class CanvasView(QWidget):
 
     def view_to_doc_coords(self, pt: QPointF) -> QPointF:
         """Transforms canvas pixel coordinates to document point coordinates."""
-        return QPointF((pt.x() - self._pan_offset.x()) / self.zoom, 
+        return QPointF((pt.x() - self._pan_offset.x()) / self.zoom,
                        (pt.y() - self._pan_offset.y()) / self.zoom)
 
     def doc_to_view_coords(self, pt: QPointF) -> QPointF:
@@ -785,8 +781,8 @@ class CanvasView(QWidget):
                 return
 
             # 3. Handle Shapes & Redaction & Underline & Strikethrough
-            if self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT, 
-                                    AnnotationType.ELLIPSE, AnnotationType.LINE, 
+            if self.active_tool in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
+                                    AnnotationType.ELLIPSE, AnnotationType.LINE,
                                     AnnotationType.ARROW, AnnotationType.REDACT,
                                     AnnotationType.UNDERLINE, AnnotationType.STRIKETHROUGH):
                 item = AnnotationItem(self.active_tool)
@@ -804,7 +800,7 @@ class CanvasView(QWidget):
                     pass
                 item.rect = QRectF(doc_pt, doc_pt)
                 item.points = [doc_pt, doc_pt]
-                
+
                 self._active_annotation = item
                 self._get_current_annotations().append(item)
                 self.update()
@@ -895,10 +891,10 @@ class CanvasView(QWidget):
                 if item.contains_point(doc_pt):
                     clicked_item = item
                     break
-            
+
             for item in self._get_current_annotations():
                 item.is_selected = (item is clicked_item)
-            
+
             self._selected_annotation = clicked_item
             self.annotation_selected.emit(clicked_item)
             if clicked_item:
@@ -915,7 +911,7 @@ class CanvasView(QWidget):
                 self._selected_text = ""
             else:
                 self._clear_text_selection()
-            
+
             self.update()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
@@ -933,7 +929,7 @@ class CanvasView(QWidget):
                     elif item.item_type == AnnotationType.NOTE:
                         self._open_sticky_note_dialog(item)
                         return
-            
+
             # Select word on double click in PDF
             if self.document and self.document.is_pdf and self.active_tool == AnnotationType.NONE:
                 words = self.document.get_page_words(self.current_page)
@@ -1053,8 +1049,8 @@ class CanvasView(QWidget):
             doc_pt_clamped = self.clamp_to_doc_bounds(doc_pt)
             if self._active_annotation.item_type in (AnnotationType.PEN, AnnotationType.HIGHLIGHTER):
                 self._active_annotation.points.append(doc_pt_clamped)
-            elif self._active_annotation.item_type in (AnnotationType.RECTANGLE, 
-                                                        AnnotationType.ROUNDED_RECT, 
+            elif self._active_annotation.item_type in (AnnotationType.RECTANGLE,
+                                                        AnnotationType.ROUNDED_RECT,
                                                         AnnotationType.ELLIPSE,
                                                         AnnotationType.REDACT,
                                                         AnnotationType.LOUPE,
@@ -1459,27 +1455,27 @@ class CanvasView(QWidget):
         if not self.document.is_pdf and self.document._pil_image:
             old_img = self.document._pil_image.copy()
             page = self.current_page
-            
+
             if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
                 r = self.crop_box.rect.normalized()
                 if r.width() < 5 or r.height() < 5:
                     return
                 crop_rect = (int(r.left()), int(r.top()), int(r.right()), int(r.bottom()))
                 cropped = old_img.crop(crop_rect)
-                
+
                 if self.crop_box.item_type == AnnotationType.CROP_OVAL:
                     w, h = cropped.size
                     mask = Image.new("L", (w, h), 0)
                     draw = ImageDraw.Draw(mask)
                     draw.ellipse((0, 0, w - 1, h - 1), fill=255)
-                    
+
                     cropped_rgba = cropped.convert("RGBA")
                     if "A" in cropped.getbands():
                         orig_alpha = cropped.split()[-1]
                         mask = ImageChops.multiply(orig_alpha, mask)
                     cropped_rgba.putalpha(mask)
                     cropped = cropped_rgba
-            
+
             elif self.crop_box.item_type == AnnotationType.CROP_LASSO:
                 pts = self.crop_box.points
                 if len(pts) < 3:
@@ -1490,14 +1486,14 @@ class CanvasView(QWidget):
                 max_y = min(old_img.height, int(max(p.y() for p in pts)))
                 if (max_x - min_x) < 5 or (max_y - min_y) < 5:
                     return
-                
+
                 cropped = old_img.crop((min_x, min_y, max_x, max_y))
                 w, h = cropped.size
                 mask = Image.new("L", (w, h), 0)
                 draw = ImageDraw.Draw(mask)
                 poly_pts = [(int(p.x() - min_x), int(p.y() - min_y)) for p in pts]
                 draw.polygon(poly_pts, fill=255)
-                
+
                 cropped_rgba = cropped.convert("RGBA")
                 if "A" in cropped.getbands():
                     orig_alpha = cropped.split()[-1]
@@ -1531,7 +1527,7 @@ class CanvasView(QWidget):
         img = old_img.convert("RGBA")
         draw = ImageDraw.Draw(img)
         clear_col = (0, 0, 0, 0)
-        
+
         if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
             r = self.crop_box.rect.normalized()
             if self.crop_box.item_type == AnnotationType.CROP_BOX:
@@ -1542,7 +1538,7 @@ class CanvasView(QWidget):
             pts = [(int(p.x()), int(p.y())) for p in self.crop_box.points]
             if len(pts) >= 3:
                 draw.polygon(pts, fill=clear_col)
-                
+
         page = self.current_page
         self.document.update_image(img, page)
         self.crop_box = None
@@ -1569,7 +1565,7 @@ class CanvasView(QWidget):
 
         old_img = self.document._pil_image.copy()
         page = self.current_page
-        
+
         # 1. Determine bounding box and extract masked selection
         if self.crop_box.item_type in (AnnotationType.CROP_BOX, AnnotationType.CROP_OVAL):
             r = self.crop_box.rect.normalized()
@@ -1910,7 +1906,7 @@ class CanvasView(QWidget):
         painter.setClipRect(QRectF(0, 0, w_doc * self.zoom, h_doc * self.zoom))
         for item in self._get_current_annotations():
             item.draw(painter, zoom=self.zoom, page_pixmap=page_pix)
-        
+
         # 4. Draw Crop Selection & Dim Outside Region
         if self.crop_box:
             dim_path = QPainterPath()
@@ -1926,7 +1922,7 @@ class CanvasView(QWidget):
             elif self.crop_box.item_type == AnnotationType.CROP_LASSO and len(self.crop_box.points) > 2:
                 poly = QPolygonF([p * self.zoom for p in self.crop_box.points])
                 sel_path.addPolygon(poly)
-            
+
             dim_outside = dim_path.subtracted(sel_path)
             painter.fillPath(dim_outside, QBrush(QColor(0, 0, 0, 50)))
             self.crop_box.draw(painter, zoom=self.zoom)
@@ -1985,7 +1981,7 @@ class CanvasView(QWidget):
             # Magnified document coordinates
             doc_center = self.view_to_doc_coords(QPointF(cx, cy))
             mag_zoom = max(0.2, self.zoom * self._loupe_zoom)
-            
+
             # Render magnified page
             mag_pix = self.document.render_page(self.current_page, zoom=mag_zoom)
             mag_page_x = cx - doc_center.x() * mag_zoom
@@ -2037,7 +2033,7 @@ class CanvasView(QWidget):
         from PyQt6.QtGui import QAction
         menu = QMenu(self)
         menu.setObjectName("canvasContextMenu")
-        
+
         # Text selection actions
         if self._selected_text:
             act_copy_sel = QAction("Copy Selection", self)

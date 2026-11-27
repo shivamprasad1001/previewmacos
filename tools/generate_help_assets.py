@@ -1,12 +1,12 @@
 import os
 import sys
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QImage, QPainter, QColor, QFont, QPen, QBrush, QLinearGradient
+from PyQt6.QtGui import QImage, QPainter, QColor, QFont, QPen, QBrush
 from PyQt6.QtCore import Qt, QRectF, QPointF
 
 def create_guide_screenshots():
     os.makedirs("preview/assets/help", exist_ok=True)
-    app = QApplication.instance() or QApplication(sys.argv)
+    QApplication.instance() or QApplication(sys.argv)
 
     # We will generate crisp synthetic UI mockups representing the real app's UI for light & dark themes
     screens = [

@@ -14,11 +14,10 @@ import pymupdf
 from PIL import Image
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
+from PyQt6.QtCore import QPointF, QRectF, QSize
 from PyQt6.QtGui import QColor, QResizeEvent
 
 from preview.ui.main_window import MacMainWindow
-from preview.core.document import Document
 from preview.core.annotations import AnnotationItem, AnnotationType
 
 app = QApplication.instance()

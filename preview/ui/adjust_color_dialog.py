@@ -3,12 +3,13 @@ macOS style 'Adjust Color' window featuring real-time histogram and sliders.
 Optimized for ultra-responsive live adjustments on high-resolution images.
 """
 
+import logging
 from typing import Optional, List
 from PIL import Image
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
-    QSlider, QPushButton, QCheckBox, QFrame, QWidget
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
+    QSlider, QPushButton, QCheckBox, QWidget
 )
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QPaintEvent
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
@@ -31,7 +32,7 @@ class HistogramWidget(QWidget):
             self.r_hist, self.g_hist, self.b_hist = r, g, b
             self.update()
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Failed to update histogram")
 
     def paintEvent(self, event: QPaintEvent):
         painter = QPainter(self)

@@ -9,7 +9,6 @@ Strict visual style:
 - Clean typography and structured tables.
 """
 
-import json
 import os
 import time
 import pymupdf

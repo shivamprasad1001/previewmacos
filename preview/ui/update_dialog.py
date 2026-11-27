@@ -1,16 +1,16 @@
 """
 macOS style Software Update Dialog & In-App Notification Banner.
-Provides authentic Apple Sparkle-like UI for discovering, inspecting, 
+Provides authentic Apple Sparkle-like UI for discovering, inspecting,
 downloading, and auto-installing new Preview releases.
 """
 
 import os
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTextBrowser, QCheckBox, QFrame, QProgressBar, QApplication
 )
-from PyQt6.QtGui import QPixmap, QDesktopServices, QFont, QColor
+from PyQt6.QtGui import QPixmap, QDesktopServices, QFont
 from PyQt6.QtCore import Qt, QUrl, QSettings, pyqtSignal
 
 from preview.core.updater import UpdateInfo, UpdateDownloadWorker, install_update
@@ -26,7 +26,7 @@ class UpdateDialog(QDialog):
         self.download_worker: Optional[UpdateDownloadWorker] = None
         self.downloaded_filepath: Optional[str] = None
         self.verified_sha256: Optional[str] = None
-        
+
         self.setWindowTitle("Software Update")
         self.setFixedSize(540, 500)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
@@ -224,7 +224,7 @@ class UpdateDialog(QDialog):
             line = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", line)
             line = re.sub(r"\*(.*?)\*", r"<i>\1</i>", line)
             line = re.sub(r"`(.*?)`", r"<code style='background: rgba(128,128,128,0.2); padding: 1px 4px; border-radius: 3px;'>\1</code>", line)
-            
+
             if line.startswith("### "):
                 lines.append(f"<h4 style='margin: 8px 0 4px 0; color: #0a84ff;'>{line[4:]}</h4>")
             elif line.startswith("## "):
@@ -367,7 +367,7 @@ class UpdateDialog(QDialog):
 
 class UpdateBanner(QFrame):
     """
-    Subtle macOS-style floating top banner inside the main window notifying 
+    Subtle macOS-style floating top banner inside the main window notifying
     the user when a new release is available.
     """
 
@@ -388,8 +388,8 @@ class UpdateBanner(QFrame):
 
         self.setStyleSheet("""
             #updateBanner {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 rgba(10, 132, 255, 0.22), 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(10, 132, 255, 0.22),
                     stop:1 rgba(94, 92, 230, 0.22));
                 border-bottom: 1px solid rgba(10, 132, 255, 0.35);
             }

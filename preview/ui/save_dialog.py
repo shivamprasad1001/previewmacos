@@ -65,17 +65,17 @@ class MacSaveConfirmationDialog(QDialog):
         icon_label.setObjectName("alertIcon")
         icon_label.setFixedSize(54, 54)
         icon_label.setStyleSheet("background: transparent;")
-        
+
         icon_pix = QPixmap(54, 54)
         icon_pix.fill(Qt.GlobalColor.transparent)
         p = QPainter(icon_pix)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         # Rounded squircle icon background
         p.setBrush(QBrush(QColor("#007aff")))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(2, 2, 50, 50, 12, 12)
-        
+
         # Document icon glyph
         p.setPen(QPen(QColor("#ffffff"), 2.2))
         p.setFont(QFont("Inter", 22, QFont.Weight.Bold))
@@ -153,7 +153,7 @@ class MacSaveConfirmationDialog(QDialog):
 
     def _apply_styling(self):
         is_dark = (self.theme == MacTheme.DARK)
-        
+
         bg_col = "#252528" if is_dark else "#f4f4f7"
         border_col = "rgba(255, 255, 255, 0.12)" if is_dark else "rgba(0, 0, 0, 0.15)"
         title_col = "#f5f5f7" if is_dark else "#1d1d1f"

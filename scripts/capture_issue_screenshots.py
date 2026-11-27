@@ -12,22 +12,21 @@ Captures high-resolution pixel-perfect screenshots for all implemented issues:
 import argparse
 import os
 import sys
-import shutil
 import tempfile
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import pymupdf
 
-from PyQt6.QtWidgets import QApplication, QWidget, QFileDialog
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
-from PyQt6.QtGui import QColor, QFont, QPainter, QPixmap
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QPointF, QRectF
+from PyQt6.QtGui import QColor
 
 # Ensure preview package is importable
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
-from preview.theme import MacTheme, ThemeManager
-from preview.core.document import Document, LRUCache
+from preview.theme import MacTheme
+from preview.core.document import Document
 from preview.core.annotations import AnnotationItem, AnnotationType
 from preview.ui.main_window import MacMainWindow
 from preview.ui.batch_dialog import BatchConvertDialog
@@ -41,25 +40,25 @@ def create_sample_documents(temp_dir: str):
     doc1 = pymupdf.open()
     for page_num in range(4):
         page = doc1.new_page(width=612, height=792)  # Standard Letter
-        
+
         # Header banner
         page.draw_rect(pymupdf.Rect(0, 0, 612, 80), color=(0.1, 0.45, 0.9), fill=(0.1, 0.45, 0.9))
         page.insert_text((36, 48), "Preview macOS • Financial & Operations Report", fontsize=18, color=(1, 1, 1))
         page.insert_text((36, 120), f"Section {page_num + 1}: Performance Metrics & Growth Overview", fontsize=15, color=(0.1, 0.1, 0.1))
-        
+
         # Content cards
         page.draw_rect(pymupdf.Rect(36, 150, 280, 300), color=(0.85, 0.85, 0.88), fill=(0.96, 0.96, 0.98))
         page.insert_text((50, 180), "Revenue Breakdown", fontsize=13, color=(0.2, 0.2, 0.2))
         page.insert_text((50, 210), "• Q1 ARR: $18.4M (+24% YoY)\n• Net Retention: 118%\n• Gross Margin: 82.5%\n• Active Enterprise Users: 14,200", fontsize=11, color=(0.3, 0.3, 0.3))
-        
+
         page.draw_rect(pymupdf.Rect(306, 150, 576, 300), color=(0.85, 0.85, 0.88), fill=(0.96, 0.96, 0.98))
         page.insert_text((320, 180), "Infrastructure Optimization", fontsize=13, color=(0.2, 0.2, 0.2))
         page.insert_text((320, 210), "• LRU Page Cache: <64MB Bound\n• Prefetch Latency: 0.12ms\n• Zero UI Frame Drops\n• Memory Leak Mitigation: 100%", fontsize=11, color=(0.3, 0.3, 0.3))
-        
+
         # Chart graphic simulation
         page.draw_rect(pymupdf.Rect(36, 330, 576, 520), color=(0.8, 0.8, 0.85), fill=(0.98, 0.98, 1.0))
         page.insert_text((50, 360), "Quarterly Performance Trajectory", fontsize=13, color=(0.2, 0.2, 0.2))
-        
+
         # Bars
         bars = [120, 150, 190, 240, 310]
         months = ["Jan", "Feb", "Mar", "Apr", "May"]
@@ -81,7 +80,7 @@ def create_sample_documents(temp_dir: str):
     draw = ImageDraw.Draw(im)
     draw.rectangle([40, 40, 1360, 860], fill=(255, 255, 255, 255), outline=(210, 215, 222, 255), width=2)
     draw.text((70, 70), "Preview macOS Core Engine Architecture", fill=(20, 25, 35, 255))
-    
+
     # Draw modules
     modules = [
         (100, 140, 450, 320, "Document Processing (PyMuPDF)", (230, 242, 255), (0, 110, 230)),
@@ -298,11 +297,11 @@ def capture_all(out_dir: str = "docs/screenshots"):
     card_im = Image.new("RGBA", (900, 520), color=(30, 30, 34, 255))
     draw = ImageDraw.Draw(card_im)
     draw.rounded_rectangle([20, 20, 880, 500], radius=12, fill=(40, 40, 45, 255), outline=(65, 65, 72, 255), width=2)
-    
+
     # Title
     draw.text((50, 45), "Issue #4 Benchmark: 500+ Page LRU Cache & Prefetch Engine", fill=(245, 245, 247, 255))
     draw.text((50, 75), "Eliminates UI frame latency and strictly bounds memory footprint on massive documents", fill=(160, 160, 168, 255))
-    
+
     metrics = [
         ("Total Document Pages", f"{bench['num_pages']} Pages", (10, 132, 255)),
         ("LRU Cache Page Cap", f"{bench['cache_limit']} Pages (~64MB Bound)", (52, 199, 89)),
@@ -313,7 +312,7 @@ def capture_all(out_dir: str = "docs/screenshots"):
         ("OOM Risk Elimination", "100% Protected", (255, 69, 58)),
         ("UI Frame Jitter", "0 Dropped Frames", (10, 132, 255))
     ]
-    
+
     for idx, (lbl, val, col) in enumerate(metrics):
         col_idx = idx % 2
         row_idx = idx // 2

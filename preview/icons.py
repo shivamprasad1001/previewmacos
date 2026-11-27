@@ -5,6 +5,7 @@ high-DPI PyQt6 renderers with light/dark theme tint support.
 Licensed under ISC by Lucide contributors.
 """
 
+import logging
 import os
 import re
 from typing import Optional, Dict, Union
@@ -574,8 +575,8 @@ class Icon:
                     content = f.read()
                     cls._svg_cache[base_name] = content
                     return content
-            except Exception:
-                pass
+            except OSError:
+                logging.getLogger(__name__).warning("Failed to read SVG icon %s", file_path, exc_info=True)
 
         # 2. Try embedded built-in SVGs (matches exact or normalized key)
         candidates = [

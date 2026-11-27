@@ -2,7 +2,10 @@
 Undo/Redo command manager for document edits and markups.
 """
 
+import logging
 from typing import List, Callable, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 class ActionCommand:
     def __init__(self, description: str, undo_fn: Callable[[], Any], redo_fn: Callable[[], Any]):
@@ -44,7 +47,7 @@ class HistoryManager:
             try:
                 self.on_changed(self.is_modified)
             except Exception:
-                pass
+                logger.exception("History on_changed callback failed")
 
     def push(self, command: ActionCommand):
         self._undo_stack.append(command)

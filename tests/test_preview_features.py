@@ -93,7 +93,7 @@ class TestPreviewParity(unittest.TestCase):
 
     def test_05_color_adjust_engine(self):
         img = Image.new("RGB", (200, 200), color=(128, 128, 128))
-        
+
         # Test adjustments
         adj = ColorAdjustEngine.adjust(img, exposure=0.5, contrast=0.2, saturation=0.3, temperature=0.2, tint=0.1)
         self.assertEqual(adj.size, img.size)
@@ -453,7 +453,7 @@ class TestPreviewParity(unittest.TestCase):
             exe_url="https://example.com/preview.exe"
         )
         self.assertEqual(info.version, "1.2.0")
-        
+
         # Test Dialog instantiation
         dlg = UpdateDialog(info, current_version="1.1.1")
         self.assertIsNotNone(dlg.notes_browser)
@@ -474,7 +474,7 @@ class TestPreviewParity(unittest.TestCase):
         win.close()
 
     def test_25_downloader_and_auto_install(self):
-        from preview.core.updater import UpdateDownloadWorker, install_update
+        from preview.core.updater import UpdateDownloadWorker
         worker = UpdateDownloadWorker("https://example.com/test.deb", "/tmp/test.deb")
         self.assertEqual(worker.download_url, "https://example.com/test.deb")
         self.assertFalse(worker._is_cancelled)
@@ -485,11 +485,11 @@ class TestPreviewParity(unittest.TestCase):
         from preview.core.annotations import Handle
         rect = AnnotationItem(AnnotationType.RECTANGLE)
         rect.rect = QRectF(100, 100, 200, 150)
-        
+
         # Test handle detection
         handle = rect.get_handle_at_point(QPointF(300, 250), zoom=1.0)
         self.assertEqual(handle, Handle.SE)
-        
+
         # Test resizing SE handle
         orig_bounds = rect.get_bounds()
         orig_pts = list(rect.points)
@@ -524,7 +524,7 @@ class TestPreviewParity(unittest.TestCase):
         self.assertIsNotNone(tb.color_adjust_btn)
         self.assertIsNotNone(tb.size_adjust_btn)
         self.assertIsNotNone(tb.rotate_btn)
-        
+
         # Verify signals
         captured = []
         tb.adjust_color_requested.connect(lambda: captured.append("color"))
@@ -535,9 +535,8 @@ class TestPreviewParity(unittest.TestCase):
     def test_29_sidebar_and_thumbnail_slider(self):
         win = MacMainWindow(initial_file=self.test_img_path)
         self.assertTrue(win.sidebar.view_btn.isEnabled())
-        
+
         # Test slider adjustment
-        initial_w = win.sidebar.thumbnail_width
         win.sidebar.size_slider.setValue(160)
         self.assertEqual(win.sidebar.thumbnail_width, 160)
         win.close()
@@ -558,7 +557,7 @@ class TestPreviewParity(unittest.TestCase):
         doc = Document(pdf_path)
         self.assertTrue(doc.is_pdf)
         self.assertEqual(doc.page_count, 2)
-        
+
         # Test word extraction
         words = doc.get_page_words(0)
         self.assertGreaterEqual(len(words), 4)
@@ -694,7 +693,7 @@ class TestPreviewParity(unittest.TestCase):
         pdf.close()
 
         doc = Document(pdf_path)
-        
+
         # Build annotations
         pen = AnnotationItem(AnnotationType.PEN)
         pen.points = [QPointF(50, 100), QPointF(100, 150), QPointF(150, 100)]
@@ -732,7 +731,7 @@ class TestPreviewParity(unittest.TestCase):
     def test_35_canvas_pdf_text_selection_and_view_mode(self):
         from preview.ui.canvas import CanvasView
         canvas = CanvasView()
-        
+
         # Test view mode switching
         canvas.set_view_mode("Two-Up")
         self.assertEqual(canvas.view_mode, "Two-Up")
@@ -743,7 +742,7 @@ class TestPreviewParity(unittest.TestCase):
         canvas._is_selecting_text = False
         canvas._selected_text = "Selected Parity Text"
         canvas._copy_selected_text()
-        
+
         # Test clipboard content
         clipboard = QApplication.clipboard()
         self.assertEqual(clipboard.text(), "Selected Parity Text")
@@ -758,7 +757,7 @@ class TestPreviewParity(unittest.TestCase):
         pdf = pymupdf.open()
         page = pdf.new_page(width=600, height=800)
         page.insert_text(pymupdf.Point(50, 100), "Sensitive Secret Token XYZ")
-        
+
         # Add a text form widget
         widget = pymupdf.Widget()
         widget.rect = pymupdf.Rect(50, 200, 250, 240)
@@ -773,13 +772,13 @@ class TestPreviewParity(unittest.TestCase):
         pdf.close()
 
         doc = Document(pdf_path)
-        
+
         # 1. Test form field inspection and update
         fields = doc.get_form_fields(0)
         self.assertEqual(len(fields), 1)
         self.assertEqual(fields[0]["name"], "UserEmail")
         self.assertEqual(fields[0]["value"], "default@apple.com")
-        
+
         set_ok = doc.set_form_field_value(0, "UserEmail", "steve@apple.com")
         self.assertTrue(set_ok)
         updated_fields = doc.get_form_fields(0)
@@ -905,7 +904,7 @@ class TestPreviewParity(unittest.TestCase):
     def test_39_open_segmented_and_dropdown_markup_controls(self):
         """Verifies Open segmented button [ 📂 Open | ▼ ] and dropdown menus for selection, color, font."""
         win = MacMainWindow(initial_file=self.test_img_path)
-        
+
         # 1. Open Segmented Control
         self.assertTrue(hasattr(win, "open_segmented"))
         self.assertTrue(hasattr(win, "open_btn"))
@@ -925,7 +924,7 @@ class TestPreviewParity(unittest.TestCase):
         self.assertIn("Rectangular Selection", select_actions[0].text())
         self.assertIn("Oval", select_actions[1].text())
         self.assertIn("Lasso", select_actions[2].text())
-        
+
         # Trigger selection tool change
         select_actions[0].trigger()
         self.assertEqual(mb.current_tool, AnnotationType.CROP_BOX)
@@ -979,11 +978,11 @@ class TestPreviewParity(unittest.TestCase):
         # 1. Test Oval Crop
         canvas.set_active_tool(AnnotationType.CROP_OVAL)
         self.assertEqual(canvas.active_tool, AnnotationType.CROP_OVAL)
-        
+
         canvas.crop_box = AnnotationItem(AnnotationType.CROP_OVAL)
         canvas.crop_box.rect = QRectF(10, 10, 80, 80)
         canvas.apply_crop()
-        
+
         # Image should be 80x80 RGBA with transparent corners and opaque center
         img = canvas.document._pil_image
         self.assertEqual(img.size, (80, 80))
@@ -1437,7 +1436,6 @@ class TestPreviewParity(unittest.TestCase):
 
     def test_53_lru_cache_prefetching_and_benchmark(self):
         """Test 53: Verify LRU cache bounded eviction, smart prefetching, and 1,000-page benchmark (Issue #4)."""
-        import time
         import tempfile
         from preview.core.document import LRUCache
 
@@ -1686,7 +1684,7 @@ class TestPreviewParity(unittest.TestCase):
         """Test Issue #1: Multi-Tab Document Interface (macOS-style Window Tabs)."""
         from preview.ui.main_window import MacMainWindow
         from preview.core.annotations import AnnotationItem, AnnotationType
-        from PyQt6.QtCore import QPointF, QRectF
+        from PyQt6.QtCore import QRectF
         import pymupdf
         import tempfile
 
@@ -1745,7 +1743,7 @@ class TestPreviewParity(unittest.TestCase):
             self.assertIn("●", win.tab_container.tab_bar.tabText(0))
 
             # 4. Create new tab via new_tab(pdf2_path)
-            tab2 = win.new_tab(pdf2_path)
+            win.new_tab(pdf2_path)
             self.assertEqual(len(win.tabs), 2)
             self.assertEqual(win.active_tab_index, 1)
             self.assertEqual(win.tab_container.tab_bar.count(), 2)

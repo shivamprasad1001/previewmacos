@@ -8,6 +8,7 @@ import re
 import json
 import hashlib
 import hmac
+import logging
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -15,7 +16,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 import platform
 
-from PyQt6.QtCore import QThread, pyqtSignal, QSettings
+from PyQt6.QtCore import QThread, pyqtSignal
 from preview import __version__
 
 GITHUB_API_LATEST = "https://api.github.com/repos/shivamprasad1001/previewmacos/releases/latest"
@@ -213,8 +214,12 @@ class UpdateDownloadWorker(QThread):
         if os.path.exists(self.target_filepath):
             try:
                 os.remove(self.target_filepath)
-            except Exception:
-                pass
+            except OSError:
+                logging.getLogger(__name__).warning(
+                    "Failed to remove temporary download %s",
+                    self.target_filepath,
+                    exc_info=True,
+                )
 
     def _verify_checksum(self) -> Tuple[bool, Optional[str], str]:
         """Fetch SHA256SUMS.txt from the same release and verify the downloaded file."""
