@@ -23,11 +23,51 @@ from preview import __version__
 GITHUB_API_LATEST = "https://api.github.com/repos/shivamprasad1001/previewmacos/releases/latest"
 GITHUB_RELEASES_PAGE = "https://github.com/shivamprasad1001/previewmacos/releases"
 ALLOWED_REPO_PATH_PREFIX = "/shivamprasad1001/previewmacos/"
+# GitHub release downloads on github.com/<owner>/<repo>/releases/download/...
+# redirect to GitHub's release asset CDN/storage hosts:
+# - objects.githubusercontent.com (primary GitHub release asset storage)
+# - release-assets.githubusercontent.com (GitHub release asset CDN)
+# - github-releases.githubusercontent.com (legacy/regional GitHub release asset host)
 ALLOWED_ASSET_HOSTS = frozenset({
     "objects.githubusercontent.com",
-    "github-releases.githubusercontent.com",
     "release-assets.githubusercontent.com",
+    "github-releases.githubusercontent.com",
 })
+
+_STDLIB_URLOPEN = urllib.request.urlopen
+
+
+class _ValidatedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Validate every HTTP redirect target against the HTTPS + host allowlist."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        resolved = urllib.parse.urljoin(req.full_url, newurl)
+        if not is_allowed_download_url(resolved):
+            raise urllib.error.URLError(f"Disallowed redirect URL: {resolved}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _open_validated_url(url: str, timeout: int = 15):
+    """Open an allowlisted HTTPS URL, validating every redirect hop."""
+    if not is_allowed_download_url(url):
+        raise urllib.error.URLError(f"Disallowed URL: {url}")
+
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Preview-App-Downloader"},
+    )
+    if urllib.request.urlopen is not _STDLIB_URLOPEN:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+    else:
+        opener = urllib.request.build_opener(_ValidatedRedirectHandler())
+        resp = opener.open(req, timeout=timeout)
+
+    final_url = resp.geturl() if hasattr(resp, "geturl") else None
+    if isinstance(final_url, str) and final_url and not is_allowed_download_url(final_url):
+        if hasattr(resp, "close"):
+            resp.close()
+        raise urllib.error.URLError(f"Disallowed redirect URL: {final_url}")
+    return resp
 
 
 def is_allowed_download_url(url: str) -> bool:
@@ -228,15 +268,8 @@ class UpdateDownloadWorker(QThread):
         if not is_allowed_download_url(checksums_url):
             return False, None, f"Disallowed checksum URL: {checksums_url}"
 
-        req = urllib.request.Request(
-            checksums_url,
-            headers={"User-Agent": "Preview-App-Downloader"},
-        )
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                final_url = resp.geturl() if hasattr(resp, "geturl") else None
-                if isinstance(final_url, str) and final_url and not is_allowed_download_url(final_url):
-                    return False, None, f"Disallowed checksum redirect URL: {final_url}"
+            with _open_validated_url(checksums_url, timeout=15) as resp:
                 checksums_text = resp.read().decode("utf-8", errors="replace")
         except Exception as e:
             return False, None, f"Could not fetch SHA256SUMS.txt: {e}"
@@ -264,16 +297,7 @@ class UpdateDownloadWorker(QThread):
 
         try:
             os.makedirs(os.path.dirname(os.path.abspath(self.target_filepath)), exist_ok=True)
-            req = urllib.request.Request(
-                self.download_url,
-                headers={"User-Agent": "Preview-App-Downloader"}
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                final_url = resp.geturl() if hasattr(resp, "geturl") else None
-                if isinstance(final_url, str) and final_url and not is_allowed_download_url(final_url):
-                    self.failed.emit(f"Disallowed redirect URL: {final_url}")
-                    return
-
+            with _open_validated_url(self.download_url, timeout=15) as resp:
                 total_size = resp.headers.get("Content-Length")
                 total_bytes = int(total_size) if total_size else 0
 

@@ -1,6 +1,7 @@
 import hashlib
 import io
 import urllib.error
+import urllib.request
 from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -8,6 +9,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from preview.core.updater import (
     UpdateDownloadWorker,
     UpdateInfo,
+    _ValidatedRedirectHandler,
     install_update,
     is_allowed_download_url,
 )
@@ -199,3 +201,114 @@ def test_install_update_unreachable_without_verified_hash(tmp_path):
             assert dlg.verified_sha256 is None
     finally:
         dlg.close()
+
+
+class _MockRedirectTransport(urllib.request.BaseHandler):
+    """Mock HTTP/HTTPS handler that simulates 302 redirects and 200 payloads without network."""
+
+    def __init__(self, routes):
+        self.routes = routes
+        self.visited = []
+
+    def default_open(self, req):
+        import email.message
+        url = req.full_url
+        self.visited.append(url)
+        status, headers_dict, body = self.routes[url]
+        headers = email.message.Message()
+        for k, v in headers_dict.items():
+            headers[k] = v
+        stream = io.BytesIO(body)
+        setattr(stream, "msg", "")
+        resp = urllib.response.addinfourl(stream, headers, url, code=status)
+        if status in (301, 302, 303, 307, 308):
+            return self.parent.error("http", req, resp, status, "Found", headers)
+        return resp
+
+
+def test_redirect_chain_allowed_github_asset_host(tmp_path):
+    payload = b"verified-redirected-deb"
+    expected_sha = hashlib.sha256(payload).hexdigest()
+    start_url = "https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb"
+    cdn_url = "https://objects.githubusercontent.com/github-production-release-asset/preview-app_1.7.2_amd64.deb"
+    sums_url = "https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/SHA256SUMS.txt"
+    sums_cdn_url = "https://release-assets.githubusercontent.com/SHA256SUMS.txt"
+    sums_payload = f"{expected_sha}  preview-app_1.7.2_amd64.deb\n".encode("utf-8")
+
+    transport = _MockRedirectTransport({
+        start_url: (302, {"Location": cdn_url}, b""),
+        cdn_url: (200, {"Content-Length": str(len(payload))}, payload),
+        sums_url: (302, {"Location": sums_cdn_url}, b""),
+        sums_cdn_url: (200, {"Content-Length": str(len(sums_payload))}, sums_payload),
+    })
+    opener = urllib.request.build_opener(_ValidatedRedirectHandler(), transport)
+
+    target = tmp_path / "preview-app_1.7.2_amd64.deb"
+    worker = UpdateDownloadWorker(start_url, str(target))
+    finished_paths = []
+    failed_msgs = []
+    worker.finished.connect(finished_paths.append)
+    worker.failed.connect(failed_msgs.append)
+
+    with patch("preview.core.updater.urllib.request.build_opener", return_value=opener):
+        worker.run()
+
+    assert failed_msgs == []
+    assert finished_paths == [str(target)]
+    assert worker.verified_sha256 == expected_sha
+    assert cdn_url in transport.visited
+    assert sums_cdn_url in transport.visited
+
+
+def test_redirect_chain_rejects_disallowed_host(tmp_path):
+    start_url = "https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb"
+    evil_url = "https://evil.example.com/payload.deb"
+
+    transport = _MockRedirectTransport({
+        start_url: (302, {"Location": evil_url}, b""),
+        evil_url: (200, {"Content-Length": "4"}, b"evil"),
+    })
+    opener = urllib.request.build_opener(_ValidatedRedirectHandler(), transport)
+
+    target = tmp_path / "preview-app_1.7.2_amd64.deb"
+    worker = UpdateDownloadWorker(start_url, str(target))
+    finished_paths = []
+    failed_msgs = []
+    worker.finished.connect(finished_paths.append)
+    worker.failed.connect(failed_msgs.append)
+
+    with patch("preview.core.updater.urllib.request.build_opener", return_value=opener):
+        worker.run()
+
+    assert finished_paths == []
+    assert len(failed_msgs) == 1
+    assert "disallowed redirect" in failed_msgs[0].lower()
+    assert evil_url not in transport.visited
+    assert not target.exists()
+
+
+def test_redirect_chain_rejects_https_to_http_downgrade(tmp_path):
+    start_url = "https://github.com/shivamprasad1001/previewmacos/releases/download/v1.7.2/preview-app_1.7.2_amd64.deb"
+    http_url = "http://objects.githubusercontent.com/github-production-release-asset/preview-app_1.7.2_amd64.deb"
+
+    transport = _MockRedirectTransport({
+        start_url: (302, {"Location": http_url}, b""),
+        http_url: (200, {"Content-Length": "4"}, b"http"),
+    })
+    opener = urllib.request.build_opener(_ValidatedRedirectHandler(), transport)
+
+    target = tmp_path / "preview-app_1.7.2_amd64.deb"
+    worker = UpdateDownloadWorker(start_url, str(target))
+    finished_paths = []
+    failed_msgs = []
+    worker.finished.connect(finished_paths.append)
+    worker.failed.connect(failed_msgs.append)
+
+    with patch("preview.core.updater.urllib.request.build_opener", return_value=opener):
+        worker.run()
+
+    assert finished_paths == []
+    assert len(failed_msgs) == 1
+    assert "disallowed redirect" in failed_msgs[0].lower()
+    assert http_url not in transport.visited
+    assert not target.exists()
