@@ -25,6 +25,7 @@ class UpdateDialog(QDialog):
         self.current_version = current_version
         self.download_worker: Optional[UpdateDownloadWorker] = None
         self.downloaded_filepath: Optional[str] = None
+        self.verified_sha256: Optional[str] = None
         
         self.setWindowTitle("Software Update")
         self.setFixedSize(540, 500)
@@ -273,7 +274,12 @@ class UpdateDialog(QDialog):
         self.later_btn.clicked.connect(self._cancel_download)
 
         # Start background download worker
-        self.download_worker = UpdateDownloadWorker(download_url, target_path, parent=self)
+        self.download_worker = UpdateDownloadWorker(
+            download_url,
+            target_path,
+            checksums_url=self.update_info.checksums_url,
+            parent=self,
+        )
         self.download_worker.progress.connect(self._on_download_progress)
         self.download_worker.finished.connect(self._on_download_finished)
         self.download_worker.failed.connect(self._on_download_failed)
@@ -288,6 +294,7 @@ class UpdateDialog(QDialog):
 
     def _on_download_finished(self, target_path: str):
         self.downloaded_filepath = target_path
+        self.verified_sha256 = self.download_worker.verified_sha256 if self.download_worker else None
         self.progress_bar.setValue(100)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
@@ -327,6 +334,8 @@ class UpdateDialog(QDialog):
         """)
 
     def _on_download_failed(self, err: str):
+        self.downloaded_filepath = None
+        self.verified_sha256 = None
         self.download_container.setVisible(False)
         self.notes_browser.setMaximumHeight(16777215)
         self.update_btn.setText("Retry Update")
@@ -345,9 +354,9 @@ class UpdateDialog(QDialog):
         self.reject()
 
     def _install_and_restart(self):
-        if not self.downloaded_filepath:
+        if not self.downloaded_filepath or not self.verified_sha256:
             return
-        success, msg = install_update(self.downloaded_filepath)
+        success, msg = install_update(self.downloaded_filepath, expected_sha256=self.verified_sha256)
         if success:
             self.accept()
             QApplication.instance().quit()
