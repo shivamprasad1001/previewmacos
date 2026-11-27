@@ -54,6 +54,8 @@ def main():
     if os.path.exists(icon_path):
         window.setWindowIcon(QIcon(icon_path))
     window.show()
+    window.raise_()
+    window.activateWindow()
 
     sys.exit(app.exec())
 

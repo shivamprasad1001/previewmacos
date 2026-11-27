@@ -6,6 +6,7 @@ markup bar, canvas, menus, keyboard shortcuts, multi-image & folder support, and
 
 import logging
 import os
+import sys
 from typing import Optional, List
 
 from PyQt6.QtWidgets import (
@@ -70,7 +71,7 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.setAcceptDrops(True)
 
         # Set window icon
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "icon.png")
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
@@ -97,7 +98,16 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
                 logging.getLogger(__name__).exception("Failed to connect system colorSchemeChanged signal")
 
         # Window chrome flags for rounded corners and shadow
-        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        if sys.platform == "win32":
+            self.setWindowFlags(
+                Qt.WindowType.Window
+                | Qt.WindowType.FramelessWindowHint
+                | Qt.WindowType.WindowSystemMenuHint
+                | Qt.WindowType.WindowMinimizeButtonHint
+                | Qt.WindowType.WindowMaximizeButtonHint
+            )
+        else:
+            self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
 
         self._setup_ui()
         self._setup_menus()
@@ -115,17 +125,21 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
                 self.open_file(target)
 
     def _setup_ui(self):
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        use_translucent = sys.platform != "win32"
+        if use_translucent:
+            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setMouseTracking(True)
 
         self.root_widget = QWidget()
         self.root_widget.setObjectName("rootContainer")
-        self.root_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        if use_translucent:
+            self.root_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.root_widget.setMouseTracking(True)
         self.setCentralWidget(self.root_widget)
 
         self.root_layout = QVBoxLayout(self.root_widget)
-        self.root_layout.setContentsMargins(10, 10, 10, 10)
+        margin = 10 if use_translucent else 0
+        self.root_layout.setContentsMargins(margin, margin, margin, margin)
         self.root_layout.setSpacing(0)
 
         # Window Frame with 10px rounded corners & soft drop shadow
@@ -133,11 +147,12 @@ class MacMainWindow(MenusMixin, FileSessionMixin, ExportPrintMixin, WorkspaceMod
         self.window_frame.setObjectName("windowFrame")
         self.root_layout.addWidget(self.window_frame)
 
-        self.shadow_effect = QGraphicsDropShadowEffect(self)
-        self.shadow_effect.setBlurRadius(24)
-        self.shadow_effect.setColor(QColor(0, 0, 0, 95))
-        self.shadow_effect.setOffset(0, 4)
-        self.window_frame.setGraphicsEffect(self.shadow_effect)
+        if use_translucent:
+            self.shadow_effect = QGraphicsDropShadowEffect(self)
+            self.shadow_effect.setBlurRadius(24)
+            self.shadow_effect.setColor(QColor(0, 0, 0, 95))
+            self.shadow_effect.setOffset(0, 4)
+            self.window_frame.setGraphicsEffect(self.shadow_effect)
 
         self.main_layout = QVBoxLayout(self.window_frame)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
