@@ -9,6 +9,7 @@ Captures high-resolution pixel-perfect screenshots for all implemented issues:
 - Issue #7: 'Reduce File Size' PDF Compression Export Sheet
 """
 
+import argparse
 import os
 import sys
 import shutil
@@ -119,17 +120,14 @@ def create_sample_documents(temp_dir: str):
     return pdf1_path, img1_path, pdf2_path
 
 
-def capture_all():
+def capture_all(out_dir: str = "docs/screenshots"):
     app = QApplication.instance()
     if not app:
         app = QApplication(sys.argv)
 
     temp_dir = tempfile.mkdtemp()
-    docs_out = os.path.join(repo_root, "docs", "screenshots")
+    docs_out = os.path.abspath(out_dir)
     os.makedirs(docs_out, exist_ok=True)
-
-    artifact_dir = "/home/zoro0x1/.gemini/antigravity-ide/brain/50214f98-c441-4363-88a0-a8f6dec56735"
-    os.makedirs(artifact_dir, exist_ok=True)
 
     pdf1, img1, pdf2 = create_sample_documents(temp_dir)
     captured_paths = []
@@ -218,7 +216,7 @@ def capture_all():
             os.path.join(temp_dir, "Feature_Infographic.webp"),
             os.path.join(temp_dir, "Team_Photo_FullRes.tiff")
         ],
-        default_output_dir="/home/user/Pictures/Exported_WebP"
+        default_output_dir=os.path.join(os.path.expanduser("~"), "Pictures", "Exported_WebP")
     )
     # Populate UI controls for rich presentation
     batch_dialog.format_combo.setCurrentText("WebP")
@@ -329,15 +327,15 @@ def capture_all():
     card_im.save(p4_path)
     captured_paths.append(("Issue #4: Page Prefetching & LRU Eviction Benchmark", p4_path))
 
-    # Copy all screenshots to artifact directory for embedding
     for title, local_path in captured_paths:
-        dest = os.path.join(artifact_dir, os.path.basename(local_path))
-        shutil.copyfile(local_path, dest)
-        print(f"Saved: {local_path} -> {dest}")
+        print(f"Saved: {local_path}")
 
-    print("\nAll screenshots generated and copied successfully!")
+    print("\nAll screenshots generated successfully!")
     return captured_paths
 
 
 if __name__ == "__main__":
-    capture_all()
+    parser = argparse.ArgumentParser(description="Capture issue verification screenshots.")
+    parser.add_argument("--out", default="docs/screenshots", help="Output directory for screenshots")
+    args = parser.parse_args()
+    capture_all(out_dir=args.out)

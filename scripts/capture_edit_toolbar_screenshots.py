@@ -6,8 +6,10 @@ Captures screenshots of the improved Edit toolbar in Preview for Linux:
 4. Light mode Edit toolbar parity
 """
 
+import argparse
 import os
 import sys
+import tempfile
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QPointF, QRectF
 from PyQt6.QtGui import QColor
@@ -17,10 +19,10 @@ from preview.ui.main_window import MacMainWindow
 from preview.core.annotations import AnnotationItem, AnnotationType
 from preview.theme import MacTheme
 
-ARTIFACT_DIR = "/home/zoro0x1/.gemini/antigravity-ide/brain/50214f98-c441-4363-88a0-a8f6dec56735"
-
-def capture_screenshots():
+def capture_screenshots(out_dir: str = "docs/screenshots"):
     app = QApplication.instance() or QApplication(sys.argv)
+    resolved_out_dir = os.path.abspath(out_dir)
+    os.makedirs(resolved_out_dir, exist_ok=True)
 
     # 1. Prepare sample PDF
     import fitz
@@ -43,7 +45,9 @@ def capture_screenshots():
         fontsize=11,
         fontname="helv"
     )
-    pdf_path = "/tmp/preview_toolbar_sample.pdf"
+    tmp_pdf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    pdf_path = tmp_pdf.name
+    tmp_pdf.close()
     pdf_doc.save(pdf_path)
     pdf_doc.close()
 
@@ -57,7 +61,7 @@ def capture_screenshots():
     win.set_inspector_visible(False)
     QApplication.processEvents()
 
-    p1 = os.path.join(ARTIFACT_DIR, "edit_toolbar_typical_width.png")
+    p1 = os.path.join(resolved_out_dir, "edit_toolbar_typical_width.png")
     win.grab().save(p1)
     print(f"Captured: {p1}")
 
@@ -68,7 +72,7 @@ def capture_screenshots():
     win.markup_bar.handle_resize(780)
     QApplication.processEvents()
 
-    p2 = os.path.join(ARTIFACT_DIR, "edit_toolbar_compact_width.png")
+    p2 = os.path.join(resolved_out_dir, "edit_toolbar_compact_width.png")
     win.grab().save(p2)
     print(f"Captured: {p2}")
 
@@ -80,7 +84,7 @@ def capture_screenshots():
     win.markup_bar.text_btn.click()
     QApplication.processEvents()
 
-    p3 = os.path.join(ARTIFACT_DIR, "edit_toolbar_contextual_text.png")
+    p3 = os.path.join(resolved_out_dir, "edit_toolbar_contextual_text.png")
     win.grab().save(p3)
     print(f"Captured: {p3}")
 
@@ -91,7 +95,7 @@ def capture_screenshots():
     win.markup_bar.pointer_btn.click()
     QApplication.processEvents()
 
-    p4 = os.path.join(ARTIFACT_DIR, "edit_toolbar_light_theme.png")
+    p4 = os.path.join(resolved_out_dir, "edit_toolbar_light_theme.png")
     win.grab().save(p4)
     print(f"Captured: {p4}")
 
@@ -103,4 +107,7 @@ def capture_screenshots():
             pass
 
 if __name__ == "__main__":
-    capture_screenshots()
+    parser = argparse.ArgumentParser(description="Capture Edit toolbar screenshots.")
+    parser.add_argument("--out", default="docs/screenshots", help="Output directory for screenshots")
+    args = parser.parse_args()
+    capture_screenshots(out_dir=args.out)

@@ -10,6 +10,7 @@ Features:
 """
 
 import os
+import sys
 import json
 import shutil
 import subprocess
@@ -54,8 +55,10 @@ class HelpWindow(QDialog):
         candidates = [
             os.path.abspath("help/content"),
             os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "help", "content"),
-            "/run/media/zoro0x1/Hard Disk Drive/MyPrograms/REA/preview-macos/help/content"
         ]
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidates.append(os.path.join(meipass, "help", "content"))
         for c in candidates:
             if os.path.exists(c):
                 return c
