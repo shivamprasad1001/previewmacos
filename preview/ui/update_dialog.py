@@ -5,16 +5,40 @@ downloading, and auto-installing new Preview releases.
 """
 
 import os
+import platform
 from typing import Optional
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTextBrowser, QCheckBox, QFrame, QProgressBar, QApplication
 )
 from PyQt6.QtGui import QPixmap, QDesktopServices, QFont
-from PyQt6.QtCore import Qt, QUrl, QSettings, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, QUrl, QSettings, pyqtSignal
 
 from preview.core.updater import UpdateInfo, UpdateDownloadWorker, install_update
 from preview import __version__
+
+
+class UpdateInstallWorker(QThread):
+    """Runs blocking package installation off the GUI thread so dialogs remain responsive."""
+
+    finished = pyqtSignal(bool, str)
+
+    def __init__(self, installer_fn, filepath: str, expected_sha256: str, parent=None):
+        super().__init__(parent)
+        self.installer_fn = installer_fn
+        self.filepath = filepath
+        self.expected_sha256 = expected_sha256
+
+    def run(self):
+        try:
+            success, msg = self.installer_fn(
+                self.filepath,
+                expected_sha256=self.expected_sha256,
+            )
+        except Exception as e:
+            success, msg = False, str(e)
+        self.finished.emit(bool(success), str(msg))
+
 
 class UpdateDialog(QDialog):
     """Authentic macOS Software Update Dialog with live in-app download and installation."""
@@ -24,6 +48,7 @@ class UpdateDialog(QDialog):
         self.update_info = update_info
         self.current_version = current_version
         self.download_worker: Optional[UpdateDownloadWorker] = None
+        self.install_worker: Optional[UpdateInstallWorker] = None
         self.downloaded_filepath: Optional[str] = None
         self.verified_sha256: Optional[str] = None
 
@@ -356,13 +381,49 @@ class UpdateDialog(QDialog):
     def _install_and_restart(self):
         if not self.downloaded_filepath or not self.verified_sha256:
             return
+        if "linux" in platform.system().lower():
+            self.update_btn.setEnabled(False)
+            self.update_btn.setText("Installing...")
+            self.later_btn.setEnabled(False)
+            self.progress_bar.setRange(0, 0)
+            self.dl_status_lbl.setText("Installing update... Please authorize if prompted.")
+            self.dl_speed_lbl.setText("")
+
+            self.install_worker = UpdateInstallWorker(
+                install_update,
+                self.downloaded_filepath,
+                self.verified_sha256,
+                parent=self,
+            )
+            self.install_worker.finished.connect(self._on_install_finished)
+            self.install_worker.start()
+            return
+
         success, msg = install_update(self.downloaded_filepath, expected_sha256=self.verified_sha256)
+        self._on_install_finished(success, msg)
+
+    def _on_install_finished(self, success: bool, msg: str):
         if success:
             self.accept()
-            QApplication.instance().quit()
+            app = QApplication.instance()
+            if app:
+                app.quit()
         else:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(100)
+            self.dl_status_lbl.setText("Installation did not complete.")
+            self.dl_speed_lbl.setText("")
+            self.update_btn.setText("Retry Install")
+            self.update_btn.setEnabled(True)
+            self.later_btn.setEnabled(True)
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Installation Error", msg)
+
+    def closeEvent(self, event):
+        if self.install_worker and self.install_worker.isRunning():
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 
 class UpdateBanner(QFrame):

@@ -9,12 +9,16 @@ import json
 import hashlib
 import hmac
 import logging
+import shlex
+import shutil
+import subprocess
+import sys
 import tempfile
 import urllib.request
 import urllib.error
 import urllib.parse
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 import platform
 
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -342,6 +346,65 @@ class UpdateDownloadWorker(QThread):
             self.failed.emit(str(e))
 
 
+def _clean_subprocess_env() -> Dict[str, str]:
+    """Return os.environ without PyInstaller runtime library overrides."""
+    env = os.environ.copy()
+    if "LD_LIBRARY_PATH_ORIG" in env:
+        orig = env.pop("LD_LIBRARY_PATH_ORIG")
+        if orig:
+            env["LD_LIBRARY_PATH"] = orig
+        else:
+            env.pop("LD_LIBRARY_PATH", None)
+    elif getattr(sys, "frozen", False):
+        env.pop("LD_LIBRARY_PATH", None)
+
+    if getattr(sys, "frozen", False):
+        for var in ("QT_PLUGIN_PATH", "QT_QPA_PLATFORM_PLUGIN_PATH", "QML2_IMPORT_PATH"):
+            env.pop(var, None)
+
+    for var in ("_MEIPASS2", "_PYI_ARCHIVE_FILE", "_PYI_APPLICATION_HOME_DIR"):
+        env.pop(var, None)
+    return env
+
+
+def _stage_linux_deb(abs_deb: str) -> Tuple[str, Optional[str]]:
+    """Copy a verified .deb into a world-readable temp dir for apt/dpkg (_apt access)."""
+    stage_dir = None
+    try:
+        stage_dir = tempfile.mkdtemp(prefix="preview-update-")
+        staged_deb = os.path.join(stage_dir, os.path.basename(abs_deb))
+        shutil.copy2(abs_deb, staged_deb)
+        os.chmod(stage_dir, 0o755)
+        os.chmod(staged_deb, 0o644)
+        return staged_deb, stage_dir
+    except Exception:
+        if stage_dir:
+            shutil.rmtree(stage_dir, ignore_errors=True)
+        return abs_deb, None
+
+
+def _launch_linux_deb_gui_fallback(abs_deb: str, env: Dict[str, str]) -> Optional[Tuple[bool, str]]:
+    """Launch a dedicated local .deb GUI installer if present (never xdg-open/Cosmic Store)."""
+    for tool in ("gdebi-gtk", "eddy", "qapt-deb-installer"):
+        gui_bin = shutil.which(tool)
+        if not gui_bin:
+            continue
+        try:
+            subprocess.Popen(
+                [gui_bin, abs_deb],
+                env=env,
+                start_new_session=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+            return True, f"Opening verified update package in {tool}..."
+        except Exception as e:
+            logging.getLogger(__name__).warning("Failed to launch %s fallback installer: %s", tool, e)
+    return None
+
+
 def install_update(filepath: str, expected_sha256: Optional[str] = None) -> Tuple[bool, str]:
     """
     Executes the native installer or package manager for the downloaded update.
@@ -355,47 +418,90 @@ def install_update(filepath: str, expected_sha256: Optional[str] = None) -> Tupl
     if not hmac.compare_digest(actual_sha256.lower(), expected_sha256.strip().lower()):
         return False, "Update package SHA-256 verification failed."
 
-    import subprocess
-    import stat
     system = platform.system().lower()
 
     if "linux" in system:
-        script_path = os.path.join(tempfile.gettempdir(), "preview_auto_update.sh")
-        escaped_deb = os.path.abspath(filepath)
+        abs_deb = os.path.abspath(filepath)
+        clean_env = _clean_subprocess_env()
+        pkexec_bin = shutil.which("pkexec")
 
-        script_content = f"""#!/usr/bin/env bash
-# macOS Preview Linux Auto-Update Runner
-sleep 1.2
+        if not pkexec_bin:
+            fallback = _launch_linux_deb_gui_fallback(abs_deb, clean_env)
+            if fallback is not None:
+                return fallback
+            return (
+                False,
+                "Automatic installation requires 'pkexec' (Polkit).\n\n"
+                f"To install the verified package manually, run:\nsudo apt install -y {shlex.quote(abs_deb)}",
+            )
 
-# Try graphical polkit installation with pkexec
-if command -v pkexec >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
-    pkexec dpkg -i "{escaped_deb}"
-    INSTALL_EXIT=$?
-    if [ $INSTALL_EXIT -eq 0 ]; then
-        if command -v preview-app >/dev/null 2>&1; then
-            preview-app &
-        fi
-        exit 0
-    fi
-fi
-
-# Fallback: Open with system Software Store / GDebi
-if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "{escaped_deb}" &
-    exit 0
-fi
-
-exit 1
-"""
+        staged_deb, stage_dir = _stage_linux_deb(abs_deb)
+        install_cmd = (
+            'if command -v apt-get >/dev/null 2>&1; then '
+            'DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-downgrades "$1" || dpkg -i "$1"; '
+            'else dpkg -i "$1"; fi'
+        )
         try:
-            with open(script_path, "w") as f:
-                f.write(script_content)
-            os.chmod(script_path, os.stat(script_path).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-
-            subprocess.Popen(["/bin/bash", script_path], start_new_session=True, close_fds=True)
-            return True, "Installing update... Please authorize when prompted."
+            proc = subprocess.run(
+                [pkexec_bin, "/bin/sh", "-c", install_cmd, "preview-updater", staged_deb],
+                env=clean_env,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired:
+            return (
+                False,
+                "Package installation timed out waiting for authorization or apt/dpkg.\n\n"
+                f"To install manually, run:\nsudo apt install -y {shlex.quote(abs_deb)}",
+            )
         except Exception as e:
             return False, f"Failed to launch installer: {e}"
+        finally:
+            if stage_dir:
+                shutil.rmtree(stage_dir, ignore_errors=True)
+
+        if proc.returncode == 0:
+            relaunch_bin = shutil.which("preview-app") or (
+                "/usr/bin/preview-app" if os.path.exists("/usr/bin/preview-app") else None
+            )
+            if relaunch_bin:
+                try:
+                    subprocess.Popen(
+                        [relaunch_bin],
+                        env=clean_env,
+                        start_new_session=True,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        close_fds=True,
+                    )
+                except Exception as e:
+                    logging.getLogger(__name__).warning(
+                        "Package updated, but failed to relaunch %s: %s", relaunch_bin, e
+                    )
+            return True, "Update installed successfully. Restarting Preview..."
+
+        stderr_text = (proc.stderr or "").strip()
+        stdout_text = (proc.stdout or "").strip()
+        detail = stderr_text or stdout_text
+
+        if proc.returncode == 126:
+            return False, "Update installation was cancelled (administrator authorization is required)."
+
+        if proc.returncode == 127 or "no authentication agent" in detail.lower():
+            fallback = _launch_linux_deb_gui_fallback(abs_deb, clean_env)
+            if fallback is not None:
+                return fallback
+
+        msg = f"Package installation failed (exit code {proc.returncode})."
+        if detail:
+            msg += f"\n\n{detail}"
+        msg += (
+            f"\n\nTo install the verified package manually in a terminal, run:\n"
+            f"sudo apt install -y {shlex.quote(abs_deb)}"
+        )
+        return False, msg
 
     elif "windows" in system:
         try:

@@ -312,3 +312,148 @@ def test_redirect_chain_rejects_https_to_http_downgrade(tmp_path):
     assert "disallowed redirect" in failed_msgs[0].lower()
     assert http_url not in transport.visited
     assert not target.exists()
+
+
+def test_linux_install_update_runs_pkexec_apt_and_restarts_without_xdg_open(tmp_path):
+    deb = tmp_path / "preview-app_1.7.3_amd64.deb"
+    payload = b"fake-deb-payload"
+    deb.write_bytes(payload)
+    expected_sha = hashlib.sha256(payload).hexdigest()
+
+    def fake_which(name):
+        if name in ("pkexec", "preview-app"):
+            return f"/usr/bin/{name}"
+        return None
+
+    class _Proc:
+        returncode = 0
+        stdout = "Installed"
+        stderr = ""
+
+    with (
+        patch("preview.core.updater.platform.system", return_value="Linux"),
+        patch("preview.core.updater.shutil.which", side_effect=fake_which),
+        patch("preview.core.updater.subprocess.run", return_value=_Proc()) as mock_run,
+        patch("preview.core.updater.subprocess.Popen") as mock_popen,
+    ):
+        ok, msg = install_update(str(deb), expected_sha256=expected_sha)
+
+    assert ok is True
+    assert "restarting" in msg.lower()
+    mock_run.assert_called_once()
+    cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "/usr/bin/pkexec"
+    assert "apt-get install -y" in cmd[3]
+    mock_popen.assert_called_once()
+    assert mock_popen.call_args[0][0] == ["/usr/bin/preview-app"]
+
+
+def test_linux_install_update_cancelled_polkit_does_not_open_store(tmp_path):
+    deb = tmp_path / "preview-app_1.7.3_amd64.deb"
+    payload = b"fake-deb-payload"
+    deb.write_bytes(payload)
+    expected_sha = hashlib.sha256(payload).hexdigest()
+
+    def fake_which(name):
+        if name in ("pkexec", "eddy", "gdebi-gtk"):
+            return f"/usr/bin/{name}"
+        return None
+
+    class _Proc:
+        returncode = 126
+        stdout = ""
+        stderr = "Request dismissed"
+
+    with (
+        patch("preview.core.updater.platform.system", return_value="Linux"),
+        patch("preview.core.updater.shutil.which", side_effect=fake_which),
+        patch("preview.core.updater.subprocess.run", return_value=_Proc()),
+        patch("preview.core.updater.subprocess.Popen") as mock_popen,
+    ):
+        ok, msg = install_update(str(deb), expected_sha256=expected_sha)
+
+    assert ok is False
+    assert "cancelled" in msg.lower()
+    mock_popen.assert_not_called()
+
+
+def test_linux_install_update_failure_never_uses_xdg_open_and_gives_apt_command(tmp_path):
+    deb = tmp_path / "preview-app_1.7.3_amd64.deb"
+    payload = b"fake-deb-payload"
+    deb.write_bytes(payload)
+    expected_sha = hashlib.sha256(payload).hexdigest()
+
+    def fake_which(name):
+        if name == "pkexec":
+            return "/usr/bin/pkexec"
+        return None
+
+    class _Proc:
+        returncode = 127
+        stdout = ""
+        stderr = "Error executing command as another user: No authentication agent found"
+
+    with (
+        patch("preview.core.updater.platform.system", return_value="Linux"),
+        patch("preview.core.updater.shutil.which", side_effect=fake_which),
+        patch("preview.core.updater.subprocess.run", return_value=_Proc()),
+        patch("preview.core.updater.subprocess.Popen") as mock_popen,
+    ):
+        ok, msg = install_update(str(deb), expected_sha256=expected_sha)
+
+    assert ok is False
+    assert "sudo apt install -y" in msg
+    assert "xdg-open" not in msg
+    mock_popen.assert_not_called()
+
+
+def test_linux_install_update_no_agent_falls_back_only_to_dedicated_deb_installer(tmp_path):
+    deb = tmp_path / "preview-app_1.7.3_amd64.deb"
+    payload = b"fake-deb-payload"
+    deb.write_bytes(payload)
+    expected_sha = hashlib.sha256(payload).hexdigest()
+
+    def fake_which(name):
+        if name in ("pkexec", "eddy"):
+            return f"/usr/bin/{name}"
+        return None
+
+    class _Proc:
+        returncode = 127
+        stdout = ""
+        stderr = "No authentication agent found"
+
+    with (
+        patch("preview.core.updater.platform.system", return_value="Linux"),
+        patch("preview.core.updater.shutil.which", side_effect=fake_which),
+        patch("preview.core.updater.subprocess.run", return_value=_Proc()),
+        patch("preview.core.updater.subprocess.Popen") as mock_popen,
+    ):
+        ok, msg = install_update(str(deb), expected_sha256=expected_sha)
+
+    assert ok is True
+    assert "eddy" in msg.lower()
+    mock_popen.assert_called_once()
+    assert mock_popen.call_args[0][0] == ["/usr/bin/eddy", str(deb.resolve())]
+
+
+def test_clean_subprocess_env_restores_pyinstaller_overrides():
+    from preview.core.updater import _clean_subprocess_env
+
+    fake_env = {
+        "PATH": "/usr/bin",
+        "LD_LIBRARY_PATH": "/usr/lib/preview-app/_internal",
+        "LD_LIBRARY_PATH_ORIG": "/usr/local/lib",
+        "QT_PLUGIN_PATH": "/usr/lib/preview-app/_internal/PyQt6/Qt6/plugins",
+        "_MEIPASS2": "/tmp/_MEI123",
+    }
+    with (
+        patch("preview.core.updater.os.environ", fake_env),
+        patch("preview.core.updater.sys.frozen", True, create=True),
+    ):
+        cleaned = _clean_subprocess_env()
+
+    assert cleaned["LD_LIBRARY_PATH"] == "/usr/local/lib"
+    assert "QT_PLUGIN_PATH" not in cleaned
+    assert "_MEIPASS2" not in cleaned
+    assert cleaned["PATH"] == "/usr/bin"
