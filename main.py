@@ -18,9 +18,11 @@ if "QT_LOGGING_RULES" not in os.environ:
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 
+from preview.logging_setup import setup_logging
 from preview.ui.main_window import MacMainWindow
 
 def main():
+    setup_logging()
     # Set high-DPI attributes for crisp rendering on retina and 4K displays
     if hasattr(Qt.ApplicationAttribute, "AA_EnableHighDpiScaling"):
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
