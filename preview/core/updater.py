@@ -438,7 +438,7 @@ def install_update(filepath: str, expected_sha256: Optional[str] = None) -> Tupl
         staged_deb, stage_dir = _stage_linux_deb(abs_deb)
         install_cmd = (
             'if command -v apt-get >/dev/null 2>&1; then '
-            'DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-downgrades "$1" || dpkg -i "$1"; '
+            'DEBIAN_FRONTEND=noninteractive apt-get install -y "$1" || dpkg -i "$1"; '
             'else dpkg -i "$1"; fi'
         )
         try:

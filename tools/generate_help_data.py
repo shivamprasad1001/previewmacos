@@ -1,7 +1,7 @@
 import json
 
 help_content = {
-    "version": "1.7.2",
+    "version": "1.7.3",
     "updated_at": "2026-10-28",
     "categories": ["Tools", "Features", "Settings", "Terms"],
     "dictionary": [

@@ -1,218 +1,67 @@
-# Preview macOS v1.7.2 Release Notes
+# Preview macOS v1.7.3 Release Notes
 
-Welcome to **Preview macOS v1.7.2**! This maintenance release addresses UI layout stability, prevents window resizing on thumbnail selection, refines the sidebar Contact Sheet view, and provides checksums for release verification.
-
----
-
-### 🛠️ Fixes and Improvements in v1.7.2
-
-#### 📐 Window Dimension Stability
-* **Constrain Minimum Size Hints:** Constrained `minimumSizeHint` across the tab bar, toolbars, and sidebar to prevent unexpected window expansion when clicking thumbnails or switching documents.
-
-#### 🗂️ Sidebar & Contact Sheet Layout
-* **Thumbnail Width Restoration:** Ensured thumbnail width and grid padding are properly restored when switching between Contact Sheet and standard thumbnail views.
-* **Two-Column Contact Sheet Defaults:** Adjusted the default Contact Sheet sidebar width to 350px to ensure a balanced two-column thumbnail grid renders immediately without horizontal clipping.
-
-#### 🛡️ Windows Installer & SmartScreen Note
-* **Unsigned Installer Notice:** The Windows installer is not yet code-signed. If Windows Defender SmartScreen appears, click "More info" and then "Run anyway", and verify the installer hash against `SHA256SUMS.txt` on the GitHub release page.
+Welcome to **Preview macOS v1.7.3**! This release fixes the Linux auto-updater (it now installs the downloaded `.deb` instead of opening the Cosmic Store), verifies every update against a published SHA-256 checksum before installing, fixes Windows window rendering, and polishes the sidebar, toolbar and full screen exit controls. Under the hood, the project now has a much stronger test and CI setup, plus rotating log files for easier bug reports.
 
 ---
 
-# Preview macOS v1.7.1 Release Notes
+### 🛠️ Fixes and Improvements in v1.7.3
 
-Welcome to **Preview macOS v1.7.1**! This maintenance release resolves a critical packaging compatibility crash on Linux distributions with newer GLIBC versions (Debian 13 Trixie, Pop!_OS, and modern Ubuntu/Kali installations).
+#### 🔄 Linux Auto-Updater Fix (Issue #20)
+* **Installs the update instead of opening a store:** On Linux, **Check for Updates** downloads the `.deb` and installs it through Polkit (`pkexec`) with `apt-get`, so it no longer hands the file to `xdg-open` (which opened the Cosmic Store on Pop!_OS).
+* **App stays open until you authorize:** Preview no longer quits before the authorization prompt appears.
+* **Clear fallbacks:** If `pkexec` is unavailable, Preview tries a dedicated local `.deb` installer (`gdebi-gtk`, `eddy` or `qapt-deb-installer`). If everything fails, you see the exact `sudo apt install -y <file>` command to run manually.
+* **Clean environment for the installer:** PyInstaller library overrides are removed before calling system tools, avoiding library conflicts during install.
 
----
+#### 🔐 Verified Updates
+* **SHA-256 verification:** Every downloaded installer is checked against `SHA256SUMS.txt` from the same GitHub release. If the checksum is missing or does not match, the download is deleted and an error is shown. Nothing is installed.
+* **Download allowlist:** Updates may only come from `https://github.com/shivamprasad1001/previewmacos/` and GitHub's release asset hosts. Every redirect hop is validated.
+* **Note:** The checksum protects against corrupted or tampered downloads. It is not a cryptographic signature of the release itself.
 
-### 🛠️ Fixes and Improvements in v1.7.1
+#### 🪟 Windows
+* **Window rendering fix:** Disabled the translucent layered window shadow on Windows, which could cause the app window to render empty or transparent.
+* **SmartScreen reminder:** The installer is still not code-signed. If SmartScreen appears, click "More info" then "Run anyway", and verify the file against `SHA256SUMS.txt` on the release page. Code signing is planned.
 
-#### 🐧 Linux Packaging and Compatibility Fix (Issue #9)
-* **Resolved GLIBC Compatibility Crash:** Fixed a critical issue where the `.deb` package crashed on launch with `version 'GLIBC_2.43' not found (required by bundled libglib-2.0.so.0)` on Debian 13 / Pop!_OS.
-* **Ubuntu 22.04 Build Baseline:** Linux `.deb` release builds are now produced on Ubuntu 22.04 (GLIBC 2.35 baseline), providing backward and forward compatibility across modern Linux distributions.
-* **Excluded Bundled Host Libraries:** PyInstaller build configuration now explicitly strips bundled host C/glib libraries (`libglib-2.0.so*`, `libgobject-2.0.so*`, `libgio-2.0.so*`, `libgmodule-2.0.so*`) from the package, allowing the application to link directly against system libraries.
-* **Minimum Supported GLIBC:** The minimum supported GLIBC version is now `2.35` (e.g. Ubuntu 22.04+, Debian 12+, Debian 13+, Pop!_OS 22.04+).
-* **Automated Clean Container Verification:** Added CI test steps verifying clean installation and headless launch in pristine `debian:13` and `debian:12` container environments.
+#### 🗂️ Sidebar, Toolbar and Full Screen
+* **Sidebar header:** Fixed clipping of the **Thumbnails / Contact Sheet** switch and a layout race when entering Organize mode.
+* **Thumbnail cards:** Cards and their hover/selection bounds now match each page's aspect ratio, so wide or tall pages no longer have large empty padding.
+* **Light Mode:** Fixed the sidebar scrollbar track color.
+* **Toolbar:** Fixed the mode pill overflowing vertically, long titles now truncate properly, and spacing is more compact on narrow windows.
+* **Full Screen / Slideshow:** The floating exit control now renders correctly on Light Mode canvases, shows an **Exit** label with an icon, and uses the right tooltip (`Exit Full Screen (Esc)` or `Exit Slideshow (Esc)`).
 
----
+#### 🐛 Bug Fixes
+* Fixed a crash in **Zoom to Fit** when two-page (two-up) view is active.
+* Fixed several undefined-name errors and silent error handling found by the new lint checks.
 
-# Preview macOS v1.7.0 Release Notes
+#### 🧰 Diagnostics
+* **Log files:** Preview now writes a rotating log file and records uncaught errors, which makes bug reports much easier.
+  * Linux: `~/.local/state/previewmacos/logs/preview.log`
+  * Windows: `%LOCALAPPDATA%\previewmacos\Logs\preview.log`
 
-Welcome to **Preview macOS v1.7.0**! This major milestone delivers a complete UI layout redesign with authentic macOS Big Sur / Sonoma chrome, Canva-style Image Overlays with live dimension badges, grouped segmented toolbars with unified Lucide vector icons, three distinct Workspace Modes (View, Edit, Organize), mouse wheel zoom centered at cursor, real-time proportional resize calculations, and protected PDF reading modes.
+#### 🐧 Packaging
+* The desktop entry (`preview.desktop`) no longer contains a developer-specific path. It now launches `preview-app` and uses the `preview-macos` icon name.
+* Help content is found correctly when launched from any working directory and from the packaged build.
 
----
-
-### 🌟 What's New in v1.7.0
-
-#### 🎨 Complete UI & Layout Redesign (macOS Big Sur / Sonoma Authentic Chrome)
-* **Unified Lucide Icon System:** Replaced inconsistent glyphs with a single, authentic Lucide vector icon set (ISC license) across all toolbars, menus, dialogs, and inspector panels.
-* **48px Unified Header & 44px Fixed Tool Bar:** Two-row zero-clipping architecture with macOS segmented pill groupings (`32x32px` buttons, `6px` corner radii, authentic hover and checked states).
-* **Workspace Modes:** Seamless switching between **View Mode** (clean reading), **Edit Mode** (markup tools and format bar), and **Organize Mode** (page reordering and insertion).
-* **Inspector Panel:** Collapsible 280px Pro Inspector with smooth animations, document metadata, annotation layer hierarchy, and quick actions.
-
-#### 🖼️ Canva-Style Image Overlays
-* **Add Image Overlay:** Overlay external logos, photos, stickers, and graphics onto any active document page via the Markup Toolbar button, the Edit/Tools menu (`Ctrl+Shift+I`), or direct clipboard paste (`Ctrl+V`).
-* **Interactive Handle Resizing & Hit-Testing:** 8-point macOS bounding box with real-time resizing and repositioning.
-* **Live Dimension Badge:** Dark floating badge showing exact pixel dimensions (`e.g. 320 × 240 px`) while dragging or selecting.
-* **Full Undo/Redo & Vector Export:** Full history stack support and automatic flattening/baking into saved images and exported PDF documents.
-
-#### 🖱️ Enhanced Interactions & Navigation
-* **Cursor-Centered Zoom:** Scrolling the mouse wheel on image documents zooms smoothly in and out centered at the mouse cursor position without requiring Ctrl.
-* **Live Proportional Size Preview:** Adjust Size dialog displays real-time resulting pixel dimensions dynamically as width, height, or scale values are edited.
-* **Protected PDF Text Selection:** PDF word selection is active only during Edit mode, preserving clean scrolling and click navigation in View mode.
-
----
-
-# Preview macOS v1.6.0 Release Notes
-
-Welcome to **Preview macOS v1.6.0**! This major milestone delivers six high-priority features: native macOS-style Multi-Tab document interface, interactive Magnifier Loupe and Callout bubble annotations, bounded LRU cache with background page prefetching for 500+ page documents, multithreaded batch image resizing and format conversion, system dark/light theme auto-detection, and the 'Reduce File Size' Quartz PDF compression filter.
+#### 🧪 Quality and Project Maintenance
+* All tests moved to `tests/` and run in CI on Python 3.10, 3.11 and 3.12 with `ruff` linting.
+* Added tests for update verification, redirect validation, logging and help-content discovery, plus a smoke test that triggers every menu action.
+* The large `main_window.py` was split into smaller modules under `preview/ui/main_window/`. This is an internal change with no behavior difference.
+* Added `pyproject.toml` with project metadata and lint configuration.
+* `SECURITY.md` now lists 1.7.x as supported.
 
 ---
 
-### 🌟 What's New in v1.6.0
+### ⬆️ Upgrading from v1.7.2 or earlier
+The updater fix lives in the new version, so v1.7.2 and earlier cannot use it. Install v1.7.3 once manually:
 
-#### 📑 Multi-Tab Document Interface (macOS-Style Window Tabs)
-* **Isolated Per-Tab State:** Open multiple PDF documents and images within a single unified window. Each tab independently preserves its active page, zoom ratio, pan offset, annotations, and undo/redo history.
-* **macOS Window Tabs (`MacTabBarContainer`):** Authentic tab bar with drag-to-reorder, close buttons (`×`), and dirty state indicators (`●`).
-* **Open File in New Tab:** When opening or dragging files while a document is open, Preview offers the option to open in a new tab or replace the current document.
-* **Keyboard Shortcuts:** `Ctrl+T` (New Tab), `Ctrl+W` (Close Tab), `Ctrl+Shift+W` (Close Window), `Ctrl+Tab` (Next Tab), `Ctrl+Shift+Tab` (Previous Tab), `Ctrl+Shift+T` (Toggle Tab Bar).
+```bash
+sudo apt install ./preview-app_1.7.3_amd64.deb
+```
 
-#### 🔍 Magnifier Loupe Tool & Speech Bubble Callout
-* **Interactive Magnifier Loupe:** Circular magnifying glass annotation enlarging the document pixels underneath in real-time (1.2x to 5.0x zoom) with interactive magnification handle.
-* **Speech Bubble Callout:** Curved dialogue bubble with text wrapping and an adjustable anchor pointer tail to spotlight specific sections or data spikes.
-* **High-DPI Vector & PDF Baking:** High-fidelity rasterization and vector rendering when exporting or saving to PDF.
+Windows users can run the new installer over the existing install. Future updates will install automatically.
 
-#### ⚡ Page Prefetching & LRU Eviction (500+ Page Support)
-* **Bounded LRU Memory Cache:** Implemented strict memory bounding (default 50 rendered pages / ~64MB) preventing memory exhaustion or sluggishness on massive 500+ page documents.
-* **Directional Background Prefetching:** Dedicated `PagePrefetchWorker` thread renders adjacent pages ($\pm 2$) in anticipation of scrolling for zero-latency page flips.
+### ✅ Verify your download
+Compare the hash of your downloaded file with `SHA256SUMS.txt` on the release page:
 
-#### 🔄 Batch Image Resizing & Format Conversion
-* **Multi-Threaded Conversion Sheet:** Accessible via `File > Batch Process Images...`, supporting batch processing across PNG, JPEG, WebP, TIFF, and BMP formats.
-* **Dimension Scaling Options:** Scale by percentage, constrain to max bounding dimensions (`1920 × 1080`), or fit within bounding boxes while preserving EXIF metadata.
-
-#### 🌓 System Dark/Light Theme Auto-Detection
-* **Desktop Environment Integration:** Auto-detects system dark/light mode across GNOME, KDE Plasma, and FreeDesktop D-Bus settings (`colorSchemeChanged`, `gsettings`, `kreadconfig6`).
-* **Theme Menu:** Added `Theme > Auto (System)` alongside manual Dark and Light mode toggles with live vector icon adaptation.
-
-#### 🗜️ 'Reduce File Size' PDF Compression Filter
-* **Native Quartz Filter:** Integrated directly into the macOS Export Dialog (`File > Export...`).
-* **Intelligent Downsampling:** Downsamples high-res images to custom DPI, re-compresses streams with optimized JPEG quality, deflates object streams, and cleans unused PDF objects.
-* **Live Reduction Estimation:** Real-time feedback calculating before/after byte sizes and percentage savings.
-
----
-
-# Preview macOS v1.4.0 Release Notes
-
-Welcome to **Preview macOS v1.4.0**! This release brings major enhancements to toolbar controls, authentic macOS segmented styling, advanced selection tools (true Oval and Lasso crop/cut with transparency masking), rich font styling, and live color palettes.
-
----
-
-### 💖 A Sincere Note of Thanks
-A heartfelt thank you to all our users, contributors, and testers! Your feedback, screenshots, feature requests, and issue reports continue to drive Preview macOS closer to 100% pixel-perfect parity with Apple Preview. We couldn't build this without your passion and dedication to open-source excellence!
-
----
-
-### 🌟 What's New
-
-#### 🗂️ Segmented Open Button `[ 📁 Open | ▼ ]`
-* **Direct Open Action:** Clicking the primary "Open" segment directly opens the file browser dialog (<kbd>Ctrl</kbd>+<kbd>O</kbd>).
-* **Dedicated Dropdown Menu:** Clicking the downward arrow segment `▼` reveals instant options to **Open File(s)...** or **Open Folder of Images...** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>).
-* **Authentic macOS Styling:** Pixel-perfect rounded borders, subtle divider line, and hover feedback matching macOS Big Sur / Sonoma design standards.
-
-#### ✂️ Advanced Selection & Cut Tools (Rectangle, Oval, Lasso)
-* **Dropdown Selection Tool:** The selection button is now a dropdown menu offering:
-  * **Rectangular Selection**
-  * **Oval / Elliptical Selection**
-  * **Lasso Selection** (freehand polygon tracing)
-* **True Oval & Lasso Cropping with Alpha Masking:**
-  * Cropping an elliptical selection now automatically cuts out the oval shape and creates a transparent background outside the ellipse.
-  * Cropping a lasso selection creates a clean polygon cutout with a transparent background.
-* **Selection Cut & Clear (`Delete` / `Backspace`):**
-  * Pressing <kbd>Delete</kbd> or <kbd>Backspace</kbd> with an active selection cuts and erases that area to transparent pixels.
-* **Copy Selection to Clipboard (`Ctrl`+`C` / `Ctrl`+`X`):**
-  * Copying an active oval or lasso selection transfers the transparently masked image directly to the system clipboard.
-* **Outside Selection Dimming:** The canvas now smoothly dims the area outside any active selection box or polygon, making the target area pop out cleanly.
-
-#### 🎨 Quick macOS Color Palettes
-* **Stroke & Fill Color Dropdowns:** Both color buttons now feature a color swatch preview with a dropdown arrow `[ Swatch | ▼ ]`.
-* **Instant Preset Palette:** Quick access to 11 macOS standard colors (Red, Orange, Yellow, Green, Cyan, Blue, Purple, Pink, Black, Gray, White), plus **No Fill (Transparent)** and **Show Colors...** for custom color wheel selection.
-* **Live Annotation Updates:** Selecting a color immediately updates any currently highlighted annotation on the canvas.
-
-#### 🔤 Rich Font Formatting
-* **Text Controls Toolbar:** Added dedicated controls for **Font Size** (`QSpinBox`), **Font Family** (`QFontComboBox`), **Bold (`B`)**, **Italic (`I`)**, and **Underline (`U`)**.
-* **Text Options Dropdown `[ A | ▼ ]`:** Instant menu to switch text alignment (**Align Left**, **Align Center**, **Align Right**) and select quick font size presets (10pt to 64pt).
-* **Rich Text Rendering:** Canvas text annotations render with exact bold, italic, underline, and alignment styles.
-
-#### 🖌️ Icon Redesign & Dropdown Indicators
-* **SF Symbols Apple Pencil:** Redesigned the markup toolbar toggle icon to match Apple's authentic circular pencil tip symbol.
-* **Crisp Dropdown Indicators:** Vector-rendered anti-aliased downward arrow triangles `▼` across all tool dropdowns.
-
----
-
-### 🐛 Bug Fixes & Refinements
-* **Fixed Selection Tool Behavior:** Fixed Oval and Lasso tools previously drawing vector shapes instead of creating selection/cut regions.
-* **Fixed Color Adjustment Glitches:** Resolved issue where image color adjustments could cause temporary zoom out or intermediate display glitches during slider dragging.
-* **Fixed Secondary Window Mobility:** Secondary tool dialogs (Adjust Color, Adjust Size, Inspector) can now be freely repositioned and resized without layout locks.
-* **Expanded Test Suite:** Added comprehensive automated verification tests for segmented open controls, selection modes, and alpha crop masking (40 test cases passing).
-
----
-
-# Preview macOS v1.3.1 Release Notes
-
-Welcome to **Preview macOS v1.3.1**! This patch release addresses a critical standalone packaging and startup failure encountered in the v1.3.0 release binaries.
-
----
-
-### 🐛 Critical Packaging & Startup Fixes
-* **Resolved PyMuPDF 2.0 Startup Crash:** Fixed `FileNotFoundError: No such file or directory: '.../pymupdf/layout/resources/onnx/layout_rf2.4.1+imf1.yaml'` when launching packaged release builds (`.deb` and Windows `.exe`).
-* **Dependency Version Constraints:** Capped `pymupdf>=1.24.0,<2.0.0` in `requirements.txt` to prevent automatic retrieval of PyMuPDF 2.0 and its unneeded ONNX layout models.
-* **Full PyInstaller Asset Bundling:** Added `--collect-all pymupdf` across all build specifications and GitHub Actions CI pipelines to ensure all PyMuPDF native shared libraries, package metadata, and resources are bundled without missing dependencies.
-
----
-
-# Preview macOS v1.3.0 Release Notes
-
-Welcome to **Preview macOS v1.3.0**! This major release delivers full parity with Apple macOS Preview for PDF viewing, interactive forms, annotation baking, multi-page layouts, and sidebar management.
-
----
-
-### 📄 Interactive PDF Viewing & Text Selection
-* **Vector Text Selection:** Click and drag across PDF text with authentic macOS translucent blue selection highlights.
-* **Double-Click & Select All:** Double-click any word or press <kbd>Ctrl</kbd>+<kbd>A</kbd> to select all text on the active page.
-* **Copy to Clipboard:** Copy selected text with <kbd>Ctrl</kbd>+<kbd>C</kbd> or via the context menu.
-* **Text Selection Shortcuts:** Right-click selected text to immediately **Highlight**, **Redact**, or **Strikethrough**.
-* **Clickable Hyperlinks:**
-  * External web URLs open seamlessly in your default browser.
-  * Internal document links jump directly to destination pages.
-  * Hovering over links displays a pointing hand cursor and target preview in the status bar.
-* **Interactive AcroForms:** Fill out interactive PDF forms directly within the app (toggle checkboxes and edit text fields).
-* **Multi-Page View Modes:**
-  * **Single Page Mode:** Standard focused page reading.
-  * **Two Pages (Two-Up) Mode:** Side-by-side reading layout with macOS drop shadows and synchronized zoom.
-
----
-
-### 🛠️ PDF Organization, Editing & Security
-* **Full Annotation Baking:** User markups (freehand pen strokes, highlighters, geometric shapes, text boxes, sticky notes, signatures, and redactions) are written directly into standard PDF annotation objects upon save or export.
-* **Permanent Redactions:** Blackout redaction boxes can now be permanently burned into PDFs via **Edit > Permanently Burn Redactions...**, irreversibly stripping underlying sensitive text and graphics.
-* **Drag-and-Drop Page Reordering:** Reorder pages visually by dragging and dropping thumbnails inside the sidebar.
-* **Insert Page from File:** Right-click any thumbnail or select **Edit > Insert > Page from File...** to insert external PDFs or images into any position.
-* **Merge PDFs:** Combine multiple PDF documents into a unified file via **File > Merge PDFs...**.
-* **Split & Extract Pages:** Extract custom page ranges (e.g. `1-3, 5, 8-10`) into a new PDF via **File > Split / Extract Pages...**.
-* **AES-256 PDF Password Security:** Encrypt documents with AES-256 passwords upon saving via **File > Set PDF Password...** and authenticate encrypted PDFs with a native macOS unlock dialog.
-
----
-
-### 🎨 Sidebar & Thumbnail Slider Improvements
-* **Zero Overlap Dynamic Delegate:** Fixed thumbnail card and page number badge overlap when adjusting the thumbnail size slider.
-* **Contact Sheet Grid Layout:** Contact Sheet mode now enforces uniform mathematical grid sizing with automatic column reflow.
-* **Auto-Expanding Sidebar:** Sidebar smoothly expands when scaling thumbnails up to prevent horizontal clipping.
-* **High-DPI Thumbnail Caching:** Composite multi-resolution caching `(page_idx, width, rot)` ensures razor-sharp thumbnail rendering at any slider scale.
-
----
-
-### 🐛 Bug Fixes & Refinements
-* Fixed markup drawing out of document boundaries; all annotation tools now respect canvas boundaries.
-* Fixed text box font family selector and inline text editing.
-* Fixed sticky note editor dialog opening and persistence.
-* Fixed Color Adjustment inspector toggle and Auto Levels button.
-* Fixed print preview dialog crash on Linux Wayland environments.
+```bash
+sha256sum preview-app_1.7.3_amd64.deb
+```

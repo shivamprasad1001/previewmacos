@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 APP_NAME="preview-app"
-VERSION="1.7.2"
+VERSION="1.7.3"
 ARCH="amd64"
 PACKAGE_NAME="${APP_NAME}_${VERSION}_${ARCH}"
 BUILD_DIR="$SCRIPT_DIR/build/deb/$PACKAGE_NAME"

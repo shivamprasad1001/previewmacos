@@ -7,7 +7,7 @@ Built with plain HTML, CSS, and vanilla JavaScript - no framework and no build s
 
 - `index.html` - Single-page semantic HTML document
 - `style.css` - Responsive light and dark theme styles (`prefers-color-scheme` + `localStorage`)
-- `script.js` - OS download detection, GitHub Releases API sync (with `v1.7.2` fallback), clipboard copy, gallery lightbox, shortcut filter, and scroll reveal
+- `script.js` - OS download detection, GitHub Releases API sync (with `v1.7.3` fallback), clipboard copy, gallery lightbox, shortcut filter, and scroll reveal
 - `assets/` - Official app icon and screenshots downloaded from the repository
 - `sitemap.xml` & `robots.txt` - Search indexing metadata
 
