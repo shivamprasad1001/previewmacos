@@ -4,9 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.2.x   | :white_check_mark: |
-| 1.1.x   | :x:                |
-| < 1.1   | :x:                |
+| 1.7.x   | :white_check_mark: |
+| < 1.7   | :x:                |
 
 ---
 
@@ -16,7 +15,7 @@ We take the security of Preview seriously. If you discover a security vulnerabil
 
 Instead, please send an email to:
 - **Shivam Prasad**: [shivamprasad1001@gmail.com](mailto:shivamprasad1001@gmail.com)
-- **TriviLabs Security**: [security@trivilabs.in](mailto:hello@trivilabs.in)
+- **TriviLabs Security**: [hello@trivilabs.in](mailto:hello@trivilabs.in)
 
 Please include:
 1. Description of the vulnerability and its potential impact.

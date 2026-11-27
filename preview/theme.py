@@ -5,9 +5,9 @@ refined card and dock surfaces, electric blue accents, and precise design tokens
 Maintains full backwards compatibility with MacTheme.
 """
 
+import logging
 import sys
 import subprocess
-from typing import Optional
 from PyQt6.QtCore import QObject, pyqtSignal, Qt
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import QWidget
@@ -223,7 +223,7 @@ class StudioTheme:
             color: {cls.DARK_TEXT_PRIMARY};
             font-family: {cls.FONT_FAMILY};
         }}
-        
+
         #rootContainer {{
             background: transparent;
         }}
@@ -288,7 +288,7 @@ class StudioTheme:
             max-height: 20px;
             margin: 0px 4px;
         }}
-        
+
         #windowTitleLabel {{
             font-family: {cls.FONT_FAMILY};
             font-size: {cls.FONT_SIZE_BASE}px;
@@ -495,7 +495,7 @@ class StudioTheme:
             font-size: {cls.FONT_SIZE_SM}px;
             font-weight: 500;
         }}
-        
+
         QToolButton:hover, QPushButton:hover {{
             background-color: {cls.DARK_BG_HOVER};
             border-color: {cls.DARK_BORDER_STRONG};
@@ -677,7 +677,7 @@ class StudioTheme:
         }}
 
         /* Segmented Controls (Sidebar & Mode Switchers) */
-        #sidebarSegmented, #modeSegmented {{
+        #sidebarSegmented {{
             background-color: {cls.DARK_BG_CARD};
             border: 1px solid {cls.DARK_BORDER_SUBTLE};
             border-radius: 6px;
@@ -685,16 +685,24 @@ class StudioTheme:
             margin: 6px 8px;
         }}
 
+        #modeSegmented {{
+            background-color: {cls.DARK_BG_CARD};
+            border: 1px solid {cls.DARK_BORDER_SUBTLE};
+            border-radius: 8px;
+            padding: 3px;
+            margin: 0px;
+        }}
+
         #sidebarSegmented QToolButton, #modeSegmented QToolButton {{
             background: transparent;
             border: none;
-            border-radius: {cls.RADIUS_SM}px;
+            border-radius: 5px;
             color: {cls.DARK_TEXT_SECONDARY};
             font-size: {cls.FONT_SIZE_XS}px;
             font-weight: 500;
-            padding: 3px 8px;
-            min-height: 24px;
-            max-height: 24px;
+            padding: 2px 10px;
+            min-height: 20px;
+            max-height: 20px;
         }}
 
         #sidebarSegmented QToolButton:hover, #modeSegmented QToolButton:hover {{
@@ -887,6 +895,10 @@ class StudioTheme:
         QScrollBar::add-line, QScrollBar::sub-line {{
             width: 0px;
             height: 0px;
+        }}
+
+        QScrollBar::add-page, QScrollBar::sub-page {{
+            background: transparent;
         }}
 
         /* SpinBox & Font Controls */
@@ -1271,7 +1283,7 @@ class StudioTheme:
             color: {cls.LIGHT_TEXT_PRIMARY};
             font-family: {cls.FONT_FAMILY};
         }}
-        
+
         #rootContainer {{
             background: transparent;
         }}
@@ -1335,7 +1347,7 @@ class StudioTheme:
             max-height: 20px;
             margin: 0px 4px;
         }}
-        
+
         #windowTitleLabel {{
             font-family: {cls.FONT_FAMILY};
             font-size: {cls.FONT_SIZE_BASE}px;
@@ -1541,7 +1553,7 @@ class StudioTheme:
             font-size: {cls.FONT_SIZE_SM}px;
             font-weight: 500;
         }}
-        
+
         QToolButton:hover, QPushButton:hover {{
             background-color: {cls.LIGHT_BG_HOVER};
             border-color: {cls.LIGHT_BORDER_STRONG};
@@ -1716,7 +1728,7 @@ class StudioTheme:
         }}
 
         /* Segmented Controls (Light) */
-        #sidebarSegmented, #modeSegmented {{
+        #sidebarSegmented {{
             background-color: rgba(0, 0, 0, 0.05);
             border: 1px solid {cls.LIGHT_BORDER_SUBTLE};
             border-radius: 6px;
@@ -1724,16 +1736,24 @@ class StudioTheme:
             margin: 6px 8px;
         }}
 
+        #modeSegmented {{
+            background-color: rgba(0, 0, 0, 0.05);
+            border: 1px solid {cls.LIGHT_BORDER_SUBTLE};
+            border-radius: 8px;
+            padding: 3px;
+            margin: 0px;
+        }}
+
         #sidebarSegmented QToolButton, #modeSegmented QToolButton {{
             background: transparent;
             border: none;
-            border-radius: {cls.RADIUS_SM}px;
+            border-radius: 5px;
             color: {cls.LIGHT_TEXT_SECONDARY};
             font-size: {cls.FONT_SIZE_XS}px;
             font-weight: 500;
-            padding: 3px 8px;
-            min-height: 24px;
-            max-height: 24px;
+            padding: 2px 10px;
+            min-height: 20px;
+            max-height: 20px;
         }}
 
         #sidebarSegmented QToolButton:hover, #modeSegmented QToolButton:hover {{
@@ -1914,6 +1934,10 @@ class StudioTheme:
         QScrollBar::add-line, QScrollBar::sub-line {{
             width: 0px;
             height: 0px;
+        }}
+
+        QScrollBar::add-page, QScrollBar::sub-page {{
+            background: transparent;
         }}
 
         /* SpinBox & Combos (Light) */
@@ -2353,7 +2377,7 @@ class ThemeManager(QObject):
             try:
                 app.styleHints().colorSchemeChanged.connect(self._on_system_scheme_changed)
             except Exception:
-                pass
+                logging.getLogger(__name__).exception("Failed to connect colorSchemeChanged")
 
     @classmethod
     def instance(cls) -> "ThemeManager":
@@ -2376,7 +2400,7 @@ class ThemeManager(QObject):
                 elif cs == Qt.ColorScheme.Dark:
                     return StudioTheme.DARK
             except Exception:
-                pass
+                logging.getLogger(__name__).debug("Qt styleHints colorScheme unavailable", exc_info=True)
 
         # Fallback for Linux GNOME / FreeDesktop
         try:
@@ -2389,8 +2413,8 @@ class ThemeManager(QObject):
                 return StudioTheme.DARK
             elif "prefer-light" in val or "light" in val:
                 return StudioTheme.LIGHT
-        except Exception:
-            pass
+        except (subprocess.SubprocessError, OSError):
+            logging.getLogger(__name__).debug("gsettings color-scheme detection unavailable", exc_info=True)
 
         # Fallback for Windows
         if sys.platform == "win32":
@@ -2402,8 +2426,8 @@ class ThemeManager(QObject):
                 )
                 val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
                 return StudioTheme.LIGHT if val == 1 else StudioTheme.DARK
-            except Exception:
-                pass
+            except OSError:
+                logging.getLogger(__name__).debug("Windows registry theme detection failed", exc_info=True)
 
         return StudioTheme.DARK
 

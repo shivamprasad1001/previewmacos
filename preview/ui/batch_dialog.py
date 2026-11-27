@@ -5,11 +5,11 @@ proportional scaling, max-dimension constraints, and EXIF metadata preservation.
 """
 
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from PIL import Image
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QComboBox, QCheckBox, QPushButton, QSlider,
     QProgressBar, QFileDialog, QWidget, QFrame, QMessageBox
 )
@@ -328,7 +328,7 @@ class BatchConvertDialog(QDialog):
         fmt = self.format_combo.currentText()
         quality = self.quality_slider.value()
         dim_mode = self.dim_combo.currentData()
-        
+
         try:
             scale_pct = float(self.scale_edit.text().strip())
         except ValueError:

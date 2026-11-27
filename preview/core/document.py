@@ -3,6 +3,7 @@ Document model supporting both multi-page PDFs (via PyMuPDF) and Image collectio
 Provides high-DPI rendering, thumbnail caching, text extraction, search, and page manipulations.
 """
 
+import logging
 import os
 import re
 import io
@@ -153,18 +154,18 @@ class PagePrefetchWorker(QThread):
                     if not self._is_cancelled:
                         self.page_rendered.emit(p_idx, self.zoom, rot, qimg)
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Prefetch render worker failed")
         finally:
             if pdf_clone:
                 try:
                     pdf_clone.close()
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).exception("Failed to close cloned PDF in prefetch worker")
 
 
 class Document(QObject):
     """Unified document representation for PDFs and Image collections/folders."""
-    
+
     document_changed = pyqtSignal()
     page_changed = pyqtSignal(int)
 
@@ -178,7 +179,7 @@ class Document(QObject):
         self.rotations: Dict[int, int] = {}  # page_idx -> degree
         self.is_dirty: bool = False
         self.metadata: Dict[str, Any] = {}
-        
+
         # Multi-image list
         self.image_paths: List[str] = []
         self._image_cache: LRUCache = LRUCache(maxsize=50)
@@ -251,7 +252,7 @@ class Document(QObject):
         all_files.sort(key=natural_sort_key)
 
         image_files = [
-            os.path.join(folder_path, f) for f in all_files 
+            os.path.join(folder_path, f) for f in all_files
             if os.path.splitext(f)[1].lower() in SUPPORTED_IMAGE_EXTS
         ]
 
@@ -271,7 +272,7 @@ class Document(QObject):
             try:
                 self._pdf_doc.close()
             except Exception:
-                pass
+                logging.getLogger(__name__).exception("Failed to close PDF document during reset")
             self._pdf_doc = None
         self._pil_image = None
 
@@ -281,7 +282,7 @@ class Document(QObject):
         self.file_name = os.path.basename(file_path)
         self.is_pdf = True
         self._pdf_doc = pymupdf.open(file_path)
-        
+
         if self._pdf_doc.is_encrypted:
             if password is not None:
                 rc = self._pdf_doc.authenticate(password)
@@ -293,7 +294,7 @@ class Document(QObject):
                     raise PasswordRequiredError(f"Password required to open '{self.file_name}'.")
 
         self.page_count = len(self._pdf_doc)
-        
+
         meta = self._pdf_doc.metadata or {}
         stat = os.stat(file_path)
         self.metadata = {
@@ -468,7 +469,7 @@ class Document(QObject):
                 scale = zoom
                 mat = pymupdf.Matrix(scale, scale).prerotate(total_rot)
                 pix = page.get_pixmap(matrix=mat, alpha=False)
-                
+
                 img_data = pix.samples
                 bytes_per_line = pix.stride
                 qimg = QImage(img_data, pix.width, pix.height, bytes_per_line, QImage.Format.Format_RGB888)
@@ -481,11 +482,11 @@ class Document(QObject):
             if img:
                 if rot != 0:
                     img = img.rotate(-rot, expand=True)
-                
+
                 target_w = max(1, int(img.width * zoom))
                 target_h = max(1, int(img.height * zoom))
                 resized = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-                
+
                 if resized.mode != "RGBA":
                     resized = resized.convert("RGBA")
                 data = resized.tobytes("raw", "RGBA")
@@ -564,18 +565,18 @@ class Document(QObject):
             return links
         try:
             page = self._pdf_doc[page_idx]
-            for l in page.get_links():
-                r = l.get("from")
+            for link in page.get_links():
+                r = link.get("from")
                 if r:
                     rect = QRectF(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0)
                     links.append({
                         "rect": rect,
-                        "uri": l.get("uri"),
-                        "page": l.get("page"),  # Destination page index
-                        "kind": l.get("kind")
+                        "uri": link.get("uri"),
+                        "page": link.get("page"),  # Destination page index
+                        "kind": link.get("kind")
                     })
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Failed to extract links from page %s", page_idx)
         return links
 
     def get_page_words(self, page_idx: int) -> List[Tuple[QRectF, str]]:
@@ -590,7 +591,7 @@ class Document(QObject):
                 rect = QRectF(w[0], w[1], w[2] - w[0], w[3] - w[1])
                 words.append((rect, w[4]))
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Failed to extract words from page %s", page_idx)
         return words
 
     def get_form_fields(self, page_idx: int) -> List[Dict[str, Any]]:
@@ -609,7 +610,7 @@ class Document(QObject):
                     "value": w.field_value
                 })
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Failed to extract form fields from page %s", page_idx)
         return fields
 
     def set_form_field_value(self, page_idx: int, field_name: str, value: Any) -> bool:
@@ -628,7 +629,7 @@ class Document(QObject):
                     self.page_changed.emit(page_idx)
                     return True
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Failed to set form field %s on page %s", field_name, page_idx)
         return False
 
     def update_image(self, new_pil_image: Image.Image, page_idx: Optional[int] = None):
@@ -832,7 +833,7 @@ class Document(QObject):
         try:
             pdf_doc.subset_fonts()
         except Exception:
-            pass
+            logging.getLogger(__name__).exception("Failed to subset fonts during PDF compression")
 
         if output_path:
             pdf_doc.save(output_path, garbage=4, deflate=True, clean=True)
@@ -915,7 +916,7 @@ class Document(QObject):
     def export_document(self, output_path: str, format_name: str = "PDF", quality: int = 95, page_idx: Optional[int] = None, reduce_size: bool = False):
         ext = os.path.splitext(output_path)[1].lower()
         target_page = self.current_page if page_idx is None else page_idx
-        
+
         if self.is_pdf and self._pdf_doc:
             if ext == '.pdf':
                 for p_idx, deg in self.rotations.items():
@@ -952,7 +953,7 @@ class Document(QObject):
                 img.save(output_path, "WEBP", quality=quality)
             else:
                 img.save(output_path, quality=quality)
-        
+
         self.is_dirty = False
 
     def move_page(self, from_idx: int, to_idx: int) -> bool:
@@ -1271,10 +1272,10 @@ class Document(QObject):
         return True
 
     def save_with_annotations(
-        self, 
-        output_path: str, 
-        annotations_map: Dict[int, List[Any]], 
-        user_pw: Optional[str] = None, 
+        self,
+        output_path: str,
+        annotations_map: Dict[int, List[Any]],
+        user_pw: Optional[str] = None,
         owner_pw: Optional[str] = None
     ) -> bool:
         """
@@ -1470,7 +1471,7 @@ class Document(QObject):
                         for item in annotations_map[idx]:
                             item.draw(annot_painter, zoom=2.0)
                     annot_painter.end()
-                    
+
                     buf = QBuffer()
                     buf.open(QIODevice.OpenModeFlag.WriteOnly)
                     page_pix.save(buf, "PNG")

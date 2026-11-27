@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/shivamprasad1001/previewmacos/releases"><img src="https://img.shields.io/github/v/release/shivamprasad1001/previewmacos?color=007AFF&style=for-the-badge&logo=apple" alt="Latest Release" /></a>
-  <a href="https://github.com/shivamprasad1001/previewmacos/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-34C759?style=for-the-badge&logo=githubactions&logoColor=white" alt="Build Status" /></a>
+  <a href="https://github.com/shivamprasad1001/previewmacos/actions/workflows/ci.yml"><img src="https://github.com/shivamprasad1001/previewmacos/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" /></a>
   <a href="https://riverbankcomputing.com/software/pyqt"><img src="https://img.shields.io/badge/GUI-PyQt6-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PyQt6" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
@@ -277,10 +277,10 @@ preview-macos/
 A dedicated automated test suite validates parity, image decoding, PDF rasterization, undo/redo history, color engines, and updater logic:
 
 ```bash
-python3 test_preview_features.py
+QT_QPA_PLATFORM=offscreen PREVIEW_TESTING=true pytest tests/ -p no:typeguard
 ```
 
-All 25 test cases run in headless offscreen mode and complete in under one second.
+The automated test suite (111 test cases across `tests/`) runs in headless offscreen mode.
 
 ---
 

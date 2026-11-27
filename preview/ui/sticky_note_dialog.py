@@ -7,7 +7,6 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QLabel, QPushButton, QWidget
 )
-from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
 
 class StickyNoteDialog(QDialog):
@@ -66,7 +65,7 @@ class StickyNoteDialog(QDialog):
         # Header bar
         header = QHBoxLayout()
         header.setSpacing(6)
-        
+
         lbl_title = QLabel("📝 Note")
         header.addWidget(lbl_title)
         header.addStretch()

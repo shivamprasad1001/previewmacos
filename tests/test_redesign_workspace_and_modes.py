@@ -14,11 +14,10 @@ import pymupdf
 from PIL import Image
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSize
+from PyQt6.QtCore import QPointF, QRectF, QSize
 from PyQt6.QtGui import QColor, QResizeEvent
 
 from preview.ui.main_window import MacMainWindow
-from preview.core.document import Document
 from preview.core.annotations import AnnotationItem, AnnotationType
 
 app = QApplication.instance()
@@ -129,15 +128,15 @@ class TestRedesignWorkspaceAndModes(unittest.TestCase):
 
         # 1. Select Pen -> Shape format row active (index 0)
         mb.pen_btn.click()
-        self.assertEqual(mb.context_stack.currentIndex(), 0)  # Shape formatting
+        self.assertFalse(mb._context_views[0].isHidden())  # Shape formatting
 
         # 2. Select Text -> Text typography format row active (index 1)
         mb.text_btn.click()
-        self.assertEqual(mb.context_stack.currentIndex(), 1)  # Text formatting
+        self.assertFalse(mb._context_views[1].isHidden())  # Text formatting
 
         # 3. Select Redact -> Redaction warning format row active (index 3)
         mb.redact_btn.click()
-        self.assertEqual(mb.context_stack.currentIndex(), 3)  # Redaction pending
+        self.assertFalse(mb._context_views[3].isHidden())  # Redaction pending
 
         # 4. Context bar with selected shape annotation
         shape_annot = AnnotationItem(AnnotationType.RECTANGLE)
@@ -147,7 +146,7 @@ class TestRedesignWorkspaceAndModes(unittest.TestCase):
         shape_annot.fill_color = QColor(0, 0, 0, 0)
         win.canvas.selected_annotation = shape_annot
         mb.set_selected_annotation(shape_annot)
-        self.assertEqual(mb.context_stack.currentIndex(), 0)
+        self.assertFalse(mb._context_views[0].isHidden())
 
         # 5. Context bar with selected text annotation
         text_annot = AnnotationItem(AnnotationType.TEXT)
@@ -158,13 +157,13 @@ class TestRedesignWorkspaceAndModes(unittest.TestCase):
         text_annot.stroke_color = QColor("#ff3b30")
         win.canvas.selected_annotation = text_annot
         mb.set_selected_annotation(text_annot)
-        self.assertEqual(mb.context_stack.currentIndex(), 1)
+        self.assertFalse(mb._context_views[1].isHidden())
         self.assertEqual(mb.font_spin.value(), 16)
 
         win.close()
 
     def test_03_mac_inspector_panel_properties_and_layers(self):
-        """Verifies Inspector panel's 3 tabs (Properties, Layers, Adjust), metadata card, and live annotation editing."""
+        """Verifies Inspector panel's 2 tabs (Format, Layers), metadata card, and live annotation editing."""
         win = MacMainWindow(initial_file=self.pdf_path)
         win.show()
         win.set_inspector_visible(True)
@@ -172,7 +171,7 @@ class TestRedesignWorkspaceAndModes(unittest.TestCase):
 
         self.assertFalse(insp.isHidden())
         self.assertEqual(insp.width(), 280)
-        self.assertEqual(insp.stack.count(), 3)
+        self.assertEqual(insp.stack.count(), 2)
 
         # Tab 0: Document metadata overview when nothing is selected
         insp.set_active_tab(0)
@@ -260,6 +259,7 @@ class TestRedesignWorkspaceAndModes(unittest.TestCase):
 
         win.close()
 
+    @unittest.skip("MacInspectorPanel was simplified to 2 tabs (Format, Layers); color adjustments live in AdjustColorDialog")
     def test_06_image_color_adjustment_tab_in_inspector(self):
         """Verifies that the Adjust tab in the inspector displays live histogram and color controls for image files."""
         win = MacMainWindow(initial_file=self.img_path)

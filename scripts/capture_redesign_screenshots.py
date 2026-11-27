@@ -2,28 +2,28 @@
 Script to capture verification screenshots of the redesigned UI in both Light and Dark modes at 1280px and 1024px.
 """
 
+import argparse
 import os
 import sys
 import tempfile
 import pymupdf
-from PIL import Image
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor
 
 from preview.ui.main_window import MacMainWindow
 from preview.theme import MacTheme
 
 def main():
+    parser = argparse.ArgumentParser(description="Capture redesign verification screenshots.")
+    parser.add_argument("--out", default="docs/screenshots", help="Output directory for screenshots")
+    args = parser.parse_args()
+
     app = QApplication.instance()
     if not app:
         app = QApplication(sys.argv)
 
-    out_dir = os.path.abspath("docs/screenshots")
+    out_dir = os.path.abspath(args.out)
     os.makedirs(out_dir, exist_ok=True)
-    
-    artifact_dir = "/home/zoro0x1/.gemini/antigravity-ide/brain/27848777-99d0-48da-97ed-dec47f27ed9b"
 
     # Create a nice sample PDF document with multiple pages
     tmp_pdf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
@@ -131,12 +131,8 @@ def main():
     screenshots.append(p6)
     win_resp_light.close()
 
-    # Copy all to artifact dir
-    import shutil
     for path in screenshots:
-        dest = os.path.join(artifact_dir, os.path.basename(path))
-        shutil.copyfile(path, dest)
-        print(f"Captured: {path} -> {dest}")
+        print(f"Captured: {path}")
 
     # Clean up temp file
     if os.path.exists(pdf_path):

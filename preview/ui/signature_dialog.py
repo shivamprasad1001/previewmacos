@@ -4,11 +4,11 @@ macOS style 'Manage Signatures' dialog where users can draw, save, and insert si
 
 from typing import Optional, List
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QWidget, QListWidget, QListWidgetItem, QLineEdit
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QWidget
 )
-from PyQt6.QtGui import QPainter, QColor, QPen, QPainterPath, QPixmap, QIcon, QMouseEvent, QPaintEvent
-from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QSize
+from PyQt6.QtGui import QPainter, QColor, QPen, QPainterPath, QPixmap, QMouseEvent, QPaintEvent
+from PyQt6.QtCore import Qt, QPointF, pyqtSignal
 
 class SignaturePad(QWidget):
     """Drawing canvas for vector signatures."""

@@ -1,14 +1,14 @@
 """
 macOS style Export Sheet / Dialog for Preview.
-Allows choosing output format (PDF, JPEG, PNG, WebP, TIFF), compression quality, 
+Allows choosing output format (PDF, JPEG, PNG, WebP, TIFF), compression quality,
 resolution (DPI), page range, and destination file path.
 """
 
 import os
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, 
-    QSlider, QPushButton, QFileDialog, QRadioButton, QButtonGroup, 
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
+    QSlider, QPushButton, QFileDialog, QRadioButton, QButtonGroup,
     QFrame, QWidget
 )
 from PyQt6.QtCore import Qt
@@ -17,7 +17,7 @@ from PyQt6.QtGui import QFont
 class MacExportDialog(QDialog):
     """macOS-authentic Export dialog sheet."""
 
-    def __init__(self, current_file_path: Optional[str] = None, page_count: int = 1, 
+    def __init__(self, current_file_path: Optional[str] = None, page_count: int = 1,
                  current_page: int = 0, document: Optional[object] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setWindowTitle("Export")
@@ -137,7 +137,7 @@ class MacExportDialog(QDialog):
             self.radio_all = QRadioButton(f"All ({self.page_count} pages)")
             self.radio_all.setChecked(True)
             self.radio_current = QRadioButton(f"Current Page ({self.current_page + 1})")
-            
+
             self.scope_group = QButtonGroup(self)
             self.scope_group.addButton(self.radio_all)
             self.scope_group.addButton(self.radio_current)
@@ -226,7 +226,7 @@ class MacExportDialog(QDialog):
             "TIFF": ".tiff"
         }
         ext = ext_map.get(fmt, ".pdf")
-        
+
         default_dir = os.path.dirname(self.current_file_path) if self.current_file_path else os.path.expanduser("~/Documents")
         candidate_name = self.name_edit.text().strip() or "Export"
         if not candidate_name.lower().endswith(ext):

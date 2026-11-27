@@ -10,20 +10,19 @@ Features:
 """
 
 import os
+import sys
 import json
 import shutil
-import subprocess
 from typing import Optional, Dict, Any, List
 
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QLineEdit, QTreeWidget, QTreeWidgetItem, QTextBrowser,
-    QPushButton, QLabel, QFileDialog, QMessageBox
+    QFileDialog, QMessageBox
 )
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QDesktopServices
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QKeySequence, QShortcut, QDesktopServices
 
-from preview.icons import MacIconFactory
 from preview.theme import MacTheme
 
 
@@ -54,8 +53,10 @@ class HelpWindow(QDialog):
         candidates = [
             os.path.abspath("help/content"),
             os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "help", "content"),
-            "/run/media/zoro0x1/Hard Disk Drive/MyPrograms/REA/preview-macos/help/content"
         ]
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidates.append(os.path.join(meipass, "help", "content"))
         for c in candidates:
             if os.path.exists(c):
                 return c
@@ -148,16 +149,16 @@ class HelpWindow(QDialog):
         # 1. Get Started
         item_get_started = QTreeWidgetItem(self.nav_tree, ["Get Started"])
         item_get_started.setData(0, Qt.ItemDataRole.UserRole, "header")
-        
+
         sub_what = QTreeWidgetItem(item_get_started, ["What is Preview"])
         sub_what.setData(0, Qt.ItemDataRole.UserRole, "what-is-preview")
-        
+
         sub_open = QTreeWidgetItem(item_get_started, ["Open a file or folder"])
         sub_open.setData(0, Qt.ItemDataRole.UserRole, "open-file-or-folder")
-        
+
         sub_window = QTreeWidgetItem(item_get_started, ["Window overview"])
         sub_window.setData(0, Qt.ItemDataRole.UserRole, "window-overview")
-        
+
         item_get_started.setExpanded(True)
 
         # 2. Help Dictionary
@@ -303,7 +304,7 @@ class HelpWindow(QDialog):
 
     def navigate_to(self, page_id: str, filter_text: str = ""):
         self.current_page_id = page_id
-        
+
         # Highlight in tree if exists
         self._select_tree_item(page_id)
 
@@ -684,9 +685,6 @@ class HelpWindow(QDialog):
         """
 
     def _render_pdf_guide_html(self) -> str:
-        guide_path = os.path.abspath("help/generated/preview_user_guide.pdf")
-        sheet_path = os.path.abspath("help/generated/preview_shortcuts_cheatsheet.pdf")
-
         return f"""
         <html>
         <head>{self._get_base_css()}</head>

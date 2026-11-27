@@ -9,14 +9,12 @@ Unit and integration tests for the improved Edit toolbar in Preview for Linux:
 """
 
 import os
+import tempfile
 import unittest
-from PyQt6.QtWidgets import QApplication, QToolButton
-from PyQt6.QtCore import Qt, QPointF, QRectF
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import QApplication, QFrame
 from PIL import Image
 
-from preview.core.document import Document
-from preview.core.annotations import AnnotationItem, AnnotationType
+from preview.core.annotations import AnnotationType
 from preview.ui.main_window import MacMainWindow
 from preview.theme import MacTheme
 
@@ -27,17 +25,14 @@ class TestEditToolbarImprovements(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
         # Create temporary test image
-        cls.test_img_path = "/tmp/test_edit_toolbar.png"
+        cls._tmp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        cls.test_img_path = os.path.join(cls._tmp_dir.name, "test_edit_toolbar.png")
         img = Image.new("RGB", (600, 400), color=(120, 160, 220))
         img.save(cls.test_img_path)
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists(cls.test_img_path):
-            try:
-                os.remove(cls.test_img_path)
-            except Exception:
-                pass
+        cls._tmp_dir.cleanup()
 
     def test_01_logical_tool_grouping_and_containers(self):
         """Verifies editing tools are organized into logical groups with consistent dimensions."""
@@ -46,23 +41,11 @@ class TestEditToolbarImprovements(unittest.TestCase):
         win.set_workspace_mode("Edit")
         mb = win.markup_bar
 
-        # Check that all 7 logical group containers exist
-        self.assertIsNotNone(mb.group_selection)
-        self.assertIsNotNone(mb.group_text)
-        self.assertIsNotNone(mb.group_drawing)
-        self.assertIsNotNone(mb.group_shapes)
-        self.assertIsNotNone(mb.group_privacy)
+        # Check that all logical group containers exist
+        self.assertIsNotNone(mb.group_select)
         self.assertIsNotNone(mb.group_image)
-        self.assertIsNotNone(mb.group_history)
-
-        # Check object names for QSS styling
-        self.assertEqual(mb.group_selection.objectName(), "markupGroup")
-        self.assertEqual(mb.group_text.objectName(), "markupGroup")
-        self.assertEqual(mb.group_drawing.objectName(), "markupGroup")
-        self.assertEqual(mb.group_shapes.objectName(), "markupGroup")
-        self.assertEqual(mb.group_privacy.objectName(), "markupGroup")
-        self.assertEqual(mb.group_image.objectName(), "markupGroup")
-        self.assertEqual(mb.group_history.objectName(), "markupGroup")
+        groups = [g for g in mb.findChildren(QFrame) if g.objectName() == "markupGroup"]
+        self.assertGreaterEqual(len(groups), 7)
 
         # Verify consistent button sizing across all standard tools
         standard_btns = [
@@ -151,7 +134,7 @@ class TestEditToolbarImprovements(unittest.TestCase):
 
         # Default context (index 4)
         mb.update_context_row()
-        self.assertEqual(mb.context_stack.currentIndex(), 4)
+        self.assertFalse(mb._context_views[4].isHidden())
 
         # Buttons have full labels
         self.assertEqual(mb.btn_adj_col.text(), "Adjust Color...")
@@ -175,22 +158,22 @@ class TestEditToolbarImprovements(unittest.TestCase):
         # Pen tool
         mb.pen_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.PEN)
-        self.assertEqual(mb.context_stack.currentIndex(), 0)
+        self.assertFalse(mb._context_views[0].isHidden())
 
         # Text tool
         mb.text_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.TEXT)
-        self.assertEqual(mb.context_stack.currentIndex(), 1)
+        self.assertFalse(mb._context_views[1].isHidden())
 
         # Redact tool
         mb.redact_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.REDACT)
-        self.assertEqual(mb.context_stack.currentIndex(), 3)
+        self.assertFalse(mb._context_views[3].isHidden())
 
         # Pointer tool / Esc
         mb.pointer_btn.click()
         self.assertEqual(win.canvas.active_tool, AnnotationType.NONE)
-        self.assertEqual(mb.context_stack.currentIndex(), 4)
+        self.assertFalse(mb._context_views[4].isHidden())
 
         win.close()
 

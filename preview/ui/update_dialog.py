@@ -1,20 +1,44 @@
 """
 macOS style Software Update Dialog & In-App Notification Banner.
-Provides authentic Apple Sparkle-like UI for discovering, inspecting, 
+Provides authentic Apple Sparkle-like UI for discovering, inspecting,
 downloading, and auto-installing new Preview releases.
 """
 
 import os
+import platform
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QTextBrowser, QCheckBox, QFrame, QProgressBar, QApplication
 )
-from PyQt6.QtGui import QPixmap, QDesktopServices, QFont, QColor
-from PyQt6.QtCore import Qt, QUrl, QSettings, pyqtSignal
+from PyQt6.QtGui import QPixmap, QDesktopServices, QFont
+from PyQt6.QtCore import Qt, QThread, QUrl, QSettings, pyqtSignal
 
 from preview.core.updater import UpdateInfo, UpdateDownloadWorker, install_update
 from preview import __version__
+
+
+class UpdateInstallWorker(QThread):
+    """Runs blocking package installation off the GUI thread so dialogs remain responsive."""
+
+    finished = pyqtSignal(bool, str)
+
+    def __init__(self, installer_fn, filepath: str, expected_sha256: str, parent=None):
+        super().__init__(parent)
+        self.installer_fn = installer_fn
+        self.filepath = filepath
+        self.expected_sha256 = expected_sha256
+
+    def run(self):
+        try:
+            success, msg = self.installer_fn(
+                self.filepath,
+                expected_sha256=self.expected_sha256,
+            )
+        except Exception as e:
+            success, msg = False, str(e)
+        self.finished.emit(bool(success), str(msg))
+
 
 class UpdateDialog(QDialog):
     """Authentic macOS Software Update Dialog with live in-app download and installation."""
@@ -24,8 +48,10 @@ class UpdateDialog(QDialog):
         self.update_info = update_info
         self.current_version = current_version
         self.download_worker: Optional[UpdateDownloadWorker] = None
+        self.install_worker: Optional[UpdateInstallWorker] = None
         self.downloaded_filepath: Optional[str] = None
-        
+        self.verified_sha256: Optional[str] = None
+
         self.setWindowTitle("Software Update")
         self.setFixedSize(540, 500)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
@@ -223,7 +249,7 @@ class UpdateDialog(QDialog):
             line = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", line)
             line = re.sub(r"\*(.*?)\*", r"<i>\1</i>", line)
             line = re.sub(r"`(.*?)`", r"<code style='background: rgba(128,128,128,0.2); padding: 1px 4px; border-radius: 3px;'>\1</code>", line)
-            
+
             if line.startswith("### "):
                 lines.append(f"<h4 style='margin: 8px 0 4px 0; color: #0a84ff;'>{line[4:]}</h4>")
             elif line.startswith("## "):
@@ -273,7 +299,12 @@ class UpdateDialog(QDialog):
         self.later_btn.clicked.connect(self._cancel_download)
 
         # Start background download worker
-        self.download_worker = UpdateDownloadWorker(download_url, target_path, parent=self)
+        self.download_worker = UpdateDownloadWorker(
+            download_url,
+            target_path,
+            checksums_url=self.update_info.checksums_url,
+            parent=self,
+        )
         self.download_worker.progress.connect(self._on_download_progress)
         self.download_worker.finished.connect(self._on_download_finished)
         self.download_worker.failed.connect(self._on_download_failed)
@@ -288,6 +319,7 @@ class UpdateDialog(QDialog):
 
     def _on_download_finished(self, target_path: str):
         self.downloaded_filepath = target_path
+        self.verified_sha256 = self.download_worker.verified_sha256 if self.download_worker else None
         self.progress_bar.setValue(100)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
@@ -327,6 +359,8 @@ class UpdateDialog(QDialog):
         """)
 
     def _on_download_failed(self, err: str):
+        self.downloaded_filepath = None
+        self.verified_sha256 = None
         self.download_container.setVisible(False)
         self.notes_browser.setMaximumHeight(16777215)
         self.update_btn.setText("Retry Update")
@@ -345,20 +379,56 @@ class UpdateDialog(QDialog):
         self.reject()
 
     def _install_and_restart(self):
-        if not self.downloaded_filepath:
+        if not self.downloaded_filepath or not self.verified_sha256:
             return
-        success, msg = install_update(self.downloaded_filepath)
+        if "linux" in platform.system().lower():
+            self.update_btn.setEnabled(False)
+            self.update_btn.setText("Installing...")
+            self.later_btn.setEnabled(False)
+            self.progress_bar.setRange(0, 0)
+            self.dl_status_lbl.setText("Installing update... Please authorize if prompted.")
+            self.dl_speed_lbl.setText("")
+
+            self.install_worker = UpdateInstallWorker(
+                install_update,
+                self.downloaded_filepath,
+                self.verified_sha256,
+                parent=self,
+            )
+            self.install_worker.finished.connect(self._on_install_finished)
+            self.install_worker.start()
+            return
+
+        success, msg = install_update(self.downloaded_filepath, expected_sha256=self.verified_sha256)
+        self._on_install_finished(success, msg)
+
+    def _on_install_finished(self, success: bool, msg: str):
         if success:
             self.accept()
-            QApplication.instance().quit()
+            app = QApplication.instance()
+            if app:
+                app.quit()
         else:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(100)
+            self.dl_status_lbl.setText("Installation did not complete.")
+            self.dl_speed_lbl.setText("")
+            self.update_btn.setText("Retry Install")
+            self.update_btn.setEnabled(True)
+            self.later_btn.setEnabled(True)
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Installation Error", msg)
+
+    def closeEvent(self, event):
+        if self.install_worker and self.install_worker.isRunning():
+            event.ignore()
+            return
+        super().closeEvent(event)
 
 
 class UpdateBanner(QFrame):
     """
-    Subtle macOS-style floating top banner inside the main window notifying 
+    Subtle macOS-style floating top banner inside the main window notifying
     the user when a new release is available.
     """
 
@@ -379,8 +449,8 @@ class UpdateBanner(QFrame):
 
         self.setStyleSheet("""
             #updateBanner {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 rgba(10, 132, 255, 0.22), 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(10, 132, 255, 0.22),
                     stop:1 rgba(94, 92, 230, 0.22));
                 border-bottom: 1px solid rgba(10, 132, 255, 0.35);
             }

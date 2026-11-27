@@ -18,14 +18,14 @@ from enum import Enum
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
     QTreeWidget, QTreeWidgetItem, QLabel, QStackedWidget,
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu, QMessageBox,
+    QStyledItemDelegate, QStyle, QMenu, QMessageBox,
     QSlider, QFileDialog, QSizePolicy, QGraphicsOpacityEffect,
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QFont, QPainterPath, QAction,
 )
 from PyQt6.QtCore import (
-    Qt, pyqtSignal, QSize, QRectF, QModelIndex, QEvent, QPointF,
+    Qt, pyqtSignal, QSize, QRectF, QEvent, QPointF,
     QVariantAnimation, QPropertyAnimation, QEasingCurve, QAbstractAnimation,
 )
 
@@ -72,7 +72,8 @@ class AnimatedSegmentedControl(QWidget):
         self._is_dark = True
         self.setMouseTracking(True)
         self.setFixedHeight(28)
-        self.setMinimumWidth(180)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # Selection sliding animation (interpolates fractional segment position 0.0 .. len-1)
@@ -88,8 +89,11 @@ class AnimatedSegmentedControl(QWidget):
         self._hover_anim.valueChanged.connect(self._on_hover_anim_frame)
 
     # ---- public API ----
+    def minimumSizeHint(self) -> QSize:
+        return QSize(120, 28)
+
     def sizeHint(self) -> QSize:
-        return QSize(240, 28)
+        return QSize(220, 28)
 
     def currentIndex(self) -> int:
         return self._current
@@ -262,11 +266,15 @@ class AnimatedSegmentedControl(QWidget):
                 col = text_idle
                 weight = QFont.Weight.Medium
 
-            font = QFont(s.FONT_FAMILY, 11)
+            seg_w = r.width()
+            font = QFont(s.FONT_FAMILY)
+            font.setPixelSize(11 if seg_w >= 62 else 10)
             font.setWeight(weight)
             p.setFont(font)
             p.setPen(col)
-            p.drawText(r, int(Qt.AlignmentFlag.AlignCenter), label)
+            avail_w = max(8, int(seg_w - 6))
+            text = p.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, avail_w)
+            p.drawText(r, int(Qt.AlignmentFlag.AlignCenter), text)
 
 
 # =====================================================================
@@ -320,17 +328,25 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             draw_w = pw * scale
             draw_h = ph * scale
 
-        box_top = r.top() + 6.0
+        badge_h = 17.0
+        group_h = draw_h + 6.0 + badge_h
         pic_x = r.left() + (r.width() - draw_w) / 2.0
-        pic_y = box_top + (max_ph - draw_h) / 2.0
+        pic_y = r.top() + max(6.0, (r.height() - group_h) / 2.0)
         pic_rect = QRectF(pic_x, pic_y, draw_w, draw_h)
+
+        badge_text = str(page_idx + 1)
+        badge_w = max(24.0, len(badge_text) * 7.5 + 14.0)
+        badge_x = r.left() + (r.width() - badge_w) / 2.0
+        badge_y = pic_rect.bottom() + 6.0
+        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
 
         # --- 2. Animated hover card ---
         hover_progress = self.sidebar._hover_progress.get(page_idx, 0.0)
         if hover_progress > 0.001 and not is_selected:
-            card_w = max(draw_w + 14.0, 48.0)
+            card_w = max(draw_w + 16.0, 56.0)
             card_x = r.left() + (r.width() - card_w) / 2.0
-            card_h = max_ph + 32.0
+            card_top = pic_rect.top() - 5.0
+            card_h = (badge_rect.bottom() + 5.0) - card_top
             base_alpha = 26 if is_dark else 18
             a = int(base_alpha * hover_progress)
             hover_bg = QColor(255, 255, 255, a) if is_dark else QColor(0, 0, 0, a)
@@ -338,7 +354,7 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             hover_border = QColor(255, 255, 255, border_a) if is_dark else QColor(0, 0, 0, border_a)
             painter.setBrush(QBrush(hover_bg))
             painter.setPen(QPen(hover_border, 1.0))
-            painter.drawRoundedRect(QRectF(card_x, box_top - 4.0, card_w, card_h), 6.0, 6.0)
+            painter.drawRoundedRect(QRectF(card_x, card_top, card_w, card_h), 6.0, 6.0)
 
         # --- 3. Drop shadow ---
         shadow_rect = pic_rect.adjusted(-1.0, 1.0, 1.0, 3.0)
@@ -377,16 +393,10 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(pic_rect, 4.0, 4.0)
 
         # --- 6. Page number pill ---
-        badge_text = str(page_idx + 1)
-        font = QFont(s.FONT_FAMILY, 10)
+        font = QFont(s.FONT_FAMILY)
+        font.setPixelSize(11)
         font.setWeight(QFont.Weight.Bold if is_selected else QFont.Weight.Medium)
         painter.setFont(font)
-
-        badge_w = max(24.0, len(badge_text) * 7.5 + 14.0)
-        badge_h = 17.0
-        badge_x = r.left() + (r.width() - badge_w) / 2.0
-        badge_y = box_top + max_ph + 5.0
-        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
 
         if is_selected:
             painter.setBrush(QBrush(accent))
@@ -404,10 +414,7 @@ class MacThumbnailDelegate(QStyledItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
-        thumb_w = float(getattr(self.sidebar, "thumbnail_width", 110))
-        item_w = int(thumb_w + 24)
-        item_h = int(thumb_w * 1.3) + 38
-        return QSize(item_w, item_h)
+        return self.sidebar._thumbnail_item_size(index.row())
 
 
 # =====================================================================
@@ -466,7 +473,7 @@ class MacSidebar(QWidget):
         header.setFixedHeight(40)
         header.setObjectName("sidebarHeader")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 6, 10, 6)
+        header_layout.setContentsMargins(8, 6, 8, 6)
         header_layout.setSpacing(6)
 
         self.seg_control = AnimatedSegmentedControl(self._SEG_LABELS, self)
@@ -719,11 +726,34 @@ class MacSidebar(QWidget):
     # =================================================================
     #  THUMBNAIL LAYOUT
     # =================================================================
+    def _thumbnail_item_size(self, page_idx: int) -> QSize:
+        size = float(self.thumbnail_width)
+        item_w = int(size + 24)
+        max_ph = size * 1.3
+        default_h = int(max_ph) + 38
+
+        doc = self.document
+        if self.current_view_mode == "Contact Sheet" or not doc or doc.page_count > 100:
+            return QSize(item_w, default_h)
+
+        if not (0 <= page_idx < doc.page_count):
+            return QSize(item_w, default_h)
+
+        if doc.is_pdf or page_idx < 50:
+            try:
+                pw, ph = doc.get_page_size(page_idx)
+                scale = min(size / max(1.0, pw), max_ph / max(1.0, ph))
+                draw_h = max(24.0, ph * scale)
+                return QSize(item_w, int(draw_h) + 36)
+            except Exception:
+                return QSize(item_w, default_h)
+        return QSize(item_w, default_h)
+
     def _apply_thumbnail_layout(self):
         size = self.thumbnail_width
         item_w = int(size + 24)
         item_h = int(size * 1.3) + 38
-        item_size = QSize(item_w, item_h)
+        uniform_size = QSize(item_w, item_h)
 
         if self.current_view_mode == "Contact Sheet":
             self.thumb_list.setViewMode(QListWidget.ViewMode.IconMode)
@@ -741,10 +771,11 @@ class MacSidebar(QWidget):
             self.thumb_list.setSpacing(4)
             self.thumb_list.setGridSize(QSize())
 
+        is_contact = self.current_view_mode == "Contact Sheet"
         for i in range(self.thumb_list.count()):
             it = self.thumb_list.item(i)
             if it:
-                it.setSizeHint(item_size)
+                it.setSizeHint(uniform_size if is_contact else self._thumbnail_item_size(i))
 
         self.thumb_list.doItemsLayout()
         self.thumb_list.viewport().update()
@@ -1070,8 +1101,10 @@ class MacSidebar(QWidget):
         is_toc = mode_name in ("Table of Contents", "Outline")
 
         if mode_name == "Thumbnails":
-            saved_w = getattr(self, "_last_thumbnail_sidebar_width", int(self.thumbnail_width + 54))
-            target_w = max(140, min(saved_w, int(self.thumbnail_width + 64)))
+            total_w = sum(sizes)
+            saved_w = getattr(self, "_last_thumbnail_sidebar_width", 220)
+            target_w = max(216, min(saved_w, int(self.thumbnail_width + 110)))
+            target_w = max(140, min(target_w, max(140, total_w - 250)))
             if sizes[0] > target_w:
                 diff = sizes[0] - target_w
                 self._animate_splitter(target_w, sizes[1] + diff, duration=duration)
@@ -1119,9 +1152,9 @@ class MacSidebar(QWidget):
 
         def on_frame(v):
             f = float(v)
-            l = int(start_l + (target_left - start_l) * f)
-            r = int(start_r + (target_right - start_r) * f)
-            splitter.setSizes([l, max(0, r)])
+            left_w = int(start_l + (target_left - start_l) * f)
+            right_w = int(start_r + (target_right - start_r) * f)
+            splitter.setSizes([left_w, max(0, right_w)])
 
         anim.valueChanged.connect(on_frame)
         self._track_anim("_splitter_anim", anim)

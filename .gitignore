@@ -24,3 +24,7 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# Local AI Studio artifacts & reports
+web/.aistudio/
+website_lighthouse_report.json

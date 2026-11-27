@@ -29,7 +29,7 @@ def extract_actions_from_main_window():
         clean = m.replace("...", "").replace("&", "").strip()
         if clean and not clean.startswith("No Recent"):
             actions.add(clean)
-            
+
     # Match toolbar buttons
     tb_matches = re.findall(r'setToolTip\s*\(\s*["\']([^"\']+)["\']', content)
     for m in tb_matches:
@@ -38,7 +38,7 @@ def extract_actions_from_main_window():
         base = re.sub(r'\s*\([^)]*\)', '', cleaned).strip()
         if base:
             actions.add(base)
-            
+
     return actions
 
 def extract_actions_from_markup_toolbar():
@@ -107,7 +107,7 @@ def main():
 
     # Filter out dynamic items or common small words
     ignored = {"", "dones", "show colors", "no recent documents"}
-    
+
     missing = []
     matched = 0
 
@@ -234,7 +234,7 @@ def main():
         norm = normalize(action)
         if norm in ignored or len(norm) <= 2:
             continue
-        
+
         target = aliases.get(norm, norm)
         if target in dict_names or target in dict_ids or any(target in dn for dn in dict_names):
             matched += 1
@@ -244,7 +244,7 @@ def main():
     print(f"Total Code Features Audited: {len(code_actions)}")
     print(f"Matched Dictionary Entries: {matched}")
     print(f"Dictionary Total Coverage: {len(dict_entries)} entries in dictionary.json")
-    
+
     if missing:
         print("\nMissing Entries Found in Codebase:")
         for m in missing:

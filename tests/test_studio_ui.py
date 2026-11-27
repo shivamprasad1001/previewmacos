@@ -9,17 +9,13 @@ Unit and integration tests for Studio Pro UI components:
 import os
 import unittest
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QSettings, QPointF
-from PyQt6.QtGui import QColor, QCloseEvent, QKeySequence
+from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtGui import QKeySequence
 
 from preview.ui.settings_dialog import (
     SettingsDialog, StudioSettingsManager, DEFAULT_STUDIO_SETTINGS, SHORTCUTS_CATALOG
 )
-from preview.ui.main_window import MacMainWindow, StudioWindowControls, StudioCloseButton
-from preview.ui.markup_toolbar import MarkupToolbar
-from preview.core.annotations import AnnotationType, AnnotationItem
-from preview.icons import MacIconFactory, Icon
-from preview.theme import MacTheme
+from preview.ui.main_window import MacMainWindow, StudioWindowControls
 
 # Single QApplication offscreen instance
 app = QApplication.instance()
@@ -412,6 +408,11 @@ class TestStudioActionRibbonAndInspector(unittest.TestCase):
         # Switch to Contact Sheet mode
         win.sidebar.set_view_mode("Contact Sheet")
         self.assertLessEqual(win.width(), 750)
+
+        # Segmented header control must never overflow sidebar width even at minimum width
+        win.sidebar.resize(140, 500)
+        QApplication.processEvents()
+        self.assertLessEqual(win.sidebar.seg_control.width(), win.sidebar.width())
 
         win.close()
 

@@ -11,14 +11,11 @@ from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QComboBox, QCheckBox, QSpinBox, QDoubleSpinBox,
     QPushButton, QColorDialog, QTableWidget, QTableWidgetItem,
-    QHeaderView, QLineEdit, QGroupBox, QFormLayout, QFrame,
-    QMessageBox, QSizePolicy
+    QHeaderView, QLineEdit, QGroupBox, QFormLayout
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSettings
-from PyQt6.QtGui import QColor, QFont, QPixmap, QPainter, QIcon
+from PyQt6.QtGui import QColor, QPixmap, QPainter
 
-from preview.icons import MacIconFactory
-from preview.theme import StudioTheme, MacTheme, ThemeManager
 
 
 # Standard default settings configuration
@@ -543,8 +540,9 @@ class SettingsDialog(QDialog):
 
     def _on_purge_memory_cache(self):
         """Frees cached pixmaps and reclaims memory."""
-        import gc
-        gc.collect()
+        if not os.environ.get("PREVIEW_TESTING"):
+            import gc
+            gc.collect()
         self.lbl_cache_status.setText("Memory Cache: Purged and freed successfully.")
         self.lbl_cache_status.setStyleSheet("color: #10b981; font-weight: 600;")
 

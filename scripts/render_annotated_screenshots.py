@@ -41,7 +41,7 @@ def draw_arrow(draw: ImageDraw.ImageDraw, x1: float, y1: float, x2: float, y2: f
     angle = math.atan2(y2 - y1, x2 - x1)
     arrow_len = 10
     arrow_angle = math.pi / 6  # 30 degrees
-    
+
     p1 = (x2 - arrow_len * math.cos(angle - arrow_angle), y2 - arrow_len * math.sin(angle - arrow_angle))
     p2 = (x2 - arrow_len * math.cos(angle + arrow_angle), y2 - arrow_len * math.sin(angle + arrow_angle))
     draw.polygon([(x2, y2), p1, p2], fill=color)
@@ -52,7 +52,7 @@ def draw_number_circle(draw: ImageDraw.ImageDraw, cx: float, cy: float, text: st
     draw.ellipse([cx - radius - 1.5, cy - radius - 1.5, cx + radius + 1.5, cy + radius + 1.5], fill=WHITE)
     # Red inner circle
     draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=RED_ACCENT)
-    
+
     # Center text
     bbox = font.getbbox(text)
     tw = bbox[2] - bbox[0]
@@ -72,14 +72,14 @@ def apply_blur(image: Image.Image, x: int, y: int, w: int, h: int, radius: int =
 def render_image_guide_item(spec_file: str, output_dir: str):
     with open(spec_file, "r", encoding="utf-8") as f:
         spec = json.load(f)
-        
+
     src_path = spec["source_image"]
     if not os.path.exists(src_path):
         print(f"Warning: Source image {src_path} not found. Skipping {spec_file}.")
         return None
 
     img = Image.open(src_path).convert("RGBA")
-    
+
     # 1. Apply blurs first
     for ann in spec.get("annotations", []):
         if ann["type"] == "blur":
