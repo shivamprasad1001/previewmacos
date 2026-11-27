@@ -565,15 +565,15 @@ class Document(QObject):
             return links
         try:
             page = self._pdf_doc[page_idx]
-            for l in page.get_links():
-                r = l.get("from")
+            for link in page.get_links():
+                r = link.get("from")
                 if r:
                     rect = QRectF(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0)
                     links.append({
                         "rect": rect,
-                        "uri": l.get("uri"),
-                        "page": l.get("page"),  # Destination page index
-                        "kind": l.get("kind")
+                        "uri": link.get("uri"),
+                        "page": link.get("page"),  # Destination page index
+                        "kind": link.get("kind")
                     })
         except Exception:
             logging.getLogger(__name__).exception("Failed to extract links from page %s", page_idx)

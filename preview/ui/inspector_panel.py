@@ -192,9 +192,9 @@ class MacInspectorPanel(QWidget):
             if w is not None:
                 w.setParent(None)
                 w.deleteLater()
-            l = item.layout()
-            if l is not None:
-                self._clear_layout(l)
+            sub_layout = item.layout()
+            if sub_layout is not None:
+                self._clear_layout(sub_layout)
 
     def _refresh_properties_view(self):
         # Clear existing properties widgets

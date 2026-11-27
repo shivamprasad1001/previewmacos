@@ -1119,9 +1119,9 @@ class MacSidebar(QWidget):
 
         def on_frame(v):
             f = float(v)
-            l = int(start_l + (target_left - start_l) * f)
-            r = int(start_r + (target_right - start_r) * f)
-            splitter.setSizes([l, max(0, r)])
+            left_w = int(start_l + (target_left - start_l) * f)
+            right_w = int(start_r + (target_right - start_r) * f)
+            splitter.setSizes([left_w, max(0, right_w)])
 
         anim.valueChanged.connect(on_frame)
         self._track_anim("_splitter_anim", anim)

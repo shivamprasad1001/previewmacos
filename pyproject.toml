@@ -20,9 +20,15 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]
-ignore = ["E402", "E501", "E741"]
+ignore = [
+    # Entrypoint, screenshot scripts, and tests configure sys.path / QT_QPA_PLATFORM before importing preview.*
+    "E402",
+    # Existing QSS stylesheets and HTML templates contain long lines; avoid repo-wide reformatting churn
+    "E501",
+]
 
 [tool.ruff.lint.per-file-ignores]
+# Package __init__.py files intentionally re-export public symbols
 "**/__init__.py" = ["F401"]
 
 [tool.ruff.format]

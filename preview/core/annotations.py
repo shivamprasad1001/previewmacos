@@ -544,21 +544,21 @@ class AnnotationItem:
             self.magnification = max(1.2, min(5.0, round(ratio * 2.0, 1)))
             return
 
-        l = orig_bounds.left()
+        left = orig_bounds.left()
         r = orig_bounds.right()
         t = orig_bounds.top()
         b = orig_bounds.bottom()
 
         if handle in (Handle.NW, Handle.W, Handle.SW):
-            l = min(doc_pt.x(), r - min_sz)
+            left = min(doc_pt.x(), r - min_sz)
         if handle in (Handle.NE, Handle.E, Handle.SE):
-            r = max(doc_pt.x(), l + min_sz)
+            r = max(doc_pt.x(), left + min_sz)
         if handle in (Handle.NW, Handle.N, Handle.NE):
             t = min(doc_pt.y(), b - min_sz)
         if handle in (Handle.SW, Handle.S, Handle.SE):
             b = max(doc_pt.y(), t + min_sz)
 
-        new_rect = QRectF(l, t, r - l, b - t)
+        new_rect = QRectF(left, t, r - left, b - t)
 
         if self.item_type in (AnnotationType.RECTANGLE, AnnotationType.ROUNDED_RECT,
                               AnnotationType.ELLIPSE, AnnotationType.TEXT,

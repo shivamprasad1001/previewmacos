@@ -1086,9 +1086,9 @@ class CanvasView(QWidget):
         if self.document and self.document.is_pdf and self.active_tool == AnnotationType.NONE and not event.buttons():
             links = self.document.get_page_links(self.current_page)
             hit_link = None
-            for l in links:
-                if l["rect"].contains(doc_pt):
-                    hit_link = l
+            for link in links:
+                if link["rect"].contains(doc_pt):
+                    hit_link = link
                     break
             self._hovered_link = hit_link
             if hit_link:
