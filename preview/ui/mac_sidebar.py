@@ -328,17 +328,25 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             draw_w = pw * scale
             draw_h = ph * scale
 
-        box_top = r.top() + 6.0
+        badge_h = 17.0
+        group_h = draw_h + 6.0 + badge_h
         pic_x = r.left() + (r.width() - draw_w) / 2.0
-        pic_y = box_top + (max_ph - draw_h) / 2.0
+        pic_y = r.top() + max(6.0, (r.height() - group_h) / 2.0)
         pic_rect = QRectF(pic_x, pic_y, draw_w, draw_h)
+
+        badge_text = str(page_idx + 1)
+        badge_w = max(24.0, len(badge_text) * 7.5 + 14.0)
+        badge_x = r.left() + (r.width() - badge_w) / 2.0
+        badge_y = pic_rect.bottom() + 6.0
+        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
 
         # --- 2. Animated hover card ---
         hover_progress = self.sidebar._hover_progress.get(page_idx, 0.0)
         if hover_progress > 0.001 and not is_selected:
-            card_w = max(draw_w + 14.0, 48.0)
+            card_w = max(draw_w + 16.0, 56.0)
             card_x = r.left() + (r.width() - card_w) / 2.0
-            card_h = max_ph + 32.0
+            card_top = pic_rect.top() - 5.0
+            card_h = (badge_rect.bottom() + 5.0) - card_top
             base_alpha = 26 if is_dark else 18
             a = int(base_alpha * hover_progress)
             hover_bg = QColor(255, 255, 255, a) if is_dark else QColor(0, 0, 0, a)
@@ -346,7 +354,7 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             hover_border = QColor(255, 255, 255, border_a) if is_dark else QColor(0, 0, 0, border_a)
             painter.setBrush(QBrush(hover_bg))
             painter.setPen(QPen(hover_border, 1.0))
-            painter.drawRoundedRect(QRectF(card_x, box_top - 4.0, card_w, card_h), 6.0, 6.0)
+            painter.drawRoundedRect(QRectF(card_x, card_top, card_w, card_h), 6.0, 6.0)
 
         # --- 3. Drop shadow ---
         shadow_rect = pic_rect.adjusted(-1.0, 1.0, 1.0, 3.0)
@@ -385,16 +393,10 @@ class MacThumbnailDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(pic_rect, 4.0, 4.0)
 
         # --- 6. Page number pill ---
-        badge_text = str(page_idx + 1)
-        font = QFont(s.FONT_FAMILY, 10)
+        font = QFont(s.FONT_FAMILY)
+        font.setPixelSize(11)
         font.setWeight(QFont.Weight.Bold if is_selected else QFont.Weight.Medium)
         painter.setFont(font)
-
-        badge_w = max(24.0, len(badge_text) * 7.5 + 14.0)
-        badge_h = 17.0
-        badge_x = r.left() + (r.width() - badge_w) / 2.0
-        badge_y = box_top + max_ph + 5.0
-        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
 
         if is_selected:
             painter.setBrush(QBrush(accent))
@@ -412,10 +414,7 @@ class MacThumbnailDelegate(QStyledItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
-        thumb_w = float(getattr(self.sidebar, "thumbnail_width", 110))
-        item_w = int(thumb_w + 24)
-        item_h = int(thumb_w * 1.3) + 38
-        return QSize(item_w, item_h)
+        return self.sidebar._thumbnail_item_size(index.row())
 
 
 # =====================================================================
@@ -727,11 +726,34 @@ class MacSidebar(QWidget):
     # =================================================================
     #  THUMBNAIL LAYOUT
     # =================================================================
+    def _thumbnail_item_size(self, page_idx: int) -> QSize:
+        size = float(self.thumbnail_width)
+        item_w = int(size + 24)
+        max_ph = size * 1.3
+        default_h = int(max_ph) + 38
+
+        doc = self.document
+        if self.current_view_mode == "Contact Sheet" or not doc or doc.page_count > 100:
+            return QSize(item_w, default_h)
+
+        if not (0 <= page_idx < doc.page_count):
+            return QSize(item_w, default_h)
+
+        if doc.is_pdf or page_idx < 50:
+            try:
+                pw, ph = doc.get_page_size(page_idx)
+                scale = min(size / max(1.0, pw), max_ph / max(1.0, ph))
+                draw_h = max(24.0, ph * scale)
+                return QSize(item_w, int(draw_h) + 36)
+            except Exception:
+                return QSize(item_w, default_h)
+        return QSize(item_w, default_h)
+
     def _apply_thumbnail_layout(self):
         size = self.thumbnail_width
         item_w = int(size + 24)
         item_h = int(size * 1.3) + 38
-        item_size = QSize(item_w, item_h)
+        uniform_size = QSize(item_w, item_h)
 
         if self.current_view_mode == "Contact Sheet":
             self.thumb_list.setViewMode(QListWidget.ViewMode.IconMode)
@@ -749,10 +771,11 @@ class MacSidebar(QWidget):
             self.thumb_list.setSpacing(4)
             self.thumb_list.setGridSize(QSize())
 
+        is_contact = self.current_view_mode == "Contact Sheet"
         for i in range(self.thumb_list.count()):
             it = self.thumb_list.item(i)
             if it:
-                it.setSizeHint(item_size)
+                it.setSizeHint(uniform_size if is_contact else self._thumbnail_item_size(i))
 
         self.thumb_list.doItemsLayout()
         self.thumb_list.viewport().update()
